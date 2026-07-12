@@ -34,19 +34,19 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [x] Scoping: surveyor hanya lihat proyek yang di-assign — 6 test baru hijau, terbukti gagal kalau guard dicabut
 
 ## Phase 4 — Arsip Dokumen  *(blocked by: Phase 3)*
-- [ ] Setup storage (Cloudflare R2 / UploadThing) + `.env`
-- [ ] `uploadDocument`: upload file + simpan metadata (kategori, uploader, ukuran)
-- [ ] UI arsip per proyek + preview PDF/gambar in-app
-- [ ] Search & filter dokumen lintas proyek (nama, kategori, klien, tanggal)
-- [ ] Toggle `sharedWithClient` (internal vs shared)
+- [x] Setup storage (Cloudflare R2 + fallback disk lokal `.storage/` saat env R2 kosong) + `.env`
+- [x] `uploadDocument`: presigned/route-handler upload + simpan metadata (kategori, uploader, ukuran)
+- [x] UI arsip per proyek + preview PDF/gambar in-app
+- [x] Search & filter dokumen lintas proyek (nama, kategori, klien, tanggal) — server-side, scoped ke surveyor
+- [x] Toggle `sharedWithClient` (internal vs shared) — owner-only
 
 ## Phase 5 — Modul Peta  *(blocked by: Phase 3)*
-- [ ] Wrapper Leaflet (react-leaflet) sebagai client component; layer OSM + toggle citra satelit gratis
-- [ ] Draw polygon/titik manual → simpan GeoJSON (`saveMapLayer`)
-- [ ] Hitung luas otomatis (turf.js), tampilkan m² & ha
-- [ ] `importMapCsv`: parse CSV koordinat (papaparse) → GeoJSON → `MapLayer`
-- [ ] Beberapa layer/versi per proyek
-- [ ] ⚠️ Reproyeksi UTM→WGS84 (proj4js) jika data lapangan UTM — lihat Open Decisions
+- [x] Wrapper Leaflet (react-leaflet) sebagai client component (`next/dynamic`, `ssr:false`); layer OSM + toggle citra satelit (Esri World Imagery)
+- [x] Draw polygon/titik manual (leaflet-draw) → simpan GeoJSON (`saveMapLayer`)
+- [x] Hitung luas otomatis (turf.js), tampilkan m² & ha (id-ID locale)
+- [x] `importMapCsv`: parse CSV koordinat (papaparse) → GeoJSON → `MapLayer`, auto-detect format + preview sebelum commit
+- [x] Beberapa layer/versi per proyek — list, toggle visibility, hapus
+- [x] Reproyeksi UTM→WGS84 (proj4js), zona 46-54 pilihan user, default 48S
 - [ ] (Enhancement, bukan v1) Import DXF
 
 ## Phase 6 — Keuangan Ringan  *(blocked by: Phase 3)*

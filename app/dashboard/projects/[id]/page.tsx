@@ -2,6 +2,7 @@ import { eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
+import { PetaTab } from "@/components/map/peta-tab";
 import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
 import { StatusChanger } from "@/components/projects/status-changer";
 import { StatusHistory } from "@/components/projects/status-history";
@@ -11,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
+import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getAllowedNextStatuses, getStatusLogsForProject } from "@/lib/actions/projects-logic";
 import { assertProjectAccess, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
@@ -29,6 +31,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const client = await getClientById(project.clientId);
   const statusLogs = await getStatusLogsForProject(project.id);
   const projectDocuments = await listDocumentsForProject(user, project.id);
+  const mapLayerRows = await listMapLayersForProject(user, project.id);
 
   const changedByIds = [...new Set(statusLogs.map((l) => l.changedById))];
   const changedByUsers = changedByIds.length
@@ -183,9 +186,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </TabsContent>
 
         <TabsContent value="peta" className="pt-4">
-          <p className="text-sm text-muted-foreground">
-            Peta hasil ukur akan tersedia di sini (Fase 4).
-          </p>
+          <PetaTab
+            projectId={project.id}
+            initialLayers={mapLayerRows.map((l) => ({
+              id: l.id,
+              name: l.name,
+              // biome-ignore lint/suspicious/noExplicitAny: jsonb column, shape validated at write time by maps-schemas.ts.
+              geojson: l.geojson as any,
+              areaSqm: l.areaSqm,
+              source: l.source,
+            }))}
+          />
         </TabsContent>
 
         <TabsContent value="dokumen" className="flex flex-col gap-4 pt-4">
