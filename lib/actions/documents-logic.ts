@@ -129,6 +129,22 @@ export async function listDocumentsForProject(user: SessionUser, projectId: stri
     .orderBy(desc(documents.createdAt));
 }
 
+/**
+ * Scoped list of documents for a single project, filtered to
+ * `sharedWithClient = true` ONLY — used by the client portal (PRD §3
+ * Feature 6). Internal (unshared) documents must never reach the portal;
+ * this is the one function that's allowed to serve documents to a client,
+ * and it enforces that filter unconditionally regardless of caller role.
+ */
+export async function listSharedDocumentsForProject(user: SessionUser, projectId: string) {
+  await assertProjectAccessOrReject(projectId, user);
+  return db
+    .select()
+    .from(documents)
+    .where(and(eq(documents.projectId, projectId), eq(documents.sharedWithClient, true)))
+    .orderBy(desc(documents.createdAt));
+}
+
 export type DocumentSearchRow = {
   id: string;
   name: string;

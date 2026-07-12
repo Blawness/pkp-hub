@@ -98,10 +98,13 @@ export function PetaMap({
   layers,
   visibleLayerIds,
   onDraftChange,
+  readOnly = false,
 }: {
   layers: MapLayerRow[];
   visibleLayerIds: Set<string>;
-  onDraftChange: (fc: FeatureCollection | null) => void;
+  onDraftChange?: (fc: FeatureCollection | null) => void;
+  /** Portal (client) view: no draw/edit toolbar at all. */
+  readOnly?: boolean;
 }) {
   const visible = layers.filter((l) => visibleLayerIds.has(l.id));
   const firstPoint = visible[0]?.geojson.features[0]?.geometry;
@@ -131,7 +134,7 @@ export function PetaMap({
         <GeoJSON key={l.id} data={l.geojson} />
       ))}
 
-      <DrawControl onDraftChange={onDraftChange} />
+      {!readOnly && onDraftChange ? <DrawControl onDraftChange={onDraftChange} /> : null}
     </MapContainer>
   );
 }
