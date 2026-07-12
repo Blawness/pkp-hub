@@ -4,6 +4,7 @@ import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaTab } from "@/components/map/peta-tab";
 import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
+import { PaymentForm } from "@/components/projects/payment-form";
 import { StatusChanger } from "@/components/projects/status-changer";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,8 @@ import { getAllowedNextStatuses, getStatusLogsForProject } from "@/lib/actions/p
 import { assertProjectAccess, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { formatIDR } from "@/lib/format";
+import { paymentStatusLabel, statusLabel, surveyTypeLabel } from "@/lib/labels";
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -205,10 +207,38 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </TabsContent>
 
         {user.role === "owner" ? (
-          <TabsContent value="keuangan" className="pt-4">
-            <p className="text-sm text-muted-foreground">
-              Nilai proyek & status pembayaran akan tersedia di sini (Fase 6).
-            </p>
+          <TabsContent value="keuangan" className="flex flex-col gap-6 pt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Status saat ini</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs text-muted-foreground">Nilai proyek</p>
+                  <p className="text-sm">{formatIDR(project.projectValue)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status pembayaran</p>
+                  <p className="text-sm">
+                    {paymentStatusLabel[project.paymentStatus] ?? project.paymentStatus}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Ubah nilai & status pembayaran</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PaymentForm
+                  projectId={project.id}
+                  projectValue={project.projectValue}
+                  paymentStatus={project.paymentStatus}
+                  paymentNotes={project.paymentNotes}
+                />
+              </CardContent>
+            </Card>
           </TabsContent>
         ) : null}
       </Tabs>

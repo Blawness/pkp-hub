@@ -1,3 +1,13 @@
+/** IDR currency, id-ID locale, no decimals (e.g. `Rp7.500.000`). `null`/`undefined` -> "—". */
+export function formatIDR(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return new Intl.NumberFormat("id-ID", {
+    style: "currency",
+    currency: "IDR",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 /** Human-readable file size, e.g. `1.2 MB`. */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

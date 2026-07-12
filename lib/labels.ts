@@ -31,6 +31,12 @@ export const documentCategoryLabel: Record<string, string> = {
   lainnya: "Lainnya",
 };
 
+export const paymentStatusLabel: Record<string, string> = {
+  belum: "Belum Dibayar",
+  sebagian: "Dibayar Sebagian",
+  lunas: "Lunas",
+};
+
 export const projectStatusOrder = [
   "baru",
   "dijadwalkan",
