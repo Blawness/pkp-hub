@@ -1,0 +1,122 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useRouter } from "next/navigation";
+import { useAction } from "next-safe-action/hooks";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import type { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { createClient, updateClient } from "@/lib/actions/clients";
+import { clientInputSchema } from "@/lib/actions/clients-schemas";
+
+type ClientFormValues = z.infer<typeof clientInputSchema>;
+
+export function ClientForm({
+  client,
+}: {
+  client?: {
+    id: string;
+    name: string;
+    type: "individual" | "company";
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    notes: string | null;
+  };
+}) {
+  const router = useRouter();
+  const [formError, setFormError] = useState<string | null>(null);
+  const isEditing = !!client;
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ClientFormValues>({
+    resolver: zodResolver(clientInputSchema),
+    defaultValues: {
+      name: client?.name ?? "",
+      type: client?.type ?? "individual",
+      phone: client?.phone ?? "",
+      email: client?.email ?? "",
+      address: client?.address ?? "",
+      notes: client?.notes ?? "",
+    },
+  });
+
+  const { executeAsync: executeCreate } = useAction(createClient);
+  const { executeAsync: executeUpdate } = useAction(updateClient);
+
+  const onSubmit = async (values: ClientFormValues) => {
+    setFormError(null);
+    const result = isEditing
+      ? await executeUpdate({ ...values, id: client.id })
+      : await executeCreate(values);
+
+    if (result?.serverError) {
+      setFormError(result.serverError);
+      return;
+    }
+    if (result?.validationErrors) {
+      setFormError("Periksa kembali data yang dimasukkan.");
+      return;
+    }
+
+    const savedId = result?.data?.client.id ?? client?.id;
+    router.push(savedId ? `/dashboard/clients/${savedId}` : "/dashboard/clients");
+    router.refresh();
+  };
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-lg flex-col gap-4" noValidate>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="name">Nama</Label>
+        <Input id="name" aria-invalid={!!errors.name} {...register("name")} />
+        {errors.name ? <p className="text-xs text-destructive">{errors.name.message}</p> : null}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="type">Tipe</Label>
+        <select
+          id="type"
+          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
+          {...register("type")}
+        >
+          <option value="individual">Perorangan</option>
+          <option value="company">Perusahaan</option>
+        </select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="phone">Telepon</Label>
+        <Input id="phone" {...register("phone")} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" type="email" aria-invalid={!!errors.email} {...register("email")} />
+        {errors.email ? <p className="text-xs text-destructive">{errors.email.message}</p> : null}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="address">Alamat</Label>
+        <Textarea id="address" rows={2} {...register("address")} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="notes">Catatan</Label>
+        <Textarea id="notes" rows={3} {...register("notes")} />
+      </div>
+
+      {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+
+      <Button type="submit" disabled={isSubmitting} className="mt-2 w-fit">
+        {isSubmitting ? "Menyimpan..." : isEditing ? "Simpan perubahan" : "Buat klien"}
+      </Button>
+    </form>
+  );
+}

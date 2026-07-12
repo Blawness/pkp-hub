@@ -1,0 +1,32 @@
+/** Indonesian display labels for enum values (PRD's UI copy is Indonesian). */
+
+export const statusLabel: Record<string, string> = {
+  baru: "Baru",
+  dijadwalkan: "Dijadwalkan",
+  data_diambil: "Data Diambil",
+  diproses: "Diproses",
+  selesai: "Selesai",
+  dibatalkan: "Dibatalkan",
+};
+
+export const surveyTypeLabel: Record<string, string> = {
+  topografi: "Topografi",
+  kavling: "Kavling",
+  batas_tanah: "Batas Tanah",
+  luas_bangunan: "Luas Bangunan",
+  lainnya: "Lainnya",
+};
+
+export const clientTypeLabel: Record<string, string> = {
+  individual: "Perorangan",
+  company: "Perusahaan",
+};
+
+export const projectStatusOrder = [
+  "baru",
+  "dijadwalkan",
+  "data_diambil",
+  "diproses",
+  "selesai",
+  "dibatalkan",
+] as const;

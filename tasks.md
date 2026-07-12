@@ -20,18 +20,18 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [x] Seed data dummy: 1 owner, 2 surveyor, 3 klien, 5 proyek lintas status — *user belum punya password; kredensial dipasang di Phase 2 lewat Better Auth*
 
 ## Phase 2 — Auth & Roles  *(blocked by: Phase 1)*
-- [ ] Setup Better Auth + adapter Drizzle
-- [ ] 3 role: `owner`, `surveyor`, `client` (PRD §2)
-- [ ] Middleware / route guards: area `(dashboard)` = owner+surveyor, area `(portal)` = client
-- [ ] Helper scoping row-level (client hanya akses proyek dengan `clientId` miliknya) — WAJIB diuji
-- [ ] Flow undangan akun klien (`inviteClientUser`) via email (Resend) — opsional per klien
+- [x] Setup Better Auth + adapter Drizzle (pakai tabel Phase 1, tanpa migration baru)
+- [x] 3 role: `owner`, `surveyor`, `client` (PRD §2)
+- [x] Middleware / route guards: `/dashboard` = owner+surveyor, `/portal` = client (guard server-side = boundary, DB-backed)
+- [x] Helper scoping row-level (client hanya akses proyek dengan `clientId` miliknya) — 12 test hijau, terbukti gagal kalau guard dicabut
+- [x] Flow undangan akun klien (`inviteClientUser`) via email (Resend) — degrade ke console log kalau `RESEND_API_KEY` kosong
 
 ## Phase 3 — Klien & Proyek (Core)  *(blocked by: Phase 2)*
 > Tiap fitur: server action (next-safe-action + Zod) → UI (shadcn + RHF + TanStack Table) → acceptance criteria PRD hijau.
-- [ ] Feature 1 — Manajemen Klien: CRUD + soft delete + detail (daftar proyek klien)
-- [ ] Feature 2 — Manajemen Proyek: CRUD, assign surveyor, filter (status/klien/surveyor/jenis)
-- [ ] Status pipeline + `changeProjectStatus` yang menulis `ProjectStatusLog`
-- [ ] Scoping: surveyor hanya lihat proyek yang di-assign
+- [x] Feature 1 — Manajemen Klien: CRUD + soft delete + detail (daftar proyek klien)
+- [x] Feature 2 — Manajemen Proyek: CRUD, assign surveyor, filter (status/klien/surveyor/jenis)
+- [x] Status pipeline + `changeProjectStatus` yang menulis `ProjectStatusLog`
+- [x] Scoping: surveyor hanya lihat proyek yang di-assign — 6 test baru hijau, terbukti gagal kalau guard dicabut
 
 ## Phase 4 — Arsip Dokumen  *(blocked by: Phase 3)*
 - [ ] Setup storage (Cloudflare R2 / UploadThing) + `.env`
