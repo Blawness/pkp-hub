@@ -31,7 +31,15 @@ function homeForRole(role: Role): string {
 
 /** Current session, or null if unauthenticated. Never throws. */
 export async function getSession(): Promise<{ user: SessionUser } | null> {
-  const session = await auth.api.getSession({ headers: await headers() });
+  // `disableCookieCache: true` forces a real DB lookup. `session.cookieCache`
+  // in `lib/auth.ts` is still enabled for `middleware.ts`'s coarse, cheap
+  // gate, but THIS is the security boundary (see file header), so it must
+  // never trust the (up to 5-minute stale) signed cookie — a revoked/deleted
+  // session or a role change (owner -> client) has to take effect immediately.
+  const session = await auth.api.getSession({
+    headers: await headers(),
+    query: { disableCookieCache: true },
+  });
   if (!session) return null;
   return { user: session.user as SessionUser };
 }

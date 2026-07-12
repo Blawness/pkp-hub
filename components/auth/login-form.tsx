@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -17,8 +17,25 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+/**
+ * Only accept `redirectTo` values that are a same-app relative path, e.g.
+ * `/dashboard/projects/123`. Rejects absolute URLs, protocol-relative URLs
+ * (`//evil.com`), and backslash tricks (`/\evil.com`) that browsers can
+ * interpret as scheme-relative — anything that isn't unambiguously a local
+ * path is dropped in favor of the role's default landing page, so this can
+ * never become an open redirect.
+ */
+function sanitizeRedirectTo(value: string | null): string | null {
+  if (!value) return null;
+  if (!value.startsWith("/")) return null;
+  if (value.startsWith("//")) return null;
+  if (value.startsWith("/\\")) return null;
+  return value;
+}
+
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [formError, setFormError] = useState<string | null>(null);
   const {
     register,
@@ -41,7 +58,12 @@ export function LoginForm() {
       return;
     }
 
-    const destination = data.user.role === "client" ? "/portal" : "/dashboard";
+    const roleHome = data.user.role === "client" ? "/portal" : "/dashboard";
+    const redirectTo = sanitizeRedirectTo(searchParams.get("redirectTo"));
+    // Only honor `redirectTo` if it lands in the area the user's role is
+    // actually allowed into — a client's stale deep-link into /dashboard
+    // must not override the client's own portal home.
+    const destination = redirectTo?.startsWith(roleHome) ? redirectTo : roleHome;
     router.push(destination);
     router.refresh();
   };

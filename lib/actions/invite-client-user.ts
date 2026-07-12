@@ -1,3 +1,5 @@
+"use server";
+
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";

@@ -10,5 +10,9 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: false,
+    // Test files share one real (Neon) dev DB and some files wipe whole
+    // tables in `beforeAll` (see lib/auth-guards.test.ts) — running files in
+    // parallel races those wipes against other files' fixtures.
+    fileParallelism: false,
   },
 });
