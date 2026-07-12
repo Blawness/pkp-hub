@@ -22,6 +22,15 @@ export const clientTypeLabel: Record<string, string> = {
   company: "Perusahaan",
 };
 
+export const documentCategoryLabel: Record<string, string> = {
+  laporan: "Laporan",
+  berita_acara: "Berita Acara",
+  foto_lapangan: "Foto Lapangan",
+  sertifikat: "Sertifikat/Legalitas",
+  data_mentah: "Data Mentah",
+  lainnya: "Lainnya",
+};
+
 export const projectStatusOrder = [
   "baru",
   "dijadwalkan",

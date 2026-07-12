@@ -1,5 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import Link from "next/link";
+import { DocumentUpload } from "@/components/documents/document-upload";
+import { DocumentsTable } from "@/components/documents/documents-table";
 import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
 import { StatusChanger } from "@/components/projects/status-changer";
 import { StatusHistory } from "@/components/projects/status-history";
@@ -8,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
+import { listDocumentsForProject } from "@/lib/actions/documents-logic";
 import { getAllowedNextStatuses, getStatusLogsForProject } from "@/lib/actions/projects-logic";
 import { assertProjectAccess, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
@@ -25,6 +28,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const client = await getClientById(project.clientId);
   const statusLogs = await getStatusLogsForProject(project.id);
+  const projectDocuments = await listDocumentsForProject(user, project.id);
 
   const changedByIds = [...new Set(statusLogs.map((l) => l.changedById))];
   const changedByUsers = changedByIds.length
@@ -39,6 +43,27 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .select({ id: users.id, name: users.name })
     .from(users)
     .where(eq(users.role, "surveyor"));
+
+  const uploaderIds = [...new Set(projectDocuments.map((d) => d.uploadedById))];
+  const uploaderUsers = uploaderIds.length
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(inArray(users.id, uploaderIds))
+    : [];
+  const uploaderNameById = new Map(uploaderUsers.map((u) => [u.id, u.name]));
+
+  const documentRows = projectDocuments.map((d) => ({
+    id: d.id,
+    name: d.name,
+    category: d.category,
+    fileUrl: d.fileUrl,
+    fileSize: d.fileSize,
+    mimeType: d.mimeType,
+    sharedWithClient: d.sharedWithClient,
+    uploaderName: uploaderNameById.get(d.uploadedById) ?? "—",
+    createdAt: d.createdAt,
+  }));
 
   const canChangeStatus = user.role === "owner" || project.assignedSurveyorId === user.id;
   const allowedNextStatuses = canChangeStatus
@@ -163,10 +188,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </p>
         </TabsContent>
 
-        <TabsContent value="dokumen" className="pt-4">
-          <p className="text-sm text-muted-foreground">
-            Arsip dokumen proyek akan tersedia di sini (Fase 5).
-          </p>
+        <TabsContent value="dokumen" className="flex flex-col gap-4 pt-4">
+          <DocumentUpload projectId={project.id} />
+          <DocumentsTable rows={documentRows} isOwner={user.role === "owner"} />
         </TabsContent>
 
         {user.role === "owner" ? (

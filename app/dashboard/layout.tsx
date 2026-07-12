@@ -19,6 +19,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         <Link href="/dashboard/projects" className="text-muted-foreground hover:text-foreground">
           Proyek
         </Link>
+        <Link href="/dashboard/documents" className="text-muted-foreground hover:text-foreground">
+          Dokumen
+        </Link>
         {user.role === "owner" ? (
           <Link href="/dashboard/clients" className="text-muted-foreground hover:text-foreground">
             Klien

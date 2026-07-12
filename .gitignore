@@ -43,3 +43,6 @@ next-env.d.ts
 
 # subagent-driven-development scratch
 .superpowers/
+
+# local dev object storage (Phase 4 — never used in production)
+/.storage/
