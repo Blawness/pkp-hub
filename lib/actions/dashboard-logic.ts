@@ -8,6 +8,11 @@ import { clients } from "@/lib/db/schema";
  * Server-only business logic for the per-role Dashboard Ringkasan (PRD §3
  * Feature 7), directly unit-tested in `dashboard.test.ts`.
  *
+ * `totalUnpaid` sums `projectValue` for projects with `paymentStatus` in
+ * belum|sebagian, EXCLUDING `dibatalkan` (cancelled) projects — a cancelled
+ * project's unpaid balance is not real outstanding revenue and must not
+ * inflate the owner dashboard's "total unpaid" figure.
+ *
  * CRITICAL, security-load-bearing: `getSurveyorDashboardData` builds its
  * output as an explicit field-by-field projection — it NEVER spreads a raw
  * project row. `projectValue` / `paymentStatus` / `paymentNotes` are simply
@@ -23,6 +28,7 @@ import { clients } from "@/lib/db/schema";
 
 const INACTIVE_STATUSES = new Set(["selesai", "dibatalkan"]);
 const UNPAID_STATUSES = new Set(["belum", "sebagian"]);
+const CANCELLED_STATUS = "dibatalkan";
 const NEEDS_ACTION_STATUSES = new Set(["baru", "dijadwalkan", "data_diambil"]);
 
 function requireOwner(user: SessionUser) {
@@ -75,7 +81,7 @@ export async function getOwnerDashboardData(user: SessionUser): Promise<OwnerDas
     if (!INACTIVE_STATUSES.has(p.status)) {
       totalActiveValue += p.projectValue ?? 0;
     }
-    if (UNPAID_STATUSES.has(p.paymentStatus)) {
+    if (UNPAID_STATUSES.has(p.paymentStatus) && p.status !== CANCELLED_STATUS) {
       totalUnpaid += p.projectValue ?? 0;
     }
   }

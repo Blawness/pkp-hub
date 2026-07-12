@@ -12,7 +12,7 @@ import type {
   UpdateProjectInput,
 } from "./projects-schemas";
 
-type ProjectStatus = (typeof projectStatusEnum)["options"][number];
+export type ProjectStatus = (typeof projectStatusEnum)["options"][number];
 
 /**
  * PRD §3 Feature 2's status pipeline (Phase 3 review fix). This is the ONLY
@@ -241,4 +241,75 @@ export async function getStatusLogsForProject(projectId: string) {
     .from(projectStatusLogs)
     .where(eq(projectStatusLogs.projectId, projectId))
     .orderBy(projectStatusLogs.createdAt);
+}
+
+/**
+ * Non-finance fields of a project, safe to hand to ANY staff role.
+ */
+export type ProjectDetailBase = {
+  id: string;
+  title: string;
+  clientId: string;
+  surveyType: string;
+  locationLabel: string | null;
+  assignedSurveyorId: string | null;
+  status: string;
+  orderDate: Date;
+  description: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/** Owner-only view: adds the Keuangan Ringan fields. */
+export type ProjectDetailForOwner = ProjectDetailBase & {
+  projectValue: number | null;
+  paymentStatus: string;
+  paymentNotes: string | null;
+};
+
+export type ProjectDetail = ProjectDetailForOwner | ProjectDetailBase;
+
+/**
+ * The project detail dashboard page's ONLY source for project data
+ * (Phase 6+7 review fix — CRITICAL). Like `dashboard-logic.ts`'s
+ * `getSurveyorDashboardData`, this builds its return value as an explicit
+ * field-by-field projection and NEVER spreads the raw `assertProjectAccess`
+ * row: `projectValue` / `paymentStatus` / `paymentNotes` are only ever
+ * copied onto the returned object when `user.role === "owner"`. For any
+ * other role those keys are simply never present on the object — not
+ * hidden by a client-side conditional, not present-but-unused — so they
+ * cannot leak into a non-owner's RSC payload no matter what the page does
+ * with the result. Enforced by `project-detail.test.ts`'s key-absence
+ * assertion, the exact regression test for this finding.
+ */
+export async function getProjectDetailForUser(
+  user: SessionUser,
+  projectId: string,
+): Promise<ProjectDetail> {
+  const project = await assertProjectAccess(projectId, user);
+
+  const base: ProjectDetailBase = {
+    id: project.id,
+    title: project.title,
+    clientId: project.clientId,
+    surveyType: project.surveyType,
+    locationLabel: project.locationLabel,
+    assignedSurveyorId: project.assignedSurveyorId,
+    status: project.status,
+    orderDate: project.orderDate,
+    description: project.description,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+  };
+
+  if (user.role !== "owner") {
+    return base;
+  }
+
+  return {
+    ...base,
+    projectValue: project.projectValue,
+    paymentStatus: project.paymentStatus,
+    paymentNotes: project.paymentNotes,
+  };
 }

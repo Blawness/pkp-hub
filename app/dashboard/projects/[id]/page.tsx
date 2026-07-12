@@ -13,9 +13,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
+import type { PaymentStatus } from "@/lib/actions/finance-schemas";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
-import { getAllowedNextStatuses, getStatusLogsForProject } from "@/lib/actions/projects-logic";
-import { assertProjectAccess, requireStaff } from "@/lib/auth-guards";
+import {
+  getAllowedNextStatuses,
+  getProjectDetailForUser,
+  getStatusLogsForProject,
+  type ProjectStatus,
+} from "@/lib/actions/projects-logic";
+import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { formatIDR } from "@/lib/format";
@@ -25,10 +31,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const user = await requireStaff();
 
-  // Mandatory scoping rule: `assertProjectAccess` is the only entry point
-  // for reading a single project here — it 404s a surveyor who isn't
-  // assigned to this project rather than leaking it.
-  const project = await assertProjectAccess(id, user);
+  // Mandatory scoping rule: `getProjectDetailForUser` (which internally
+  // calls `assertProjectAccess`) is the only entry point for reading a
+  // single project here — it 404s a surveyor who isn't assigned to this
+  // project rather than leaking it, AND it strips `projectValue` /
+  // `paymentStatus` / `paymentNotes` from the returned object entirely for
+  // any non-owner caller (Phase 6+7 review fix — CRITICAL). `project` below
+  // never contains those keys unless `user.role === "owner"`.
+  const project = await getProjectDetailForUser(user, id);
 
   const client = await getClientById(project.clientId);
   const statusLogs = await getStatusLogsForProject(project.id);
@@ -72,7 +82,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const canChangeStatus = user.role === "owner" || project.assignedSurveyorId === user.id;
   const allowedNextStatuses = canChangeStatus
-    ? getAllowedNextStatuses(project.status, user.role === "owner" ? "owner" : "surveyor")
+    ? getAllowedNextStatuses(
+        project.status as ProjectStatus,
+        user.role === "owner" ? "owner" : "surveyor",
+      )
     : [];
   const assignedSurveyorName = project.assignedSurveyorId
     ? (nameById.get(project.assignedSurveyorId) ??
@@ -113,7 +126,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="peta">Peta</TabsTrigger>
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
-          {user.role === "owner" ? <TabsTrigger value="keuangan">Keuangan</TabsTrigger> : null}
+          {"projectValue" in project ? <TabsTrigger value="keuangan">Keuangan</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="overview" className="flex flex-col gap-6 pt-4">
@@ -206,7 +219,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <DocumentsTable rows={documentRows} isOwner={user.role === "owner"} />
         </TabsContent>
 
-        {user.role === "owner" ? (
+        {/* Both the trigger above and this panel only exist in the tree when
+            `"projectValue" in project` — which is only true for an owner's
+            payload (see `getProjectDetailForUser`). A surveyor's `project`
+            never has this key, so this branch is unreachable for them and
+            no finance data is ever part of their RSC payload. */}
+        {"projectValue" in project ? (
           <TabsContent value="keuangan" className="flex flex-col gap-6 pt-4">
             <Card>
               <CardHeader>
@@ -234,7 +252,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 <PaymentForm
                   projectId={project.id}
                   projectValue={project.projectValue}
-                  paymentStatus={project.paymentStatus}
+                  paymentStatus={project.paymentStatus as PaymentStatus}
                   paymentNotes={project.paymentNotes}
                 />
               </CardContent>

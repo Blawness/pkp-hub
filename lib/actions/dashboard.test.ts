@@ -95,9 +95,10 @@ beforeAll(async () => {
 
   // Known fixture, deterministic aggregates:
   //  - active (not selesai/dibatalkan): baru 10M + diproses 20M + dijadwalkan 15M = 45_000_000
-  //  - unpaid (belum|sebagian), regardless of status: baru 10M + diproses 20M
-  //    + selesai 5M + dibatalkan 8M = 43_000_000 (the brief's definition of
-  //    "unpaid" is NOT restricted to active projects)
+  //  - unpaid (belum|sebagian), EXCLUDING dibatalkan: baru 10M + diproses 20M
+  //    + selesai 5M = 35_000_000 (the dibatalkan/belum 8M fixture below is
+  //    deliberately excluded — a cancelled project must not inflate "total
+  //    unpaid")
   //  - lunas project (dijadwalkan, 15M): counted in active value, NOT in unpaid
   await db.insert(projects).values([
     {
@@ -128,7 +129,7 @@ beforeAll(async () => {
       paymentStatus: "sebagian",
     },
     {
-      title: "Fixture: dibatalkan, belum (excluded from active value, still counted as unpaid)",
+      title: "Fixture: dibatalkan, belum (excluded from active value AND from total unpaid)",
       clientId: client.id,
       surveyType: "lainnya",
       status: "dibatalkan",
@@ -156,8 +157,9 @@ describe("getOwnerDashboardData", () => {
     const data = await getOwnerDashboardData(owner);
     // active (not selesai/dibatalkan): 10M + 20M + 15M = 45M
     expect(data.totalActiveValue).toBe(45_000_000);
-    // unpaid (belum|sebagian), regardless of active/inactive: 10M + 20M + 5M + 8M = 43M
-    expect(data.totalUnpaid).toBe(43_000_000);
+    // unpaid (belum|sebagian), excluding dibatalkan: 10M + 20M + 5M = 35M
+    // (the dibatalkan/belum 8M fixture is deliberately excluded)
+    expect(data.totalUnpaid).toBe(35_000_000);
   });
 
   it("counts projects per status", async () => {
