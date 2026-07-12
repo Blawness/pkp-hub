@@ -1,14 +1,18 @@
 import { eq } from "drizzle-orm";
 import { ProjectForm } from "@/components/projects/project-form";
+import { listClients } from "@/lib/actions/clients-logic";
 import { requireOwner } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, users } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
 
 export default async function NewProjectPage() {
   await requireOwner();
 
+  // `listClients()` excludes archived (soft-deleted) clients by default —
+  // there's no existing project here whose client we'd otherwise need to
+  // keep visible, unlike the edit page.
   const [clientRows, surveyorRows] = await Promise.all([
-    db.select({ id: clients.id, name: clients.name }).from(clients),
+    listClients(),
     db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, "surveyor")),
   ]);
 

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, isNull, or } from "drizzle-orm";
 import { ProjectForm } from "@/components/projects/project-form";
 import { assertProjectAccess, requireOwner } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
@@ -12,8 +12,14 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
   // raw `db.select()` on `projects` — even on an owner-only page.
   const project = await assertProjectAccess(id, user);
 
+  // Exclude archived (soft-deleted) clients from the dropdown, EXCEPT this
+  // project's own client if it happens to be archived — otherwise the form
+  // would silently drop the project's current client from the options.
   const [clientRows, surveyorRows] = await Promise.all([
-    db.select({ id: clients.id, name: clients.name }).from(clients),
+    db
+      .select({ id: clients.id, name: clients.name })
+      .from(clients)
+      .where(or(isNull(clients.archivedAt), eq(clients.id, project.clientId))),
     db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, "surveyor")),
   ]);
 

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
-import { getStatusLogsForProject } from "@/lib/actions/projects-logic";
+import { getAllowedNextStatuses, getStatusLogsForProject } from "@/lib/actions/projects-logic";
 import { assertProjectAccess, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -41,6 +41,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .where(eq(users.role, "surveyor"));
 
   const canChangeStatus = user.role === "owner" || project.assignedSurveyorId === user.id;
+  const allowedNextStatuses = canChangeStatus
+    ? getAllowedNextStatuses(project.status, user.role === "owner" ? "owner" : "surveyor")
+    : [];
   const assignedSurveyorName = project.assignedSurveyorId
     ? (nameById.get(project.assignedSurveyorId) ??
       surveyorRows.find((s) => s.id === project.assignedSurveyorId)?.name ??
@@ -131,7 +134,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               {canChangeStatus ? (
-                <StatusChanger projectId={project.id} currentStatus={project.status} />
+                <StatusChanger
+                  projectId={project.id}
+                  currentStatus={project.status}
+                  allowedNextStatuses={allowedNextStatuses}
+                />
               ) : (
                 <p className="text-sm text-muted-foreground">
                   Hanya owner atau surveyor yang ditugaskan yang bisa mengubah status.
