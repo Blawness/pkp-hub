@@ -7,17 +7,17 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 ---
 
 ## Phase 0 — Project Setup
-- [ ] Scaffold Next.js (latest, App Router, TS strict) + pnpm
-- [ ] Setup Tailwind + shadcn/ui, import brand palette Vorca (CSS variables: `#0A0D14`, `#1B6FD8`, `#3FA3FF`)
-- [ ] Setup Biome (lint + format), `@t3-oss/env-nextjs`
-- [ ] Setup Drizzle + koneksi Postgres (local dev), config `DATABASE_URL`
-- [ ] `.env.example` sesuai PRD §8 (DB, Better Auth, R2, Resend)
+- [x] Scaffold Next.js (latest, App Router, TS strict) + pnpm
+- [x] Setup Tailwind + shadcn/ui, import brand palette Vorca (CSS variables: `#0A0D14`, `#1B6FD8`, `#3FA3FF`)
+- [x] Setup Biome (lint + format), `@t3-oss/env-nextjs`
+- [x] Setup Drizzle + koneksi Postgres (local dev), config `DATABASE_URL` — *koneksi menunggu DB `pkp_hub` dibuat*
+- [x] `.env.example` sesuai PRD §8 (DB, Better Auth, R2, Resend)
 
 ## Phase 1 — Data Layer  *(blocked by: Phase 0)*
-- [ ] Drizzle schema untuk semua entity PRD §5: `Client`, `Project`, `ProjectStatusLog`, `MapLayer`, `Document` (+ field `role` di user)
-- [ ] Enum: `ProjectStatus`, `SurveyType`, `PaymentStatus`, `DocumentCategory`, `UserRole`
-- [ ] Generate + jalankan migration awal
-- [ ] Seed data dummy: 1 owner, 2 surveyor, 3 klien, beberapa proyek lintas status
+- [x] Drizzle schema untuk semua entity PRD §5: `Client`, `Project`, `ProjectStatusLog`, `MapLayer`, `Document` (+ field `role` di user)
+- [x] Enum: `ProjectStatus`, `SurveyType`, `PaymentStatus`, `DocumentCategory`, `UserRole` (+ `MapLayerSource`)
+- [x] Generate + jalankan migration awal — applied ke Neon (`0000_cute_scrambler`)
+- [x] Seed data dummy: 1 owner, 2 surveyor, 3 klien, 5 proyek lintas status — *user belum punya password; kredensial dipasang di Phase 2 lewat Better Auth*
 
 ## Phase 2 — Auth & Roles  *(blocked by: Phase 1)*
 - [ ] Setup Better Auth + adapter Drizzle
