@@ -25,7 +25,7 @@ import type { MapLayerRow } from "./peta-map";
 const PetaMap = dynamic(() => import("./peta-map").then((m) => m.PetaMap), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[500px] w-full items-center justify-center rounded-lg border border-border bg-muted text-sm text-muted-foreground">
+    <div className="flex h-[320px] w-full items-center justify-center rounded-lg border border-border bg-muted text-sm text-muted-foreground sm:h-[500px]">
       Memuat peta...
     </div>
   ),

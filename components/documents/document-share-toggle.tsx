@@ -22,6 +22,11 @@ export function DocumentShareToggle({
     <button
       type="button"
       disabled={isExecuting}
+      aria-label={
+        optimistic
+          ? "Dokumen dibagikan ke klien, klik untuk membuat privat"
+          : "Dokumen privat, klik untuk membagikan ke klien"
+      }
       onClick={async () => {
         const next = !optimistic;
         setOptimistic(next);

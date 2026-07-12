@@ -1,12 +1,16 @@
 import { inArray } from "drizzle-orm";
+import { FileSearchIcon } from "lucide-react";
 import { DocumentsFilters } from "@/components/documents/documents-filters";
 import { DocumentsTable } from "@/components/documents/documents-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
 import { searchDocumentsForUser } from "@/lib/actions/documents-logic";
 import { documentCategorySchema } from "@/lib/actions/documents-schemas";
 import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+
+export const metadata = { title: "Arsip Dokumen" };
 
 /**
  * Cross-project document search (PRD §3 Feature 4). All filtering happens
@@ -80,7 +84,13 @@ export default async function DocumentsSearchPage({
         rows={rows}
         isOwner={user.role === "owner"}
         showProject
-        emptyMessage="Tidak ada dokumen yang cocok."
+        emptyMessage={
+          <EmptyState
+            icon={FileSearchIcon}
+            title="Tidak ada dokumen yang cocok"
+            description="Coba kata kunci, kategori, atau rentang tanggal lain."
+          />
+        }
       />
     </main>
   );

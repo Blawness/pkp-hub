@@ -1,7 +1,9 @@
 "use client";
 
+import { MapIcon } from "lucide-react";
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { MapLayerRow } from "./peta-map";
 
 /**
@@ -15,7 +17,7 @@ import type { MapLayerRow } from "./peta-map";
 const PetaMap = dynamic(() => import("./peta-map").then((m) => m.PetaMap), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[500px] w-full items-center justify-center rounded-lg border border-border bg-muted text-sm text-muted-foreground">
+    <div className="flex h-[320px] w-full items-center justify-center rounded-lg border border-border bg-muted text-sm text-muted-foreground sm:h-[500px]">
       Memuat peta...
     </div>
   ),
@@ -25,7 +27,13 @@ export function PetaView({ layers }: { layers: MapLayerRow[] }) {
   const [visibleLayerIds] = useState<Set<string>>(() => new Set(layers.map((l) => l.id)));
 
   if (layers.length === 0) {
-    return <p className="text-sm text-muted-foreground">Belum ada data peta untuk proyek ini.</p>;
+    return (
+      <EmptyState
+        icon={MapIcon}
+        title="Belum ada data peta"
+        description="Studio belum mengunggah data ukur untuk proyek ini."
+      />
+    );
   }
 
   return <PetaMap layers={layers} visibleLayerIds={visibleLayerIds} readOnly />;

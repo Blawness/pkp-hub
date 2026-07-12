@@ -1,5 +1,7 @@
 import { ClientForm } from "@/components/clients/client-form";
 
+export const metadata = { title: "Klien baru" };
+
 export default function NewClientPage() {
   return (
     <main className="flex flex-col gap-6 p-8">

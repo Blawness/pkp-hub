@@ -1,12 +1,24 @@
+import { FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listProjectsForUser, requireOwner } from "@/lib/auth-guards";
 import { clientTypeLabel, statusLabel } from "@/lib/labels";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  // Defense in depth: this route is already owner-gated by `layout.tsx`,
+  // but `generateMetadata` runs independently, so re-check here rather than
+  // rely purely on rendering order before touching `getClientById`.
+  await requireOwner();
+  const client = await getClientById(id);
+  return { title: client?.name ?? "Klien" };
+}
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -73,7 +85,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {clientProjects.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada proyek untuk klien ini.</p>
+            <EmptyState
+              icon={FolderKanbanIcon}
+              title="Belum ada proyek"
+              description="Klien ini belum punya proyek survey."
+              action={
+                <Button
+                  size="sm"
+                  render={<Link href="/dashboard/projects/new">Buat proyek</Link>}
+                />
+              }
+            />
           ) : (
             clientProjects.map((project) => (
               <Link

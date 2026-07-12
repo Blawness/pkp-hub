@@ -1,12 +1,16 @@
 import { eq } from "drizzle-orm";
+import { FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { ProjectFilters } from "@/components/projects/project-filters";
 import { projectsColumns } from "@/components/projects/projects-columns";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
+
+export const metadata = { title: "Proyek" };
 
 export default async function ProjectsPage({
   searchParams,
@@ -69,7 +73,35 @@ export default async function ProjectsPage({
 
       <ProjectFilters clients={clientRows} surveyors={surveyorRows} />
 
-      <DataTable columns={projectsColumns} data={rows} emptyMessage="Tidak ada proyek." />
+      <DataTable
+        columns={projectsColumns}
+        data={rows}
+        emptyMessage={
+          <EmptyState
+            icon={FolderKanbanIcon}
+            title={
+              filters.status || filters.clientId || filters.surveyorId || filters.surveyType
+                ? "Tidak ada proyek yang cocok dengan filter"
+                : "Belum ada proyek"
+            }
+            description={
+              filters.status || filters.clientId || filters.surveyorId || filters.surveyType
+                ? "Coba ubah atau hapus filter yang aktif."
+                : user.role === "owner"
+                  ? "Buat proyek pertama untuk mulai melacak pekerjaan survey."
+                  : "Belum ada proyek yang ditugaskan kepada Anda."
+            }
+            action={
+              user.role === "owner" ? (
+                <Button
+                  size="sm"
+                  render={<Link href="/dashboard/projects/new">Proyek baru</Link>}
+                />
+              ) : undefined
+            }
+          />
+        }
+      />
     </main>
   );
 }

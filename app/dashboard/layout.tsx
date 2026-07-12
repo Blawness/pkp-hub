@@ -1,6 +1,11 @@
-import Link from "next/link";
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { requireStaff } from "@/lib/auth-guards";
+
+export const metadata: Metadata = {
+  title: { template: "%s · PKP Hub", default: "Dashboard · PKP Hub" },
+};
 
 /**
  * Authoritative role check for the staff area (owner + surveyor). Middleware
@@ -12,22 +17,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="flex min-h-svh flex-col">
-      <nav className="flex items-center gap-4 border-b border-border px-8 py-3 text-sm">
-        <Link href="/dashboard" className="font-medium">
-          PKP Hub
-        </Link>
-        <Link href="/dashboard/projects" className="text-muted-foreground hover:text-foreground">
-          Proyek
-        </Link>
-        <Link href="/dashboard/documents" className="text-muted-foreground hover:text-foreground">
-          Dokumen
-        </Link>
-        {user.role === "owner" ? (
-          <Link href="/dashboard/clients" className="text-muted-foreground hover:text-foreground">
-            Klien
-          </Link>
-        ) : null}
-      </nav>
+      <DashboardNav role={user.role} />
       {children}
     </div>
   );

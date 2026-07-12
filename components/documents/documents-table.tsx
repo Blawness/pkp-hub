@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { buildDocumentsColumns, type DocumentRow } from "@/components/documents/documents-columns";
 import { DataTable } from "@/components/ui/data-table";
 
@@ -19,7 +20,7 @@ export function DocumentsTable({
   rows: DocumentRow[];
   isOwner: boolean;
   showProject?: boolean;
-  emptyMessage?: string;
+  emptyMessage?: ReactNode;
 }) {
   return (
     <DataTable

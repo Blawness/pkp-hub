@@ -31,7 +31,7 @@ export function DataTable<TData, TValue>({
 }: {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
-  emptyMessage?: string
+  emptyMessage?: React.ReactNode
 }) {
   const [sorting, setSorting] = React.useState<SortingState>([])
 
@@ -73,7 +73,7 @@ export function DataTable<TData, TValue>({
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+              <TableCell colSpan={columns.length} className="p-0 text-center text-muted-foreground">
                 {emptyMessage}
               </TableCell>
             </TableRow>

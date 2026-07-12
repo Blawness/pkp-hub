@@ -1,8 +1,9 @@
 "use client";
 
-import { Trash2Icon } from "lucide-react";
+import { LayersIcon, Trash2Icon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { deleteMapLayer } from "@/lib/actions/maps";
 import { formatArea } from "@/lib/geo/area";
 import type { MapLayerRow } from "./peta-map";
@@ -39,7 +40,13 @@ export function MapLayerList({
   }
 
   if (layers.length === 0) {
-    return <p className="text-sm text-muted-foreground">Belum ada layer peta untuk proyek ini.</p>;
+    return (
+      <EmptyState
+        icon={LayersIcon}
+        title="Belum ada layer peta"
+        description="Gambar polygon/titik di peta atau import CSV koordinat untuk membuat layer pertama."
+      />
+    );
   }
 
   return (

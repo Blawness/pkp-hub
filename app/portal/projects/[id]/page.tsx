@@ -1,8 +1,10 @@
+import { FileIcon } from "lucide-react";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaView } from "@/components/map/peta-view";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getStatusLogsForProject } from "@/lib/actions/projects-logic";
@@ -23,6 +25,13 @@ import { paymentStatusLabel, statusLabel, surveyTypeLabel } from "@/lib/labels";
  * `listSharedDocumentsForProject` additionally enforces the
  * shared-documents-only filter unconditionally.
  */
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await requireClient();
+  const project = await assertProjectAccess(id, user);
+  return { title: project.title };
+}
+
 export default async function PortalProjectDetailPage({
   params,
 }: {
@@ -111,7 +120,13 @@ export default async function PortalProjectDetailPage({
           <DocumentsTable
             rows={documentTableRows}
             isOwner={false}
-            emptyMessage="Belum ada dokumen yang dibagikan untuk proyek ini."
+            emptyMessage={
+              <EmptyState
+                icon={FileIcon}
+                title="Belum ada dokumen"
+                description="Studio belum membagikan dokumen untuk proyek ini."
+              />
+            }
           />
         </CardContent>
       </Card>

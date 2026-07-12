@@ -50,20 +50,20 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [ ] (Enhancement, bukan v1) Import DXF
 
 ## Phase 6 — Keuangan Ringan  *(blocked by: Phase 3)*
-- [ ] `updatePayment`: nilai proyek + status bayar (`Belum`/`Sebagian`/`Lunas`) + catatan
-- [ ] Guard: hanya owner/admin edit & lihat; surveyor tidak
-- [ ] Ringkasan keuangan di dashboard owner (total aktif, total belum terbayar)
+- [x] `updatePayment`: nilai proyek + status bayar (`Belum`/`Sebagian`/`Lunas`) + catatan — owner-only (2 lapis)
+- [x] Guard: hanya owner edit & lihat; surveyor tidak — field finance di-omit server-side dari payload surveyor (bukan CSS), ada regression test
+- [x] Ringkasan keuangan di dashboard owner (total aktif, total belum terbayar; `dibatalkan` dikecualikan)
 
 ## Phase 7 — Portal Klien & Dashboard  *(blocked by: Phase 4, 5, 6)*
-- [ ] Area `(portal)`: daftar proyek klien + detail (status, peta, dokumen shared, luas, nilai & status bayar)
-- [ ] Uji ketat: client TIDAK bisa akses proyek klien lain (row-level)
-- [ ] Dashboard ringkasan per role (owner / surveyor / client) — PRD Feature 7
+- [x] Area `/portal`: daftar proyek klien + detail (status, peta read-only, dokumen shared saja, luas, nilai & status bayar read-only)
+- [x] Uji ketat: client TIDAK bisa akses proyek klien lain — terbukti 404 live dengan cookie session
+- [x] Dashboard ringkasan per role (owner / surveyor / client) — PRD Feature 7
 
 ## Phase 8 — Polish
-- [ ] Loading / empty / error states
-- [ ] Responsive check (mobile-first) — peta & tabel di layar kecil
-- [ ] Accessibility pass dasar (focus, alt, kontras)
-- [ ] SEO/metadata dasar (app internal, minimal)
+- [x] Loading / empty / error states — `loading.tsx` skeleton tiap segmen lambat, `error.tsx` (root/dashboard/portal) + `not-found.tsx`, `EmptyState` di semua list/peta/dokumen yang bisa kosong
+- [x] Responsive check (mobile-first) — peta & tabel di layar kecil — nav collapse ke `Sheet` di `sm`, tabel sudah scroll horizontal via `Table` wrapper, peta `h-[320px] sm:h-[500px]`, tab list scrollable
+- [x] Accessibility pass dasar (focus, alt, kontras) — audit fokus/aria-label/alt sudah ada di sebagian besar komponen; ditambah aria-label toggle share, region label peta, keyboard tab pass diverifikasi via Playwright
+- [x] SEO/metadata dasar (app internal, minimal) — title template per area + `generateMetadata` per detail page, `robots: noindex`
 
 ## Phase 9 — Deploy
 - [ ] Swap `DATABASE_URL` ke Neon (prod), jalankan migration

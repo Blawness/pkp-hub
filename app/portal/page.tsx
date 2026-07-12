@@ -1,9 +1,13 @@
+import { FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { listPortalProjects } from "@/lib/actions/portal-logic";
 import { requireClient } from "@/lib/auth-guards";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+
+export const metadata = { title: "Proyek Saya" };
 
 export default async function PortalPage() {
   const user = await requireClient();
@@ -17,7 +21,11 @@ export default async function PortalPage() {
       </div>
 
       {projectRows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Belum ada proyek.</p>
+        <EmptyState
+          icon={FolderKanbanIcon}
+          title="Belum ada proyek"
+          description="Proyek survey Anda akan tampil di sini setelah studio membuatnya."
+        />
       ) : (
         <div className="flex flex-col gap-3">
           {projectRows.map((p) => (

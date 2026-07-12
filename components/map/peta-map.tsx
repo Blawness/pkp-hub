@@ -114,27 +114,32 @@ export function PetaMap({
       : DEFAULT_CENTER;
 
   return (
-    <MapContainer center={center} zoom={16} style={{ height: "500px", width: "100%" }}>
-      <LayersControl position="topright">
-        <LayersControl.BaseLayer checked name="OpenStreetMap">
-          <TileLayer
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          />
-        </LayersControl.BaseLayer>
-        <LayersControl.BaseLayer name="Citra Satelit (Esri)">
-          <TileLayer
-            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
-          />
-        </LayersControl.BaseLayer>
-      </LayersControl>
+    <section
+      aria-label="Peta interaktif hasil ukur. Setelah fokus pada peta, gunakan tombol panah untuk menggeser dan tombol +/- untuk memperbesar/memperkecil."
+      className="overflow-hidden rounded-lg"
+    >
+      <MapContainer center={center} zoom={16} className="h-[320px] w-full sm:h-[500px]">
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="OpenStreetMap">
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Citra Satelit (Esri)">
+            <TileLayer
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution="Tiles &copy; Esri &mdash; Source: Esri, Maxar, Earthstar Geographics"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
-      {visible.map((l) => (
-        <GeoJSON key={l.id} data={l.geojson} />
-      ))}
+        {visible.map((l) => (
+          <GeoJSON key={l.id} data={l.geojson} />
+        ))}
 
-      {!readOnly && onDraftChange ? <DrawControl onDraftChange={onDraftChange} /> : null}
-    </MapContainer>
+        {!readOnly && onDraftChange ? <DrawControl onDraftChange={onDraftChange} /> : null}
+      </MapContainer>
+    </section>
   );
 }

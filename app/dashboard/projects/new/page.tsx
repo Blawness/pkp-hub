@@ -5,6 +5,8 @@ import { requireOwner } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 
+export const metadata = { title: "Proyek baru" };
+
 export default async function NewProjectPage() {
   await requireOwner();
 

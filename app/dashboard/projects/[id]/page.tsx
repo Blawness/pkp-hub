@@ -1,4 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
+import { FileIcon } from "lucide-react";
 import Link from "next/link";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
@@ -10,6 +11,7 @@ import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
@@ -26,6 +28,16 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { formatIDR } from "@/lib/format";
 import { paymentStatusLabel, statusLabel, surveyTypeLabel } from "@/lib/labels";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  // Defense in depth: re-run the same scoped lookup `generateMetadata` will
+  // otherwise skip if it ran before the page body — `getProjectDetailForUser`
+  // 404s a surveyor who isn't assigned rather than leaking the title.
+  const user = await requireStaff();
+  const project = await getProjectDetailForUser(user, id);
+  return { title: project.title };
+}
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -122,7 +134,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </div>
 
       <Tabs defaultValue="overview">
-        <TabsList>
+        <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="peta">Peta</TabsTrigger>
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
@@ -216,7 +228,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
         <TabsContent value="dokumen" className="flex flex-col gap-4 pt-4">
           <DocumentUpload projectId={project.id} />
-          <DocumentsTable rows={documentRows} isOwner={user.role === "owner"} />
+          <DocumentsTable
+            rows={documentRows}
+            isOwner={user.role === "owner"}
+            emptyMessage={
+              <EmptyState
+                icon={FileIcon}
+                title="Belum ada dokumen"
+                description="Unggah laporan, berita acara, atau foto lapangan untuk proyek ini."
+              />
+            }
+          />
         </TabsContent>
 
         {/* Both the trigger above and this panel only exist in the tree when

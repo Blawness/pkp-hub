@@ -1,8 +1,12 @@
+import { UsersIcon } from "lucide-react";
 import Link from "next/link";
 import { clientsColumns } from "@/components/clients/clients-columns";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
+import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
+
+export const metadata = { title: "Klien" };
 
 export default async function ClientsPage({
   searchParams,
@@ -38,7 +42,20 @@ export default async function ClientsPage({
         />
       </div>
 
-      <DataTable columns={clientsColumns} data={rows} emptyMessage="Belum ada klien." />
+      <DataTable
+        columns={clientsColumns}
+        data={rows}
+        emptyMessage={
+          <EmptyState
+            icon={UsersIcon}
+            title={showArchived ? "Belum ada klien" : "Belum ada klien aktif"}
+            description="Tambahkan klien pertama untuk mulai mengelola proyek survey."
+            action={
+              <Button size="sm" render={<Link href="/dashboard/clients/new">Klien baru</Link>} />
+            }
+          />
+        }
+      />
     </main>
   );
 }

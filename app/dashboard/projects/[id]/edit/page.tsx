@@ -4,6 +4,13 @@ import { assertProjectAccess, requireOwner } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await requireOwner();
+  const project = await assertProjectAccess(id, user);
+  return { title: `Edit ${project.title}` };
+}
+
 export default async function EditProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const user = await requireOwner();

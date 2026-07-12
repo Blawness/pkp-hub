@@ -13,8 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PKP Hub",
+  title: { template: "%s · PKP Hub", default: "PKP Hub" },
   description: "Dashboard manajemen survey & pengukuran — Presisi Konsulindo Prima",
+  // Internal tool only — never index in search engines.
+  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({

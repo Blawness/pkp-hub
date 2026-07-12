@@ -1,10 +1,14 @@
+import { FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getOwnerDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
 import { requireStaff } from "@/lib/auth-guards";
 import { formatIDR } from "@/lib/format";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+
+export const metadata = { title: "Dashboard" };
 
 /**
  * Dashboard Ringkasan (PRD §3 Feature 7), per-role content.
@@ -62,7 +66,11 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {data.latestProjects.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Belum ada proyek.</p>
+              <EmptyState
+                icon={FolderKanbanIcon}
+                title="Belum ada proyek"
+                description="Proyek yang baru dibuat akan muncul di sini."
+              />
             ) : (
               data.latestProjects.map((p) => (
                 <Link
@@ -99,7 +107,11 @@ export default async function DashboardPage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           {data.projects.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Belum ada proyek yang ditugaskan.</p>
+            <EmptyState
+              icon={FolderKanbanIcon}
+              title="Belum ada proyek yang ditugaskan"
+              description="Owner akan menugaskan Anda ke proyek survey saat tersedia."
+            />
           ) : (
             data.projects.map((p) => (
               <Link
