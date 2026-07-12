@@ -1,36 +1,68 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PKP Hub
 
-## Getting Started
+Internal management dashboard for a land/building survey studio: manage
+clients, survey projects, measurement maps, a document archive, light
+finances, plus a read-only portal for clients to check their own project
+status and shared documents.
 
-First, run the development server:
+See `PRD.md` for the full product spec (features, data model, server
+actions, environment variables) and `tasks.md` for the phase-by-phase build
+log.
+
+## Stack
+
+- **Next.js** (App Router, Server Components by default) + TypeScript strict
+- **Tailwind CSS** + shadcn/ui
+- **Drizzle ORM** on PostgreSQL — local Postgres (or Neon) in dev, **Neon**
+  in production
+- **Better Auth** — three roles: `owner`, `surveyor`, `client`
+- **Zod** + React Hook Form, **next-safe-action** for server actions
+- **`@t3-oss/env-nextjs`** for validated environment variables
+- **Leaflet** + react-leaflet (OpenStreetMap + free satellite imagery) with
+  **turf.js** for area calculations; survey geometry stored as GeoJSON in a
+  `jsonb` column
+- **Cloudflare R2** (S3-compatible) for document storage, with a local-disk
+  fallback driver for development
+- **papaparse** for CSV coordinate import
+- **Biome** for lint/format, **Vitest** for tests
+- Deployed on **Vercel**
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+
+cp .env.example .env.local
+# then fill in .env.local:
+#   DATABASE_URL         — a local/dev Postgres, or a Neon dev branch
+#   BETTER_AUTH_SECRET    — generate with: openssl rand -base64 32
+#   BETTER_AUTH_URL        — http://localhost:3000
+#   NEXT_PUBLIC_APP_URL    — http://localhost:3000
+#   R2_* / RESEND_API_KEY  — optional in dev; omit and the app falls back to
+#                            a local-disk storage driver and logs invite
+#                            links to the console instead of emailing them
+
+pnpm db:migrate   # apply migrations to DATABASE_URL
+pnpm db:seed      # seed demo owner/surveyor/client accounts + sample data
+
+pnpm dev          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tests
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm test         # vitest, run once
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Also useful during development: `pnpm lint` (Biome), `pnpm typecheck` (`tsc
+--noEmit`), `pnpm build` (production build — also validates required env
+vars via `env.ts`).
 
-## Learn More
+## Deploying
 
-To learn more about Next.js, take a look at the following resources:
+Not part of local dev — see [`DEPLOY.md`](./DEPLOY.md) for the exact Vercel
+setup, the full production environment variable list, running migrations
+against the production database, and the per-role smoke-test checklist to
+run after every deploy.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For product requirements and the data model, see [`PRD.md`](./PRD.md).

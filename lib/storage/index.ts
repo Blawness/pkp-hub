@@ -26,9 +26,31 @@ export function selectStorageDriverName(): StorageDriverName {
 }
 
 function createDriver(): StorageDriver {
-  const driver = selectStorageDriverName() === "r2" ? createR2Driver() : createLocalDriver();
+  const name = selectStorageDriverName();
+  const driver = name === "r2" ? createR2Driver() : createLocalDriver();
   // Log once, at module load, which driver is active — required by the brief.
   console.log(`[storage] using "${driver.name}" driver`);
+
+  // The local driver writes to `.storage/` on the local disk. On Vercel
+  // serverless that disk is EPHEMERAL — it is reset between invocations and
+  // is not shared across instances, so uploaded files silently vanish. This
+  // must never be the production driver. We only warn (not throw) so a
+  // preview deploy without R2 credentials configured yet can still boot;
+  // see DEPLOY.md for the required R2_* env vars.
+  if (name === "local" && process.env.NODE_ENV === "production") {
+    console.warn(
+      "\n" +
+        "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" +
+        "!! [storage] WARNING: local disk driver selected in production.   !!\n" +
+        "!! `.storage/` is EPHEMERAL on Vercel — uploaded files WILL BE     !!\n" +
+        "!! LOST. Configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,                !!\n" +
+        "!! R2_SECRET_ACCESS_KEY, R2_BUCKET, and R2_PUBLIC_URL to enable    !!\n" +
+        "!! the R2 driver before relying on document uploads. See          !!\n" +
+        "!! DEPLOY.md for setup steps.                                     !!\n" +
+        "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n",
+    );
+  }
+
   return driver;
 }
 
