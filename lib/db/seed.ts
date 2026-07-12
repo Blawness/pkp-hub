@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
+import { hashPassword } from "better-auth/crypto";
 import { db } from "./index";
 import {
+  accounts,
   clients,
   documents,
   mapLayers,
@@ -10,9 +12,13 @@ import {
   users,
 } from "./schema";
 
+/** Dev seed password for all seeded users, hashed via Better Auth's own hasher. */
+const SEED_PASSWORD = "password123";
+
 /**
- * Dev seed. Users are created without credentials — passwords are attached in
- * Phase 2 once Better Auth owns the `account` table.
+ * Dev seed. Every seeded user gets a working `password123` credential,
+ * hashed with Better Auth's own `hashPassword` (never hand-rolled) and
+ * stored in the `account` table it owns.
  */
 async function seed() {
   // FK-safe teardown so the seed is re-runnable.
@@ -22,6 +28,7 @@ async function seed() {
   await db.delete(projects);
   await db.delete(clients);
   await db.delete(sessions);
+  await db.delete(accounts);
   await db.delete(users);
 
   const ownerId = randomUUID();
@@ -35,6 +42,17 @@ async function seed() {
     { id: surveyor2Id, name: "Rizky Ananda", email: "rizky@pkp.test", role: "surveyor" },
     { id: clientUserId, name: "Andi Wijaya", email: "andi@klien.test", role: "client" },
   ]);
+
+  const hashedPassword = await hashPassword(SEED_PASSWORD);
+  await db.insert(accounts).values(
+    [ownerId, surveyor1Id, surveyor2Id, clientUserId].map((userId) => ({
+      id: randomUUID(),
+      accountId: userId,
+      providerId: "credential",
+      userId,
+      password: hashedPassword,
+    })),
+  );
 
   const [budi, cahaya, dewi] = await db
     .insert(clients)
