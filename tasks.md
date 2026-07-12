@@ -66,9 +66,20 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [x] SEO/metadata dasar (app internal, minimal) — title template per area + `generateMetadata` per detail page, `robots: noindex`
 
 ## Phase 9 — Deploy
-- [ ] Swap `DATABASE_URL` ke Neon (prod), jalankan migration
-- [ ] Deploy ke Vercel, set env production (DB, Better Auth, R2, Resend)
-- [ ] Smoke test end-to-end per role di prod
+- [x] Repo publik di GitHub (`Blawness/pkp-hub`) — di-push ke `master`
+- [x] `DEPLOY.md` lengkap (setup Vercel, daftar env, migrasi prod, smoke-test per role)
+- [x] README ditulis ulang dari template default Next.js
+- [x] Storage driver beri peringatan (tidak crash) bila lokal dipakai di production
+- [x] **Verifikasi lokal hijau**: `pnpm typecheck`, `pnpm lint`, `pnpm test` (96 test),
+      `pnpm build` (production build sukses dengan env placeholder) — semua pass
+- [ ] **Human action** — buat project Vercel, set env production (DB, Better Auth, R2, Resend)
+- [ ] **Human action** — jalankan migrasi ke Neon prod (`DATABASE_URL` prod, jangan seed)
+- [ ] **Human action** — smoke test end-to-end per role di prod (lihat checklist DEPLOY.md §7)
+
+> Semua langkah kode & verifikasi selesai. Tiga item terakhir butuh akses akun
+> Vercel / Neon prod / Cloudflare R2 / Resend milik manusia — tidak bisa dijalankan
+> dari environment build. `vercel` CLI sudah ter-autentikasi (`blawness`); deploy
+> bisa dipicu begitu env production tersedia.
 
 ---
 
