@@ -1,0 +1,7 @@
+onlyBuiltDependencies:
+  - "@biomejs/biome"
+  - esbuild
+  - sharp
+
+ignoredBuiltDependencies:
+  - unrs-resolver
