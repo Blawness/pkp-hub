@@ -160,21 +160,74 @@ async function signIn(email: string, pass: string): Promise<Headers> {
   return new Headers({ cookie: cookieHeaderFrom(headers.get("set-cookie") ?? "") });
 }
 
+/** Ambil hash password (tabel `accounts`, providerId "credential") milik `userId`. */
+async function credentialHashFor(userId: string): Promise<string | null> {
+  const [account] = await db.select().from(accounts).where(eq(accounts.userId, userId));
+  return account?.password ?? null;
+}
+
 describe("ganti password sendiri", () => {
   it("menolak password lama yang salah", async () => {
     const me = await signIn(`me-${meId}@fixture.test`, password);
-    await expect(
-      auth.api.changePassword({
+    const hashBefore = await credentialHashFor(meId);
+    expect(hashBefore).not.toBeNull();
+
+    // TEMUAN 3: `rejects.toThrow()` polos lulus untuk error APA PUN (sesi
+    // tidak valid, body invalid, dsb) — tidak membuktikan bahwa kegagalan
+    // ini benar-benar karena password lama yang salah. Better Auth melempar
+    // `APIError` dengan `body.code` stabil ("INVALID_PASSWORD", lihat
+    // node_modules/.pnpm/@better-auth+core@*/node_modules/@better-auth/core/dist/error/codes.mjs)
+    // saat `ctx.context.password.verify` gagal (lib update-user.mjs). Kita
+    // cocokkan kode itu langsung, bukan menebak dari pesan yang bisa berubah
+    // antar versi.
+    let caught: unknown;
+    try {
+      await auth.api.changePassword({
         headers: me,
         body: { currentPassword: "salah-sekali", newPassword: "password-baru-panjang" },
-      }),
-    ).rejects.toThrow();
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    const apiError = caught as { body?: { code?: string }; status?: unknown };
+    // Pastikan ini BUKAN sekadar error sesi/validasi (mis. "UNAUTHORIZED" atau
+    // "VALIDATION_ERROR") — melainkan spesifik penolakan password.
+    expect(apiError.body?.code).toBe("INVALID_PASSWORD");
+
+    // TEMUAN 2: buktikan percobaan gagal ini benar-benar tidak mengubah apa
+    // pun di DB — bandingkan hash sebelum/sesudah, dan buktikan password
+    // lama masih bisa dipakai login.
+    const hashAfter = await credentialHashFor(meId);
+    expect(hashAfter).toBe(hashBefore);
+
+    const stillWorks = await auth.api.signInEmail({
+      body: { email: `me-${meId}@fixture.test`, password },
+    });
+    expect(stillWorks.user.id).toBe(meId);
   });
 
   it("memutus sesi perangkat lain tapi sesi sendiri tetap hidup", async () => {
     // Dua sesi untuk user yang sama — bayangkan laptop dan HP.
     const laptop = await signIn(`me-${meId}@fixture.test`, password);
     const hp = await signIn(`me-${meId}@fixture.test`, password);
+
+    // TEMUAN 1 (kontrol positif): buktikan KEDUA sesi memang valid SEBELUM
+    // changePassword. Tanpa ini, kalau `signIn`/`cookieHeaderFrom` punya bug
+    // (mis. parsing set-cookie salah), `hp`/`laptop` bisa saja sudah tidak
+    // valid sejak awal -- dan assertion "sesi HP mati" di bawah akan tetap
+    // hijau meski `revokeOtherSessions` sebenarnya rusak, karena sesi itu
+    // memang sudah null dari awal, bukan karena benar-benar direvoke.
+    const laptopBeforeSession = await auth.api.getSession({
+      headers: laptop,
+      query: { disableCookieCache: true },
+    });
+    expect(laptopBeforeSession?.user.id).toBe(meId);
+    const hpBeforeSession = await auth.api.getSession({
+      headers: hp,
+      query: { disableCookieCache: true },
+    });
+    expect(hpBeforeSession?.user.id).toBe(meId);
 
     const { headers: changed } = await auth.api.changePassword({
       headers: laptop,
