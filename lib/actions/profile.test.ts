@@ -142,3 +142,74 @@ describe("updateOwnNameAction (integrasi)", () => {
     expect(otherAfter.name).not.toBe("Nama Hasil Serangan");
   });
 });
+
+/** Set-Cookie (bisa berisi banyak cookie) -> satu header `cookie` seperti kiriman browser. */
+function cookieHeaderFrom(setCookie: string): string {
+  return setCookie
+    .split(/,(?=\s*[\w.-]+=)/)
+    .map((part) => part.split(";")[0].trim())
+    .filter(Boolean)
+    .join("; ");
+}
+
+async function signIn(email: string, pass: string): Promise<Headers> {
+  const { headers } = await auth.api.signInEmail({
+    body: { email, password: pass },
+    returnHeaders: true,
+  });
+  return new Headers({ cookie: cookieHeaderFrom(headers.get("set-cookie") ?? "") });
+}
+
+describe("ganti password sendiri", () => {
+  it("menolak password lama yang salah", async () => {
+    const me = await signIn(`me-${meId}@fixture.test`, password);
+    await expect(
+      auth.api.changePassword({
+        headers: me,
+        body: { currentPassword: "salah-sekali", newPassword: "password-baru-panjang" },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("memutus sesi perangkat lain tapi sesi sendiri tetap hidup", async () => {
+    // Dua sesi untuk user yang sama — bayangkan laptop dan HP.
+    const laptop = await signIn(`me-${meId}@fixture.test`, password);
+    const hp = await signIn(`me-${meId}@fixture.test`, password);
+
+    const { headers: changed } = await auth.api.changePassword({
+      headers: laptop,
+      body: {
+        currentPassword: password,
+        newPassword: "password-baru-yang-panjang",
+        revokeOtherSessions: true,
+      },
+      returnHeaders: true,
+    });
+
+    // Sesi "laptop" diganti yang BARU oleh Better Auth — cookie penggantinya
+    // ada di response. Inilah cookie yang, kalau hilang (mis. dipanggil dari
+    // Server Action tanpa nextCookies), membuat user ke-kick setelah ganti
+    // password. Test ini yang menjaga kita tidak mengulanginya.
+    const laptopBaru = new Headers({
+      cookie: cookieHeaderFrom(changed.get("set-cookie") ?? ""),
+    });
+    const laptopSession = await auth.api.getSession({
+      headers: laptopBaru,
+      query: { disableCookieCache: true },
+    });
+    expect(laptopSession?.user.id).toBe(meId);
+
+    // Sesi "HP" harus mati.
+    const hpSession = await auth.api.getSession({
+      headers: hp,
+      query: { disableCookieCache: true },
+    });
+    expect(hpSession).toBeNull();
+
+    // Kembalikan password fixture supaya test lain tidak terpengaruh urutan.
+    await auth.api.changePassword({
+      headers: laptopBaru,
+      body: { currentPassword: "password-baru-yang-panjang", newPassword: password },
+    });
+  });
+});
