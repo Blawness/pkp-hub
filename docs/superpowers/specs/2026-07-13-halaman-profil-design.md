@@ -53,7 +53,7 @@ role: `/dashboard/profile` untuk staf, `/portal/profile` untuk klien.
 ## Server actions
 
 Berkas baru `lib/actions/profile.ts`, memakai **`authActionClient`** (user apa pun yang login),
-BUKAN `adminActionClient`.
+BUKAN `adminActionClient`. Hanya berisi ganti nama — lihat catatan password di bawah.
 
 ### `updateOwnNameAction`
 
@@ -64,22 +64,40 @@ input**. Kalau ia datang dari input, siapa pun yang login bisa mengganti nama si
 Skema input hanya berisi `name` — tidak ada tempat untuk menyelundupkan `userId`. Ini dikunci
 test.
 
-### `changeOwnPasswordAction`
+### Ganti password: dari KLIEN, bukan server action
 
-Meneruskan ke `auth.api.changePassword` milik Better Auth:
+Ini koreksi terhadap rancangan awal, dan alasannya penting.
+
+`revokeOtherSessions: true` membuat Better Auth **menghapus SEMUA sesi user — termasuk sesi
+yang sedang berjalan** — lalu membuat sesi baru dan memasang cookie baru
+(`node_modules/better-auth/dist/api/routes/update-user.mjs:169-176`).
+
+Kalau itu dipanggil dari Server Action lewat `auth.api.changePassword({ headers })`,
+`Set-Cookie`-nya **tidak sampai ke browser**: `nextCookies()` tidak terpasang di `lib/auth.ts`.
+Baris sesi lama sudah terhapus, browser masih memegang token lama — user langsung **ke-kick
+tepat setelah berhasil mengganti password**. Itu persis kelas bug yang baru saja diperbaiki di
+`proxy.ts`, dibangun ulang dengan tangan sendiri.
+
+Karena itu ganti password memakai `authClient.changePassword()` dari komponen klien. Ia
+memanggil `/api/auth/change-password`, dan response route itulah yang memasang cookie sesi
+baru — jalur yang sama dengan `authClient.signIn.email()` di `login-form.tsx`.
 
 ```ts
-await auth.api.changePassword({
-  headers: await headers(),
-  body: { currentPassword, newPassword, revokeOtherSessions: true },
+await authClient.changePassword({
+  currentPassword,
+  newPassword,
+  revokeOtherSessions: true,
 });
 ```
 
 Verifikasi password lama ada **di dalam Better Auth**, bukan ditulis ulang di sini.
 
-`revokeOtherSessions: true` — mengganti password memutus sesi di perangkat lain, tapi
-mempertahankan sesi yang sedang berjalan. Kalau tidak, user yang mengganti password karena
-curiga akunnya diakses orang lain justru membiarkan orang itu tetap masuk.
+`revokeOtherSessions: true` — sesi di perangkat lain diputus, sesi sendiri diganti yang baru dan
+tetap hidup. Kalau tidak diputus, user yang mengganti password justru karena curiga akunnya
+dipakai orang lain malah membiarkan orang itu tetap masuk.
+
+Konsekuensi: **hanya nama** yang lewat server action. Password tidak butuh `revalidatePath`
+(tidak ada yang dirender ulang), jadi tidak ada yang hilang dari asimetri ini.
 
 ## Validasi
 
