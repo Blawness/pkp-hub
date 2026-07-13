@@ -50,6 +50,10 @@ export function Stagger({
   );
 }
 
+/**
+ * Item dalam stagger. Harus di-nest dalam Stagger (atau ancestor motion yang
+ * menyediakan initial/animate) untuk beranimasi; tanpa induk, akan render tanpa animasi.
+ */
 export function Reveal({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <motion.div className={className} variants={itemVariants}>
