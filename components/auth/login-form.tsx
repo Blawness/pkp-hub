@@ -1,10 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { DURATION_FAST, EASE_OUT_EXPO } from "@/components/motion/reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -94,9 +96,21 @@ export function LoginForm() {
           <p className="text-xs text-destructive">{errors.password.message}</p>
         ) : null}
       </div>
-      {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+      <AnimatePresence>
+        {formError ? (
+          <motion.p
+            className="text-sm text-destructive"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: DURATION_FAST, ease: EASE_OUT_EXPO }}
+          >
+            {formError}
+          </motion.p>
+        ) : null}
+      </AnimatePresence>
       <Button type="submit" disabled={isSubmitting} className="mt-2">
-        {isSubmitting ? "Signing in..." : "Sign in"}
+        {isSubmitting ? "Masuk..." : "Masuk"}
       </Button>
     </form>
   );

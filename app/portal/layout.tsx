@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Authoritative role check for the client portal area. Middleware only does
+ * Authoritative role check for the client portal area. The proxy only does
  * a coarse cookie-cache check; this is the real gate — it hits the DB via
  * `getSession`/`requireClient`.
  */
