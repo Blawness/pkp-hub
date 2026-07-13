@@ -1,5 +1,7 @@
 import { eq } from "drizzle-orm";
 import { FolderKanbanIcon } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
+import { ActiveFilters } from "@/components/projects/active-filters";
 import { ProjectFilters } from "@/components/projects/project-filters";
 import { projectsColumns } from "@/components/projects/projects-columns";
 import { ButtonLink } from "@/components/ui/button";
@@ -55,26 +57,31 @@ export default async function ProjectsPage({
   }));
 
   return (
-    <main className="flex flex-col gap-6 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-medium">Proyek</h1>
-          <p className="text-sm text-muted-foreground">
-            {user.role === "surveyor"
-              ? "Proyek yang ditugaskan kepada Anda."
-              : "Semua proyek studio."}
-          </p>
-        </div>
-        {user.role === "owner" ? (
-          <ButtonLink href="/dashboard/projects/new">Proyek baru</ButtonLink>
-        ) : null}
-      </div>
-
-      <ProjectFilters clients={clientRows} surveyors={surveyorRows} />
+    <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">
+      <PageHeader
+        title="Proyek"
+        description={
+          user.role === "surveyor" ? "Proyek yang ditugaskan kepada Anda." : "Semua proyek studio."
+        }
+        action={
+          user.role === "owner" ? (
+            <ButtonLink href="/dashboard/projects/new">Proyek baru</ButtonLink>
+          ) : undefined
+        }
+      />
 
       <DataTable
         columns={projectsColumns}
         data={rows}
+        searchable
+        searchPlaceholder="Cari proyek atau klien…"
+        rowHrefBase="/dashboard/projects"
+        toolbar={
+          <>
+            <ProjectFilters clients={clientRows} surveyors={surveyorRows} />
+            <ActiveFilters clients={clientRows} surveyors={surveyorRows} />
+          </>
+        }
         emptyMessage={
           <EmptyState
             icon={FolderKanbanIcon}

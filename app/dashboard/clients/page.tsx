@@ -1,5 +1,6 @@
 import { UsersIcon } from "lucide-react";
 import { clientsColumns } from "@/components/clients/clients-columns";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -17,16 +18,12 @@ export default async function ClientsPage({
   const rows = await listClients({ includeArchived: showArchived });
 
   return (
-    <main className="flex flex-col gap-6 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-medium">Klien</h1>
-          <p className="text-sm text-muted-foreground">
-            Kelola data klien perorangan dan perusahaan.
-          </p>
-        </div>
-        <ButtonLink href="/dashboard/clients/new">Klien baru</ButtonLink>
-      </div>
+    <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">
+      <PageHeader
+        title="Klien"
+        description="Kelola data klien perorangan dan perusahaan."
+        action={<ButtonLink href="/dashboard/clients/new">Klien baru</ButtonLink>}
+      />
 
       <div className="flex items-center gap-2">
         <ButtonLink
@@ -48,6 +45,9 @@ export default async function ClientsPage({
       <DataTable
         columns={clientsColumns}
         data={rows}
+        searchable
+        searchPlaceholder="Cari nama klien…"
+        rowHrefBase="/dashboard/clients"
         emptyMessage={
           <EmptyState
             icon={UsersIcon}

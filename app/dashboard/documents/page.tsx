@@ -1,5 +1,6 @@
 import { inArray } from "drizzle-orm";
 import { FileSearchIcon } from "lucide-react";
+import { PageHeader } from "@/components/dashboard/page-header";
 import { DocumentsFilters } from "@/components/documents/documents-filters";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -68,15 +69,15 @@ export default async function DocumentsSearchPage({
   }));
 
   return (
-    <main className="flex flex-col gap-6 p-8">
-      <div>
-        <h1 className="text-xl font-medium">Arsip Dokumen</h1>
-        <p className="text-sm text-muted-foreground">
-          {user.role === "surveyor"
+    <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">
+      <PageHeader
+        title="Arsip Dokumen"
+        description={
+          user.role === "surveyor"
             ? "Dokumen dari proyek yang ditugaskan kepada Anda."
-            : "Semua dokumen lintas proyek."}
-        </p>
-      </div>
+            : "Semua dokumen lintas proyek."
+        }
+      />
 
       <DocumentsFilters clients={clientRows} />
 
