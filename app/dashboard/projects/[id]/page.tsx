@@ -9,7 +9,7 @@ import { PaymentForm } from "@/components/projects/payment-form";
 import { StatusChanger } from "@/components/projects/status-changer";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -125,10 +125,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div className="flex items-center gap-2">
           <Badge variant="secondary">{statusLabel[project.status] ?? project.status}</Badge>
           {user.role === "owner" ? (
-            <Button
-              variant="outline"
-              render={<Link href={`/dashboard/projects/${project.id}/edit`}>Edit</Link>}
-            />
+            <ButtonLink variant="outline" href={`/dashboard/projects/${project.id}/edit`}>
+              Edit
+            </ButtonLink>
           ) : null}
         </div>
       </div>

@@ -1,5 +1,4 @@
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 
 export default function NotFound() {
   return (
@@ -8,7 +7,7 @@ export default function NotFound() {
       <p className="max-w-sm text-sm text-muted-foreground">
         Halaman yang Anda cari tidak ada atau sudah dipindahkan.
       </p>
-      <Button render={<Link href="/">Kembali ke beranda</Link>} />
+      <ButtonLink href="/">Kembali ke beranda</ButtonLink>
     </main>
   );
 }

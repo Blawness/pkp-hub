@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getClientById } from "@/lib/actions/clients-logic";
@@ -45,10 +45,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            render={<Link href={`/dashboard/clients/${client.id}/edit`}>Edit</Link>}
-          />
+          <ButtonLink variant="outline" href={`/dashboard/clients/${client.id}/edit`}>
+            Edit
+          </ButtonLink>
           {!client.archivedAt ? <ArchiveClientButton clientId={client.id} /> : null}
         </div>
       </div>
@@ -90,10 +89,9 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               title="Belum ada proyek"
               description="Klien ini belum punya proyek survey."
               action={
-                <Button
-                  size="sm"
-                  render={<Link href="/dashboard/projects/new">Buat proyek</Link>}
-                />
+                <ButtonLink size="sm" href="/dashboard/projects/new">
+                  Buat proyek
+                </ButtonLink>
               }
             />
           ) : (

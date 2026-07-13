@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ViewTransition } from "react";
 import { BrandPanel } from "@/components/brand/brand-panel";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getSession, homeForRole } from "@/lib/auth-guards";
 
@@ -51,7 +50,9 @@ export default async function Home() {
             untuk melanjutkan.
           </p>
 
-          <Button className="mt-8 w-full" size="lg" render={<Link href="/login">Masuk</Link>} />
+          <ButtonLink className="mt-8 w-full" size="lg" href="/login">
+            Masuk
+          </ButtonLink>
 
           <div className="mt-10 space-y-3">
             {AREA.map((area) => (

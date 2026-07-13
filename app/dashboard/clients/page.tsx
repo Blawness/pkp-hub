@@ -1,7 +1,6 @@
 import { UsersIcon } from "lucide-react";
-import Link from "next/link";
 import { clientsColumns } from "@/components/clients/clients-columns";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
@@ -26,20 +25,24 @@ export default async function ClientsPage({
             Kelola data klien perorangan dan perusahaan.
           </p>
         </div>
-        <Button render={<Link href="/dashboard/clients/new">Klien baru</Link>} />
+        <ButtonLink href="/dashboard/clients/new">Klien baru</ButtonLink>
       </div>
 
       <div className="flex items-center gap-2">
-        <Button
+        <ButtonLink
           variant={showArchived ? "outline" : "secondary"}
           size="sm"
-          render={<Link href="/dashboard/clients">Aktif</Link>}
-        />
-        <Button
+          href="/dashboard/clients"
+        >
+          Aktif
+        </ButtonLink>
+        <ButtonLink
           variant={showArchived ? "secondary" : "outline"}
           size="sm"
-          render={<Link href="/dashboard/clients?archived=1">Termasuk yang diarsipkan</Link>}
-        />
+          href="/dashboard/clients?archived=1"
+        >
+          Termasuk yang diarsipkan
+        </ButtonLink>
       </div>
 
       <DataTable
@@ -51,7 +54,9 @@ export default async function ClientsPage({
             title={showArchived ? "Belum ada klien" : "Belum ada klien aktif"}
             description="Tambahkan klien pertama untuk mulai mengelola proyek survey."
             action={
-              <Button size="sm" render={<Link href="/dashboard/clients/new">Klien baru</Link>} />
+              <ButtonLink size="sm" href="/dashboard/clients/new">
+                Klien baru
+              </ButtonLink>
             }
           />
         }

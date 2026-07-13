@@ -1,9 +1,8 @@
 import { eq } from "drizzle-orm";
 import { FolderKanbanIcon } from "lucide-react";
-import Link from "next/link";
 import { ProjectFilters } from "@/components/projects/project-filters";
 import { projectsColumns } from "@/components/projects/projects-columns";
-import { Button } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
@@ -67,7 +66,7 @@ export default async function ProjectsPage({
           </p>
         </div>
         {user.role === "owner" ? (
-          <Button render={<Link href="/dashboard/projects/new">Proyek baru</Link>} />
+          <ButtonLink href="/dashboard/projects/new">Proyek baru</ButtonLink>
         ) : null}
       </div>
 
@@ -93,10 +92,9 @@ export default async function ProjectsPage({
             }
             action={
               user.role === "owner" ? (
-                <Button
-                  size="sm"
-                  render={<Link href="/dashboard/projects/new">Proyek baru</Link>}
-                />
+                <ButtonLink size="sm" href="/dashboard/projects/new">
+                  Proyek baru
+                </ButtonLink>
               ) : undefined
             }
           />

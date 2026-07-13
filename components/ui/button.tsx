@@ -1,4 +1,5 @@
 import { Button as ButtonPrimitive } from "@base-ui/react/button"
+import Link from "next/link"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -55,4 +56,32 @@ function Button({
   )
 }
 
-export { Button, buttonVariants }
+/**
+ * Link yang BERPENAMPILAN tombol — dan tetap sebuah link.
+ *
+ * Jangan pakai `<Button render={<Link/>}>` untuk ini. Base UI menganggap
+ * `render` tetap menghasilkan <button> (`nativeButton` default `true`) dan
+ * memperingatkannya di console; menyetel `nativeButton={false}` memang
+ * membungkam peringatan itu, tapi Base UI lalu menempelkan `role="button"`
+ * pada <a> — sehingga tautan navigasi diumumkan screen reader sebagai tombol
+ * padahal ia berpindah halaman. Dua-duanya salah.
+ *
+ * Yang benar: elemen ini memang link, jadi biarkan ia jadi <a> asli dan
+ * pinjam style tombolnya saja.
+ */
+function ButtonLink({
+  className,
+  variant = "default",
+  size = "default",
+  ...props
+}: React.ComponentProps<typeof Link> & VariantProps<typeof buttonVariants>) {
+  return (
+    <Link
+      data-slot="button"
+      className={cn(buttonVariants({ variant, size, className }))}
+      {...props}
+    />
+  )
+}
+
+export { Button, ButtonLink, buttonVariants }

@@ -81,7 +81,11 @@ export function LoginForm() {
           aria-invalid={!!errors.email}
           {...register("email")}
         />
-        {errors.email ? <p className="text-xs text-destructive">{errors.email.message}</p> : null}
+        {errors.email ? (
+          <p role="alert" className="text-xs text-destructive">
+            {errors.email.message}
+          </p>
+        ) : null}
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="password">Password</Label>
@@ -93,12 +97,20 @@ export function LoginForm() {
           {...register("password")}
         />
         {errors.password ? (
-          <p className="text-xs text-destructive">{errors.password.message}</p>
+          <p role="alert" className="text-xs text-destructive">
+            {errors.password.message}
+          </p>
         ) : null}
       </div>
+      {/*
+        `role="alert"` membuat kegagalan login diumumkan screen reader begitu
+        elemennya masuk DOM. Tanpa ini, satu-satunya penanda bahwa login gagal
+        adalah teks merah — yang tidak terlihat oleh pengguna screen reader.
+      */}
       <AnimatePresence>
         {formError ? (
           <motion.p
+            role="alert"
             className="text-sm text-destructive"
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
