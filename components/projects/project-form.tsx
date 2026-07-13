@@ -4,20 +4,18 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { optionsFromLabels, SelectField, type SelectOption } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createProject, updateProject } from "@/lib/actions/projects";
 import { projectInputSchema } from "@/lib/actions/projects-schemas";
 import { surveyTypeLabel } from "@/lib/labels";
 
 type ProjectFormValues = z.infer<typeof projectInputSchema>;
-
-const selectClassName =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 export function ProjectForm({
   clients,
@@ -42,6 +40,7 @@ export function ProjectForm({
   const isEditing = !!project;
 
   const {
+    control,
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
@@ -60,6 +59,13 @@ export function ProjectForm({
 
   const { executeAsync: executeCreate } = useAction(createProject);
   const { executeAsync: executeUpdate } = useAction(updateProject);
+
+  const clientOptions: SelectOption[] = clients.map((c) => ({ value: c.id, label: c.name }));
+  const typeOptions = optionsFromLabels(surveyTypeLabel);
+  const surveyorOptions: SelectOption[] = [
+    { value: "", label: "Belum ditugaskan" },
+    ...surveyors.map((s) => ({ value: s.id, label: s.name })),
+  ];
 
   const onSubmit = async (values: ProjectFormValues) => {
     setFormError(null);
@@ -89,15 +95,29 @@ export function ProjectForm({
         {errors.title ? <p className="text-xs text-destructive">{errors.title.message}</p> : null}
       </div>
 
+      {/*
+        `register()` hanya bisa dipakai pada elemen form native — ia menempelkan
+        ref + onChange ke DOM node. <SelectField> bukan itu, jadi setiap dropdown
+        di form ini melewati <Controller>, yang menghubungkan state react-hook-form
+        ke pasangan value/onValueChange milik komponennya.
+      */}
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="clientId">Klien</Label>
-        <select id="clientId" className={selectClassName} {...register("clientId")}>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
+        <Controller
+          control={control}
+          name="clientId"
+          render={({ field }) => (
+            <SelectField
+              id="clientId"
+              className="w-full"
+              options={clientOptions}
+              value={field.value ?? ""}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              aria-invalid={!!errors.clientId}
+            />
+          )}
+        />
         {errors.clientId ? (
           <p className="text-xs text-destructive">{errors.clientId.message}</p>
         ) : null}
@@ -105,13 +125,20 @@ export function ProjectForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="surveyType">Jenis survey</Label>
-        <select id="surveyType" className={selectClassName} {...register("surveyType")}>
-          {Object.entries(surveyTypeLabel).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <Controller
+          control={control}
+          name="surveyType"
+          render={({ field }) => (
+            <SelectField
+              id="surveyType"
+              className="w-full"
+              options={typeOptions}
+              value={field.value ?? ""}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -122,18 +149,20 @@ export function ProjectForm({
       {!isEditing ? (
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="assignedSurveyorId">Surveyor</Label>
-          <select
-            id="assignedSurveyorId"
-            className={selectClassName}
-            {...register("assignedSurveyorId")}
-          >
-            <option value="">Belum ditugaskan</option>
-            {surveyors.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="assignedSurveyorId"
+            render={({ field }) => (
+              <SelectField
+                id="assignedSurveyorId"
+                className="w-full"
+                options={surveyorOptions}
+                value={field.value ?? ""}
+                onValueChange={field.onChange}
+                onBlur={field.onBlur}
+              />
+            )}
+          />
         </div>
       ) : (
         <p className="text-xs text-muted-foreground">

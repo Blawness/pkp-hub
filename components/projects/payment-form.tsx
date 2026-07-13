@@ -3,17 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { updatePayment } from "@/lib/actions/finance";
 import type { PaymentStatus } from "@/lib/actions/finance-schemas";
 import { paymentStatusLabel } from "@/lib/labels";
-
-const selectClassName =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 type PaymentFormValues = {
   projectValue: string;
@@ -41,6 +39,7 @@ export function PaymentForm({
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const {
+    control,
     register,
     handleSubmit,
     formState: { isSubmitting },
@@ -89,13 +88,20 @@ export function PaymentForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="paymentStatus">Status pembayaran</Label>
-        <select id="paymentStatus" className={selectClassName} {...register("paymentStatus")}>
-          {Object.entries(paymentStatusLabel).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+        <Controller
+          control={control}
+          name="paymentStatus"
+          render={({ field }) => (
+            <SelectField
+              id="paymentStatus"
+              className="w-full"
+              options={optionsFromLabels(paymentStatusLabel)}
+              value={field.value ?? ""}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">

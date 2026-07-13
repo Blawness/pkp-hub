@@ -36,7 +36,18 @@ function initials(name: string): string {
  * klien, jadi menekan Kembali bisa memperlihatkan sekilas halaman dashboard
  * berisi data orang yang baru saja keluar.
  */
-export function UserMenu({ user, collapsed = false }: { user: SessionUser; collapsed?: boolean }) {
+export function UserMenu({
+  user,
+  collapsed = false,
+  // Default "top" karena pemakaian aslinya ada di KAKI sidebar — menu yang
+  // membuka ke bawah dari sana akan keluar layar. Portal klien memasangnya di
+  // topbar dan harus membalik arahnya.
+  side = "top",
+}: {
+  user: SessionUser;
+  collapsed?: boolean;
+  side?: "top" | "bottom";
+}) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
 
@@ -81,7 +92,7 @@ export function UserMenu({ user, collapsed = false }: { user: SessionUser; colla
         }
       />
 
-      <DropdownMenuContent side="top" align="start" className="w-56">
+      <DropdownMenuContent side={side} align="start" className="w-56">
         {/* Identitas ini bukan label sebuah grup, jadi ia TIDAK memakai
             <DropdownMenuLabel> — di Base UI itu Menu.GroupLabel dan hanya sah
             di dalam Menu.Group. Sekadar teks, ditulis sebagai teks. */}

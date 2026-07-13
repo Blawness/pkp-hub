@@ -145,6 +145,22 @@ export async function setUserRole(
   await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, userId));
 }
 
+/**
+ * Ganti nama tampilan seorang user.
+ *
+ * Berbeda dari `setUserRole`/`archiveUser`, ini TIDAK melarang admin menyentuh
+ * dirinya sendiri: larangan di sana ada karena satu klik salah bisa mengunci
+ * admin dari halaman yang baru ia buka. Mengganti nama tidak memindahkan akses
+ * siapa pun, jadi mengubah nama sendiri justru jalur yang paling sering dipakai.
+ */
+export async function setUserName(userId: string, name: string): Promise<void> {
+  await getUserOrThrow(userId);
+  await db
+    .update(users)
+    .set({ name: name.trim(), updatedAt: new Date() })
+    .where(eq(users.id, userId));
+}
+
 /** Setel ulang password seorang user. Sesi lamanya diputus. */
 export async function setUserPassword(userId: string, password: string): Promise<void> {
   await getUserOrThrow(userId);

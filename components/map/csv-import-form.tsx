@@ -5,6 +5,7 @@ import { type ChangeEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
 import { importMapCsv } from "@/lib/actions/maps";
 import { formatArea } from "@/lib/geo/area";
 import { importCsvToGeoJson } from "@/lib/geo/csv-import";
@@ -16,9 +17,6 @@ import {
 } from "@/lib/geo/reproject";
 import type { DetectedCoordinateFormat, UtmHemisphere } from "@/lib/geo/types";
 import type { MapLayerRow } from "./peta-map";
-
-const selectClassName =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 const zoneOptions = Array.from(
   { length: MAX_UTM_ZONE - MIN_UTM_ZONE + 1 },
@@ -166,47 +164,44 @@ export function CsvImportForm({
           <div className="flex flex-wrap items-end gap-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="format-override">Format koordinat</Label>
-              <select
+              <SelectField
                 id="format-override"
-                className={selectClassName}
+                options={[
+                  { value: "auto", label: "Otomatis (terdeteksi)" },
+                  { value: "latlong", label: "Lintang/Bujur (WGS84)" },
+                  { value: "utm", label: "UTM (easting/northing)" },
+                ]}
                 value={formatOverride}
-                onChange={(e) =>
-                  setFormatOverride(e.target.value as DetectedCoordinateFormat | "auto")
+                onValueChange={(value) =>
+                  setFormatOverride(value as DetectedCoordinateFormat | "auto")
                 }
-              >
-                <option value="auto">Otomatis (terdeteksi)</option>
-                <option value="latlong">Lintang/Bujur (WGS84)</option>
-                <option value="utm">UTM (easting/northing)</option>
-              </select>
+              />
             </div>
             {isUtm ? (
               <>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="utm-zone">Zona UTM</Label>
-                  <select
+                  {/* Zona UTM disimpan sebagai number, sementara <SelectField>
+                      bekerja dengan string — konversinya di sini, bukan di
+                      state, supaya `utmZone` tetap number bagi `importCsvToGeoJson`. */}
+                  <SelectField
                     id="utm-zone"
-                    className={selectClassName}
-                    value={utmZone}
-                    onChange={(e) => setUtmZone(Number(e.target.value))}
-                  >
-                    {zoneOptions.map((z) => (
-                      <option key={z} value={z}>
-                        {z}
-                      </option>
-                    ))}
-                  </select>
+                    options={zoneOptions.map((z) => ({ value: String(z), label: String(z) }))}
+                    value={String(utmZone)}
+                    onValueChange={(value) => setUtmZone(Number(value))}
+                  />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="utm-hemisphere">Belahan bumi</Label>
-                  <select
+                  <SelectField
                     id="utm-hemisphere"
-                    className={selectClassName}
+                    options={[
+                      { value: "S", label: "Selatan (S)" },
+                      { value: "N", label: "Utara (N)" },
+                    ]}
                     value={utmHemisphere}
-                    onChange={(e) => setUtmHemisphere(e.target.value as UtmHemisphere)}
-                  >
-                    <option value="S">Selatan (S)</option>
-                    <option value="N">Utara (N)</option>
-                  </select>
+                    onValueChange={(value) => setUtmHemisphere(value as UtmHemisphere)}
+                  />
                 </div>
               </>
             ) : null}
