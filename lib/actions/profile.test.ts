@@ -2,11 +2,30 @@ import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { updateOwnNameSchema } from "@/lib/actions/profile-schemas";
 import { setUserName } from "@/lib/actions/users-logic";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { accounts, sessions, users } from "@/lib/db/schema";
+
+// `updateOwnNameAction` (via `authActionClient` -> `requireUser()`) calls
+// `headers()` from `next/headers`, which only works inside a real request
+// context. Outside of one it throws. We fake a request context by capturing
+// a `Headers` instance carrying a real session cookie (see the "smuggled
+// userId" test below) and returning it from a mocked `headers()`.
+let mockedRequestHeaders: Headers | undefined;
+vi.mock("next/headers", () => ({
+  headers: async () => mockedRequestHeaders ?? new Headers(),
+}));
+// `revalidatePath` also requires a request context outside of which it
+// throws; the action's own correctness isn't about caching, so stub it out.
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
+// Imported after the mocks above so the action picks up the mocked modules.
+const { updateOwnNameAction } = await import("@/lib/actions/profile");
 
 /**
  * Batas keamanan fitur profil ada di SATU tempat: `userId` datang dari sesi
@@ -75,5 +94,51 @@ describe("ganti nama sendiri", () => {
     const [me] = await db.select().from(users).where(eq(users.id, meId));
     expect(me.role).toBe("surveyor");
     expect(me.email).toBe(`me-${meId}@fixture.test`);
+  });
+});
+
+describe("updateOwnNameAction (integrasi)", () => {
+  it("mengabaikan userId yang diselundupkan di payload dan hanya mengubah nama pemanggil", async () => {
+    const meEmail = `me-${meId}@fixture.test`;
+    const { headers: signInHeaders } = await auth.api.signInEmail({
+      body: { email: meEmail, password },
+      returnHeaders: true,
+    });
+
+    const setCookie = signInHeaders.get("set-cookie") ?? "";
+    const cookieHeader = setCookie
+      .split(/,(?=\s*[\w.-]+=)/)
+      .map((part) => part.split(";")[0].trim())
+      .filter(Boolean)
+      .join("; ");
+    expect(cookieHeader).toContain("better-auth.session_token=");
+
+    mockedRequestHeaders = new Headers({ cookie: cookieHeader });
+
+    const [otherBefore] = await db.select().from(users).where(eq(users.id, otherId));
+
+    // Selundupkan userId milik ORANG LAIN di payload. Kalau action pernah
+    // diubah untuk membaca userId dari input alih-alih ctx.user.id (sesi),
+    // ini akan mengubah nama `other`, bukan `me` -- dan assertion di bawah
+    // akan gagal.
+    const result = await updateOwnNameAction({
+      name: "Nama Hasil Serangan",
+      // @ts-expect-error -- sengaja mengirim field yang tidak ada di skema
+      userId: otherId,
+    });
+
+    mockedRequestHeaders = undefined;
+
+    if (result.serverError) {
+      throw new Error(`updateOwnNameAction gagal: ${result.serverError}`);
+    }
+    expect(result.data).toEqual({ success: true });
+
+    const [meAfter] = await db.select().from(users).where(eq(users.id, meId));
+    const [otherAfter] = await db.select().from(users).where(eq(users.id, otherId));
+
+    expect(meAfter.name).toBe("Nama Hasil Serangan");
+    expect(otherAfter.name).toBe(otherBefore.name);
+    expect(otherAfter.name).not.toBe("Nama Hasil Serangan");
   });
 });
