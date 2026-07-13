@@ -8,7 +8,7 @@ import { type NextRequest, NextResponse } from "next/server";
  * still calls the authoritative helpers in `lib/auth-guards.ts`, which hit
  * the DB and do row-level scoping. See phase-2 brief §3–§4.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isDashboard = pathname.startsWith("/dashboard");
   const isPortal = pathname.startsWith("/portal");
@@ -39,5 +39,4 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: ["/dashboard/:path*", "/portal/:path*"],
-  runtime: "nodejs",
 };

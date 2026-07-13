@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 };
 
 /**
- * Authoritative role check for the staff area (owner + surveyor). Middleware
+ * Authoritative role check for the staff area (owner + surveyor). The proxy
  * only does a coarse cookie-cache check; this is the real gate — it hits the
  * DB via `getSession`/`requireStaff`.
  */
