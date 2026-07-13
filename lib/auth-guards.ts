@@ -8,7 +8,7 @@ import { clients, projects } from "@/lib/db/schema";
 /**
  * THE SECURITY BOUNDARY (Phase 2 brief §4).
  *
- * `middleware.ts` is only a coarse, cookie-presence gate. Every server
+ * `proxy.ts` is only a coarse, cookie-presence gate. Every server
  * action / RSC / route handler that touches project or client data MUST go
  * through the helpers below — they are the only place row-level scoping is
  * enforced. Never bypass `assertProjectAccess` / `listProjectsForUser` by
@@ -25,14 +25,14 @@ export type SessionUser = {
 };
 
 /** URL prefix each role should land on / be bounced back to. */
-function homeForRole(role: Role): string {
+export function homeForRole(role: Role): string {
   return role === "client" ? "/portal" : "/dashboard";
 }
 
 /** Current session, or null if unauthenticated. Never throws. */
 export async function getSession(): Promise<{ user: SessionUser } | null> {
   // `disableCookieCache: true` forces a real DB lookup. `session.cookieCache`
-  // in `lib/auth.ts` is still enabled for `middleware.ts`'s coarse, cheap
+  // in `lib/auth.ts` is still enabled for `proxy.ts`'s coarse, cheap
   // gate, but THIS is the security boundary (see file header), so it must
   // never trust the (up to 5-minute stale) signed cookie — a revoked/deleted
   // session or a role change (owner -> client) has to take effect immediately.
