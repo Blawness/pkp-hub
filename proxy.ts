@@ -1,13 +1,28 @@
-import { getCookieCache } from "better-auth/cookies";
+import { getCookieCache, getSessionCookie } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
 import type { Role } from "@/lib/auth-guards";
 
 /**
- * Coarse route gate. Reads the signed session cookie cache (no DB call) to
- * decide unauthenticated vs. wrong-area redirects fast at the edge of the
- * request. This is NOT the security boundary — every server action / RSC
- * still calls the authoritative helpers in `lib/auth-guards.ts`, which hit
- * the DB and do row-level scoping. See phase-2 brief §3–§4.
+ * Coarse route gate. Reads cookies only (no DB call) to decide
+ * unauthenticated vs. wrong-area redirects fast at the edge of the request.
+ * This is NOT the security boundary — every server action / RSC still calls
+ * the authoritative helpers in `lib/auth-guards.ts`, which hit the DB and do
+ * row-level scoping. See phase-2 brief §3–§4.
+ *
+ * Dua cookie yang dibaca di sini punya umur yang SANGAT berbeda, dan
+ * membedakannya adalah inti dari gerbang ini:
+ *
+ *  - `session_token` (7 hari) — satu-satunya bukti "user ini sudah login".
+ *  - `session_data`  (5 menit, `session.cookieCache.maxAge` di lib/auth.ts) —
+ *    hanya cache berisi role, dan ia TIDAK PERNAH diperbarui: satu-satunya
+ *    yang menulisnya adalah response dari `/api/auth/*`, sedangkan aplikasi
+ *    ini tidak memakai `useSession` di klien dan tidak memasang `nextCookies()`
+ *    (RSC pun tak boleh menyetel cookie saat render).
+ *
+ * Menilai "sudah login atau belum" dari `session_data` — seperti versi
+ * sebelumnya — berarti menendang setiap user ke /login 5 menit setelah masuk,
+ * padahal sesinya di database masih sah berhari-hari. Itu bug produksi yang
+ * nyata, dan `proxy.test.ts` menguncinya.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -18,17 +33,27 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const cache = await getCookieCache(request);
+  if (!getSessionCookie(request)) {
+    const loginUrl = new URL("/login", request.url);
+    loginUrl.searchParams.set("redirectTo", pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Mulai sini user PASTI punya session_token. Cookie cache cuma dipakai untuk
+  // membelokkan salah-area lebih awal, dan itu murni optimasi: begitu ia basi
+  // (atau belum sempat ditulis) kita teruskan saja, karena layout `/dashboard`
+  // dan `/portal` sudah memanggil `requireStaff`/`requireClient` yang
+  // membelokkan berdasarkan role dari DB. Gerbang ini boleh melewatkan, tidak
+  // boleh salah menolak.
+  //
   // Type-only import dari auth-guards: `Role` hilang saat kompilasi, jadi
   // proxy tidak ikut menarik lib/db ke runtime-nya. Menyalin union-nya di sini
   // justru yang berbahaya — salinan itu tetap menyebut "owner" setelah enum
   // di-rename, dan tidak ada yang memberitahu.
+  const cache = await getCookieCache(request);
   const role = cache?.user?.role as Role | undefined;
-
   if (!role) {
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("redirectTo", pathname);
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.next();
   }
 
   if (isDashboard && role === "client") {
