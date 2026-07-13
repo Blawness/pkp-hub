@@ -1,10 +1,8 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { optionsFromLabels, SelectField, type SelectOption } from "@/components/ui/select-field";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
-
-const selectClassName =
-  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 /**
  * URL-search-param-driven filters (status / klien / surveyor / jenis) for
@@ -33,63 +31,45 @@ export function ProjectFilters({
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  // "" adalah opsi sungguhan ("Semua ..."), bukan placeholder: memilihnya
+  // berarti membuang param filternya dari URL — lihat `setParam`.
+  const statusOptions = optionsFromLabels(statusLabel, { value: "", label: "Semua status" });
+  const typeOptions = optionsFromLabels(surveyTypeLabel, { value: "", label: "Semua jenis" });
+  const clientOptions: SelectOption[] = [
+    { value: "", label: "Semua klien" },
+    ...clients.map((c) => ({ value: c.id, label: c.name })),
+  ];
+  const surveyorOptions: SelectOption[] = [
+    { value: "", label: "Semua surveyor" },
+    ...surveyors.map((s) => ({ value: s.id, label: s.name })),
+  ];
+
   return (
     <div className="flex flex-wrap gap-2">
-      <select
+      <SelectField
         aria-label="Filter status"
-        className={selectClassName}
+        options={statusOptions}
         value={searchParams.get("status") ?? ""}
-        onChange={(e) => setParam("status", e.target.value)}
-      >
-        <option value="">Semua status</option>
-        {Object.entries(statusLabel).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
-
-      <select
+        onValueChange={(value) => setParam("status", value)}
+      />
+      <SelectField
         aria-label="Filter klien"
-        className={selectClassName}
+        options={clientOptions}
         value={searchParams.get("clientId") ?? ""}
-        onChange={(e) => setParam("clientId", e.target.value)}
-      >
-        <option value="">Semua klien</option>
-        {clients.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
-
-      <select
+        onValueChange={(value) => setParam("clientId", value)}
+      />
+      <SelectField
         aria-label="Filter surveyor"
-        className={selectClassName}
+        options={surveyorOptions}
         value={searchParams.get("surveyorId") ?? ""}
-        onChange={(e) => setParam("surveyorId", e.target.value)}
-      >
-        <option value="">Semua surveyor</option>
-        {surveyors.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-
-      <select
+        onValueChange={(value) => setParam("surveyorId", value)}
+      />
+      <SelectField
         aria-label="Filter jenis"
-        className={selectClassName}
+        options={typeOptions}
         value={searchParams.get("surveyType") ?? ""}
-        onChange={(e) => setParam("surveyType", e.target.value)}
-      >
-        <option value="">Semua jenis</option>
-        {Object.entries(surveyTypeLabel).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+        onValueChange={(value) => setParam("surveyType", value)}
+      />
     </div>
   );
 }

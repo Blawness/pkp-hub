@@ -58,6 +58,17 @@
 }
 
 :root {
+  /*
+   * Memberi tahu browser palet mana yang dipakai, dan ini BUKAN duplikat dari
+   * token di bawahnya. Kontrol native — daftar opsi <select>, date picker
+   * <input type="date">, scrollbar, autofill — digambar oleh browser/OS, bukan
+   * oleh CSS kita. Satu-satunya kanal untuk mempengaruhinya adalah properti
+   * ini. Tanpa `color-scheme: dark` di `.dark`, kotak <select> ikut gelap
+   * (itu Tailwind) tapi popup opsinya tetap dirender dengan palet terang
+   * bawaan browser — persis inkonsistensi yang terlihat di produksi.
+   */
+  color-scheme: light;
+
   /* Vorca brand palette */
   --brand-base: #0a0d14;
   --brand-primary: #1b6fd8;
@@ -98,6 +109,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+
   --background: var(--brand-base);
   --foreground: oklch(0.97 0.005 260);
   --card: oklch(0.21 0.02 260);

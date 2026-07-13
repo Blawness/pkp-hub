@@ -4,14 +4,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createClient, updateClient } from "@/lib/actions/clients";
 import { clientInputSchema } from "@/lib/actions/clients-schemas";
+import { clientTypeLabel } from "@/lib/labels";
 
 type ClientFormValues = z.infer<typeof clientInputSchema>;
 
@@ -33,6 +35,7 @@ export function ClientForm({
   const isEditing = !!client;
 
   const {
+    control,
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
@@ -81,14 +84,20 @@ export function ClientForm({
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="type">Tipe</Label>
-        <select
-          id="type"
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-          {...register("type")}
-        >
-          <option value="individual">Perorangan</option>
-          <option value="company">Perusahaan</option>
-        </select>
+        <Controller
+          control={control}
+          name="type"
+          render={({ field }) => (
+            <SelectField
+              id="type"
+              className="w-full"
+              options={optionsFromLabels(clientTypeLabel)}
+              value={field.value ?? ""}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+            />
+          )}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">

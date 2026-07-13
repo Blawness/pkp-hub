@@ -4,10 +4,8 @@ import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SelectField, type SelectOption } from "@/components/ui/select-field";
 import { assignSurveyor } from "@/lib/actions/projects";
-
-const selectClassName =
-  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 /** Admin-only: this component must never be rendered for a surveyor. */
 export function AssignSurveyorForm({
@@ -24,22 +22,20 @@ export function AssignSurveyorForm({
   const [error, setError] = useState<string | null>(null);
   const { executeAsync, isExecuting } = useAction(assignSurveyor);
 
+  const options: SelectOption[] = [
+    { value: "", label: "Belum ditugaskan" },
+    ...surveyors.map((s) => ({ value: s.id, label: s.name })),
+  ];
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <select
+        <SelectField
           aria-label="Assign surveyor"
-          className={selectClassName}
+          options={options}
           value={surveyorId}
-          onChange={(e) => setSurveyorId(e.target.value)}
-        >
-          <option value="">Belum ditugaskan</option>
-          {surveyors.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+          onValueChange={setSurveyorId}
+        />
         <Button
           size="sm"
           variant="outline"

@@ -2,10 +2,8 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Input } from "@/components/ui/input";
+import { optionsFromLabels, SelectField, type SelectOption } from "@/components/ui/select-field";
 import { documentCategoryLabel } from "@/lib/labels";
-
-const selectClassName =
-  "h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 /**
  * URL-search-param-driven filters for the cross-project document search
@@ -28,6 +26,15 @@ export function DocumentsFilters({ clients }: { clients: { id: string; name: str
     router.push(`${pathname}?${params.toString()}`);
   }
 
+  const categoryOptions = optionsFromLabels(documentCategoryLabel, {
+    value: "",
+    label: "Semua kategori",
+  });
+  const clientOptions: SelectOption[] = [
+    { value: "", label: "Semua klien" },
+    ...clients.map((c) => ({ value: c.id, label: c.name })),
+  ];
+
   return (
     <div className="flex flex-wrap gap-2">
       <Input
@@ -38,33 +45,19 @@ export function DocumentsFilters({ clients }: { clients: { id: string; name: str
         onChange={(e) => setParam("q", e.target.value)}
       />
 
-      <select
+      <SelectField
         aria-label="Filter kategori"
-        className={selectClassName}
+        options={categoryOptions}
         value={searchParams.get("category") ?? ""}
-        onChange={(e) => setParam("category", e.target.value)}
-      >
-        <option value="">Semua kategori</option>
-        {Object.entries(documentCategoryLabel).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
-      </select>
+        onValueChange={(value) => setParam("category", value)}
+      />
 
-      <select
+      <SelectField
         aria-label="Filter klien"
-        className={selectClassName}
+        options={clientOptions}
         value={searchParams.get("clientId") ?? ""}
-        onChange={(e) => setParam("clientId", e.target.value)}
-      >
-        <option value="">Semua klien</option>
-        {clients.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+        onValueChange={(value) => setParam("clientId", value)}
+      />
 
       <Input
         aria-label="Dari tanggal"

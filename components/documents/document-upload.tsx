@@ -5,12 +5,10 @@ import { type ChangeEvent, type DragEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { uploadDocument } from "@/lib/actions/documents";
 import type { DocumentCategory } from "@/lib/actions/documents-schemas";
 import { documentCategoryLabel } from "@/lib/labels";
-
-const selectClassName =
-  "h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
 type UploadTarget = { mode: "presigned" | "direct"; uploadUrl: string; publicUrl: string };
 
@@ -137,18 +135,12 @@ export function DocumentUpload({ projectId }: { projectId: string }) {
           </div>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="doc-category">Kategori</Label>
-            <select
+            <SelectField
               id="doc-category"
-              className={selectClassName}
+              options={optionsFromLabels(documentCategoryLabel)}
               value={category}
-              onChange={(e) => setCategory(e.target.value as DocumentCategory)}
-            >
-              {Object.entries(documentCategoryLabel).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              onValueChange={(value) => setCategory(value as DocumentCategory)}
+            />
           </div>
           <Button type="button" onClick={handleUpload} disabled={isUploading}>
             {isUploading ? "Mengunggah..." : "Unggah"}
