@@ -2,8 +2,8 @@
 
 import type { ColumnDef } from "@tanstack/react-table";
 import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { StatusBadge } from "@/components/projects/status-badge";
+import { surveyTypeLabel } from "@/lib/labels";
 
 export type ProjectRow = {
   id: string;
@@ -41,9 +41,7 @@ export const projectsColumns: ColumnDef<ProjectRow>[] = [
   {
     accessorKey: "status",
     header: "Status",
-    cell: ({ row }) => (
-      <Badge variant="secondary">{statusLabel[row.original.status] ?? row.original.status}</Badge>
-    ),
+    cell: ({ row }) => <StatusBadge status={row.original.status} />,
   },
   {
     accessorKey: "orderDate",

@@ -2,6 +2,7 @@
 
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
 import type { PointerEvent } from "react";
+import { GRID_BACKGROUND_IMAGE, GRID_BACKGROUND_SIZE } from "@/components/brand/grid-texture";
 import { Reveal, Stagger } from "@/components/motion/reveal";
 
 const LAYANAN = ["Survey topografi", "Pengukuran lahan", "Pemetaan digital"];
@@ -57,9 +58,8 @@ export function BrandPanel() {
         style={{
           x: gridX,
           y: gridY,
-          backgroundImage:
-            "linear-gradient(to right, color-mix(in oklch, var(--brand-accent), transparent 92%) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in oklch, var(--brand-accent), transparent 92%) 1px, transparent 1px)",
-          backgroundSize: "48px 48px",
+          backgroundImage: GRID_BACKGROUND_IMAGE,
+          backgroundSize: GRID_BACKGROUND_SIZE,
         }}
       />
 

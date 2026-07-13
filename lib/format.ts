@@ -8,6 +8,23 @@ export function formatIDR(value: number | null | undefined): string {
   }).format(value);
 }
 
+const relative = new Intl.RelativeTimeFormat("id-ID", { numeric: "auto" });
+
+/**
+ * Waktu relatif ringkas, mis. `2 hari lalu` / `kemarin`.
+ *
+ * Dipanggil dari Server Component, jadi "sekarang" adalah jam server. Untuk
+ * granularitas hari ke atas itu tidak masalah; jangan pakai ini untuk selisih
+ * dalam hitungan menit, yang akan terasa meleset bagi klien di zona waktu lain.
+ */
+export function formatRelativeDate(date: Date, now: Date = new Date()): string {
+  const days = Math.round((date.getTime() - now.getTime()) / 86_400_000);
+  if (Math.abs(days) < 1) return "hari ini";
+  if (Math.abs(days) < 30) return relative.format(days, "day");
+  if (Math.abs(days) < 365) return relative.format(Math.round(days / 30), "month");
+  return relative.format(Math.round(days / 365), "year");
+}
+
 /** Human-readable file size, e.g. `1.2 MB`. */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;

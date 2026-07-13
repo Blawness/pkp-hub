@@ -2,7 +2,7 @@ import { inArray } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth-guards";
 import { listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients } from "@/lib/db/schema";
+import { clients, users } from "@/lib/db/schema";
 
 /**
  * Server-only business logic for the per-role Dashboard Ringkasan (PRD §3
@@ -53,11 +53,23 @@ async function clientNameMap(clientIds: string[]): Promise<Map<string, string>> 
   return new Map(rows.map((c) => [c.id, c.name]));
 }
 
+async function surveyorNameMap(ids: (string | null)[]): Promise<Map<string, string>> {
+  const unique = [...new Set(ids.filter((id): id is string => id !== null))];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(inArray(users.id, unique));
+  return new Map(rows.map((u) => [u.id, u.name]));
+}
+
 export type OwnerDashboardLatestProject = {
   id: string;
   title: string;
   status: string;
+  surveyType: string;
   clientName: string;
+  surveyorName: string | null;
   orderDate: Date;
 };
 
@@ -86,17 +98,26 @@ export async function getOwnerDashboardData(user: SessionUser): Promise<OwnerDas
     }
   }
 
-  const nameById = await clientNameMap(allProjects.map((p) => p.clientId));
-  const latestProjects = [...allProjects]
+  // Hanya 5 proyek terbaru yang ditampilkan, jadi nama surveyor cukup dicari
+  // untuk lima itu — bukan untuk seluruh proyek studio.
+  const latest = [...allProjects]
     .sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime())
-    .slice(0, 5)
-    .map((p) => ({
-      id: p.id,
-      title: p.title,
-      status: p.status,
-      clientName: nameById.get(p.clientId) ?? "—",
-      orderDate: p.orderDate,
-    }));
+    .slice(0, 5);
+
+  const [nameById, surveyorById] = await Promise.all([
+    clientNameMap(allProjects.map((p) => p.clientId)),
+    surveyorNameMap(latest.map((p) => p.assignedSurveyorId)),
+  ]);
+
+  const latestProjects = latest.map((p) => ({
+    id: p.id,
+    title: p.title,
+    status: p.status,
+    surveyType: p.surveyType,
+    clientName: nameById.get(p.clientId) ?? "—",
+    surveyorName: p.assignedSurveyorId ? (surveyorById.get(p.assignedSurveyorId) ?? null) : null,
+    orderDate: p.orderDate,
+  }));
 
   return { countsByStatus, totalActiveValue, totalUnpaid, latestProjects };
 }
