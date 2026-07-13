@@ -1,5 +1,11 @@
 import type { LucideIcon } from "lucide-react";
-import { FileTextIcon, FolderKanbanIcon, LayoutDashboardIcon, UsersIcon } from "lucide-react";
+import {
+  FileTextIcon,
+  FolderKanbanIcon,
+  LayoutDashboardIcon,
+  SettingsIcon,
+  UsersIcon,
+} from "lucide-react";
 import type { Role } from "@/lib/auth-guards";
 
 /**
@@ -40,6 +46,12 @@ export function buildLinks(role: Role): NavLink[] {
 
   if (role === "admin") {
     links.push({ segment: "clients", href: "/dashboard/clients", label: "Klien", icon: UsersIcon });
+    links.push({
+      segment: "settings",
+      href: "/dashboard/settings/users",
+      label: "Pengaturan",
+      icon: SettingsIcon,
+    });
   }
 
   return links;

@@ -12,6 +12,7 @@ import type { SessionUser } from "@/lib/auth-guards";
 const ACTION_LABELS: Record<string, string> = {
   new: "Baru",
   edit: "Edit",
+  users: "User",
 };
 
 type Crumb = { key: string; label: string; href?: string };

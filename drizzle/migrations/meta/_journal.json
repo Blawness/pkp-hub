@@ -15,6 +15,13 @@
       "when": 1783925974707,
       "tag": "0001_nasty_shotgun",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783926749580,
+      "tag": "0002_classy_kitty_pryde",
+      "breakpoints": true
     }
   ]
 }

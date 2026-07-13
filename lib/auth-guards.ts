@@ -29,7 +29,17 @@ export function homeForRole(role: Role): string {
   return role === "client" ? "/portal" : "/dashboard";
 }
 
-/** Current session, or null if unauthenticated. Never throws. */
+/**
+ * Current session, or null if unauthenticated. Never throws.
+ *
+ * User yang diarsipkan diperlakukan SAMA dengan tidak login. Pengecekannya ada
+ * di sini, di batas keamanan, bukan di masing-masing halaman — arsip yang cuma
+ * menyembunyikan baris dari sebuah tabel tidak mencabut akses siapa pun.
+ *
+ * Pengarsipan juga menghapus baris `sessions` milik user itu (lihat
+ * `users-logic.ts`), jadi sesi yang sedang berjalan langsung putus. Sabuk dan
+ * bretel: kalaupun ada baris sesi yang lolos, gerbang ini tetap menutupnya.
+ */
 export async function getSession(): Promise<{ user: SessionUser } | null> {
   // `disableCookieCache: true` forces a real DB lookup. `session.cookieCache`
   // in `lib/auth.ts` is still enabled for `proxy.ts`'s coarse, cheap
@@ -41,7 +51,11 @@ export async function getSession(): Promise<{ user: SessionUser } | null> {
     query: { disableCookieCache: true },
   });
   if (!session) return null;
-  return { user: session.user as SessionUser };
+
+  const user = session.user as SessionUser & { archivedAt?: Date | string | null };
+  if (user.archivedAt) return null;
+
+  return { user };
 }
 
 /** Session user, or redirect to /login if unauthenticated. */

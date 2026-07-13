@@ -55,6 +55,12 @@ export const users = pgTable("user", {
   emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
   role: userRole("role").notNull().default("client"),
+  // Soft delete. Baris user TIDAK pernah dihapus: projects.assignedSurveyorId,
+  // documents.uploadedById, dan projectStatusLogs menunjuk ke sini lewat FK,
+  // jadi DELETE akan gagal — atau, kalau dipaksa cascade, ikut menghapus
+  // riwayat pekerjaan orang tersebut. Mengarsipkan mencabut aksesnya tanpa
+  // merusak jejak siapa mengerjakan apa.
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });

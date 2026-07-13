@@ -46,3 +46,6 @@ next-env.d.ts
 
 # local dev object storage (Phase 4 — never used in production)
 /.storage/
+
+# Artefak sesi playwright-cli (bukan bagian dari proyek)
+.playwright-cli/

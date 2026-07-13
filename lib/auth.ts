@@ -59,6 +59,14 @@ export const auth = betterAuth({
         input: false,
         defaultValue: "client",
       },
+      // Ikut dibawa ke objek sesi supaya `getSession` di auth-guards bisa
+      // menolak user terarsip tanpa satu query tambahan di setiap request.
+      // `input: false` — tidak ada payload dari klien yang boleh menyetelnya.
+      archivedAt: {
+        type: "date",
+        input: false,
+        required: false,
+      },
     },
   },
   session: {
