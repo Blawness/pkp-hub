@@ -11,16 +11,16 @@ import {
   clientInputSchema,
   updateClientInputSchema,
 } from "@/lib/actions/clients-schemas";
-import { ownerActionClient } from "@/lib/actions/safe-action";
+import { adminActionClient } from "@/lib/actions/safe-action";
 
 /**
- * Owner-only server actions for client CRUD (PRD §3 Feature 1). Business
+ * Admin-only server actions for client CRUD (PRD §3 Feature 1). Business
  * logic + the role check itself live in `clients-logic.ts` (directly unit
- * tested in `clients.test.ts`); `ownerActionClient` here is the primary,
+ * tested in `clients.test.ts`); `adminActionClient` here is the primary,
  * request-bound enforcement of the same rule.
  */
 
-export const createClient = ownerActionClient
+export const createClient = adminActionClient
   .inputSchema(clientInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const client = await createClientForUser(ctx.user, parsedInput);
@@ -28,7 +28,7 @@ export const createClient = ownerActionClient
     return { success: true as const, client };
   });
 
-export const updateClient = ownerActionClient
+export const updateClient = adminActionClient
   .inputSchema(updateClientInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const client = await updateClientForUser(ctx.user, parsedInput);
@@ -37,7 +37,7 @@ export const updateClient = ownerActionClient
     return { success: true as const, client };
   });
 
-export const archiveClient = ownerActionClient
+export const archiveClient = adminActionClient
   .inputSchema(archiveClientInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const client = await archiveClientForUser(ctx.user, parsedInput);

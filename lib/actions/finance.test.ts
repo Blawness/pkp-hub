@@ -10,11 +10,11 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
 /**
  * Runs against the real (Neon) dev database, same convention as
  * `documents.test.ts`. Exercises the phase-6/7 brief's REQUIRED test: a
- * surveyor calling `updatePayment` is rejected (owner-only) — this must
- * fail if the owner-only guard in `finance-logic.ts` is ever removed.
+ * surveyor calling `updatePayment` is rejected (admin-only) — this must
+ * fail if the admin-only guard in `finance-logic.ts` is ever removed.
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyor: SessionUser;
 let projectId: string;
 
@@ -26,15 +26,15 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorId = randomUUID();
 
   await db.insert(users).values([
     {
-      id: ownerId,
-      name: "Finance Test Owner",
-      email: "test-owner-finance@fixture.test",
-      role: "owner",
+      id: adminId,
+      name: "Finance Test Admin",
+      email: "test-admin-finance@fixture.test",
+      role: "admin",
     },
     {
       id: surveyorId,
@@ -44,11 +44,11 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = {
-    id: ownerId,
-    name: "Finance Test Owner",
-    email: "test-owner-finance@fixture.test",
-    role: "owner",
+  admin = {
+    id: adminId,
+    name: "Finance Test Admin",
+    email: "test-admin-finance@fixture.test",
+    role: "admin",
   };
   surveyor = {
     id: surveyorId,
@@ -97,8 +97,8 @@ describe("updatePaymentForUser", () => {
     expect(row.paymentStatus).toBe("belum");
   });
 
-  it("the owner CAN update payment info", async () => {
-    const updated = await updatePaymentForUser(owner, {
+  it("the admin CAN update payment info", async () => {
+    const updated = await updatePaymentForUser(admin, {
       projectId,
       projectValue: 5_000_000,
       paymentStatus: "lunas",
@@ -109,9 +109,9 @@ describe("updatePaymentForUser", () => {
     expect(updated.paymentNotes).toBe("Lunas via transfer.");
   });
 
-  it("an owner updating a project that does not exist is rejected", async () => {
+  it("an admin updating a project that does not exist is rejected", async () => {
     await expect(
-      updatePaymentForUser(owner, {
+      updatePaymentForUser(admin, {
         projectId: randomUUID(),
         projectValue: 1,
         paymentStatus: "belum",

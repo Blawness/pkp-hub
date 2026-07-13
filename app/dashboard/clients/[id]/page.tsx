@@ -7,28 +7,28 @@ import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getClientById } from "@/lib/actions/clients-logic";
-import { listProjectsForUser, requireOwner } from "@/lib/auth-guards";
+import { listProjectsForUser, requireAdmin } from "@/lib/auth-guards";
 import { clientTypeLabel, statusLabel } from "@/lib/labels";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // Defense in depth: this route is already owner-gated by `layout.tsx`,
+  // Defense in depth: this route is already admin-gated by `layout.tsx`,
   // but `generateMetadata` runs independently, so re-check here rather than
   // rely purely on rendering order before touching `getClientById`.
-  await requireOwner();
+  await requireAdmin();
   const client = await getClientById(id);
   return { title: client?.name ?? "Klien" };
 }
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireOwner();
+  const user = await requireAdmin();
 
   const client = await getClientById(id);
   if (!client) notFound();
 
   // Mandatory scoping rule: never query `projects` directly — go through
-  // `listProjectsForUser`, then filter to this client in-memory. As owner,
+  // `listProjectsForUser`, then filter to this client in-memory. As admin,
   // `user` sees every project, so this is equivalent to (but never bypasses)
   // the shared scoping helper.
   const allProjects = await listProjectsForUser(user);

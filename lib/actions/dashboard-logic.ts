@@ -11,7 +11,7 @@ import { clients, users } from "@/lib/db/schema";
  * `totalUnpaid` sums `projectValue` for projects with `paymentStatus` in
  * belum|sebagian, EXCLUDING `dibatalkan` (cancelled) projects — a cancelled
  * project's unpaid balance is not real outstanding revenue and must not
- * inflate the owner dashboard's "total unpaid" figure.
+ * inflate the admin dashboard's "total unpaid" figure.
  *
  * CRITICAL, security-load-bearing: `getSurveyorDashboardData` builds its
  * output as an explicit field-by-field projection — it NEVER spreads a raw
@@ -31,9 +31,9 @@ const UNPAID_STATUSES = new Set(["belum", "sebagian"]);
 const CANCELLED_STATUS = "dibatalkan";
 const NEEDS_ACTION_STATUSES = new Set(["baru", "dijadwalkan", "data_diambil"]);
 
-function requireOwner(user: SessionUser) {
-  if (user.role !== "owner") {
-    throw new Error("Only the owner can view the owner dashboard.");
+function requireAdmin(user: SessionUser) {
+  if (user.role !== "admin") {
+    throw new Error("Only the admin can view the admin dashboard.");
   }
 }
 
@@ -63,7 +63,7 @@ async function surveyorNameMap(ids: (string | null)[]): Promise<Map<string, stri
   return new Map(rows.map((u) => [u.id, u.name]));
 }
 
-export type OwnerDashboardLatestProject = {
+export type AdminDashboardLatestProject = {
   id: string;
   title: string;
   status: string;
@@ -73,16 +73,16 @@ export type OwnerDashboardLatestProject = {
   orderDate: Date;
 };
 
-export type OwnerDashboardData = {
+export type AdminDashboardData = {
   countsByStatus: Record<string, number>;
   totalActiveValue: number;
   totalUnpaid: number;
-  latestProjects: OwnerDashboardLatestProject[];
+  latestProjects: AdminDashboardLatestProject[];
 };
 
-/** Owner-only: project counts per status, total active value, total unpaid, latest projects. */
-export async function getOwnerDashboardData(user: SessionUser): Promise<OwnerDashboardData> {
-  requireOwner(user);
+/** Admin-only: project counts per status, total active value, total unpaid, latest projects. */
+export async function getAdminDashboardData(user: SessionUser): Promise<AdminDashboardData> {
+  requireAdmin(user);
   const allProjects = await listProjectsForUser(user);
 
   const countsByStatus: Record<string, number> = {};

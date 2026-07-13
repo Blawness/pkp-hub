@@ -7,8 +7,8 @@ import { homeForRole } from "@/lib/auth-guards";
  * mendarat di portal klien (atau sebaliknya) — test ini yang menahannya.
  */
 describe("homeForRole", () => {
-  it("mengirim owner ke dashboard staf", () => {
-    expect(homeForRole("owner")).toBe("/dashboard");
+  it("mengirim admin ke dashboard staf", () => {
+    expect(homeForRole("admin")).toBe("/dashboard");
   });
 
   it("mengirim surveyor ke dashboard staf", () => {

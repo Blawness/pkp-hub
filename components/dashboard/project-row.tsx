@@ -5,7 +5,7 @@ import { formatRelativeDate } from "@/lib/format";
 import { surveyTypeLabel } from "@/lib/labels";
 
 /**
- * Satu proyek di feed dashboard. Dipakai owner dan surveyor.
+ * Satu proyek di feed dashboard. Dipakai admin dan surveyor.
  *
  * Sengaja tidak menerima objek proyek utuh, melainkan field-field lepas: baris
  * ini tampil di dashboard surveyor, dan menerima seluruh baris proyek berarti

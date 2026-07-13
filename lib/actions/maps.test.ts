@@ -20,7 +20,7 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
  * plus the rest of the CRUD + CSV import scoping surface.
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyorAssigned: SessionUser;
 let clientA: { id: string };
 let clientB: { id: string };
@@ -46,12 +46,12 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorAssignedId = randomUUID();
   const surveyorOtherId = randomUUID();
 
   await db.insert(users).values([
-    { id: ownerId, name: "Map Test Owner", email: "test-owner-maps@fixture.test", role: "owner" },
+    { id: adminId, name: "Map Test Admin", email: "test-admin-maps@fixture.test", role: "admin" },
     {
       id: surveyorAssignedId,
       name: "Map Test Surveyor Assigned",
@@ -66,11 +66,11 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = {
-    id: ownerId,
-    name: "Map Test Owner",
-    email: "test-owner-maps@fixture.test",
-    role: "owner",
+  admin = {
+    id: adminId,
+    name: "Map Test Admin",
+    email: "test-admin-maps@fixture.test",
+    role: "admin",
   };
   surveyorAssigned = {
     id: surveyorAssignedId,
@@ -214,7 +214,7 @@ describe("importMapCsvForUser: UTM CSV", () => {
       "3,700100,9314100",
     ].join("\n");
 
-    const result = await importMapCsvForUser(owner, {
+    const result = await importMapCsvForUser(admin, {
       projectId: projectAssigned,
       name: "Import UTM v1",
       csvText,
@@ -248,7 +248,7 @@ describe("deleteMapLayerForUser", () => {
         name: "Other project layer",
         geojson: validGeojson,
         source: "manual",
-        createdById: owner.id,
+        createdById: admin.id,
       })
       .returning();
 
@@ -258,7 +258,7 @@ describe("deleteMapLayerForUser", () => {
     expect(stillThere).toBeDefined();
   });
 
-  it("the owner CAN delete a map layer", async () => {
+  it("the admin CAN delete a map layer", async () => {
     const [layer] = await db
       .insert(mapLayers)
       .values({
@@ -266,11 +266,11 @@ describe("deleteMapLayerForUser", () => {
         name: "To be deleted",
         geojson: validGeojson,
         source: "manual",
-        createdById: owner.id,
+        createdById: admin.id,
       })
       .returning();
 
-    await deleteMapLayerForUser(owner, layer.id);
+    await deleteMapLayerForUser(admin, layer.id);
     const [gone] = await db.select().from(mapLayers).where(eq(mapLayers.id, layer.id));
     expect(gone).toBeUndefined();
   });

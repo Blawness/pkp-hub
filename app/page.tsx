@@ -8,7 +8,7 @@ import { getSession, homeForRole } from "@/lib/auth-guards";
 const AREA = [
   {
     nama: "Area Staf",
-    untuk: "Owner & surveyor",
+    untuk: "Admin & surveyor",
     deskripsi: "Kelola proyek, penugasan surveyor, dokumen, dan invoice.",
   },
   {

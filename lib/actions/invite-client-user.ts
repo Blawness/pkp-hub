@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { ownerActionClient } from "@/lib/actions/safe-action";
+import { adminActionClient } from "@/lib/actions/safe-action";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
@@ -13,14 +13,14 @@ const inviteClientUserSchema = z.object({
 });
 
 /**
- * Owner-only: given a `clients.id`, create a portal `user` (role client),
+ * Admin-only: given a `clients.id`, create a portal `user` (role client),
  * link it via `clients.userId`, and send a set-password invite.
  *
  * When `RESEND_API_KEY` is absent (this environment), `lib/auth.ts`'s
  * `sendResetPassword` logs the invite URL to the server console instead of
  * emailing it — the invite still succeeds, it never crashes or no-ops.
  */
-export const inviteClientUser = ownerActionClient
+export const inviteClientUser = adminActionClient
   .inputSchema(inviteClientUserSchema)
   .action(async ({ parsedInput }) => {
     const [client] = await db.select().from(clients).where(eq(clients.id, parsedInput.clientId));

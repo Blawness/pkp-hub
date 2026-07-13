@@ -17,7 +17,7 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
  * `listProjectsForUser`.
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyorA: SessionUser;
 let surveyorB: SessionUser;
 let clientUserA: SessionUser;
@@ -37,14 +37,14 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorAId = randomUUID();
   const surveyorBId = randomUUID();
   const clientUserAId = randomUUID();
   const clientUserBId = randomUUID();
 
   await db.insert(users).values([
-    { id: ownerId, name: "Test Owner", email: "test-owner@fixture.test", role: "owner" },
+    { id: adminId, name: "Test Admin", email: "test-admin@fixture.test", role: "admin" },
     {
       id: surveyorAId,
       name: "Test Surveyor A",
@@ -71,7 +71,7 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = { id: ownerId, name: "Test Owner", email: "test-owner@fixture.test", role: "owner" };
+  admin = { id: adminId, name: "Test Admin", email: "test-admin@fixture.test", role: "admin" };
   surveyorA = {
     id: surveyorAId,
     name: "Test Surveyor A",
@@ -166,19 +166,19 @@ describe("assertProjectAccess", () => {
     expect(project.id).toBe(projA1);
   });
 
-  it("owner CAN access any project", async () => {
-    const project = await assertProjectAccess(projB2, owner);
+  it("admin CAN access any project", async () => {
+    const project = await assertProjectAccess(projB2, admin);
     expect(project.id).toBe(projB2);
   });
 
   it("throws for a project that does not exist at all", async () => {
-    await expect(assertProjectAccess(randomUUID(), owner)).rejects.toThrow();
+    await expect(assertProjectAccess(randomUUID(), admin)).rejects.toThrow();
   });
 });
 
 describe("listProjectsForUser", () => {
-  it("owner sees every project", async () => {
-    const rows = await listProjectsForUser(owner);
+  it("admin sees every project", async () => {
+    const rows = await listProjectsForUser(admin);
     const ids = rows.map((p) => p.id);
     expect(ids).toEqual(expect.arrayContaining([projA1, projA2, projB1, projB2]));
     expect(rows.length).toBeGreaterThanOrEqual(4);

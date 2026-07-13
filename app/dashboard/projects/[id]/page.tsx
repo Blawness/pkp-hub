@@ -48,8 +48,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // single project here — it 404s a surveyor who isn't assigned to this
   // project rather than leaking it, AND it strips `projectValue` /
   // `paymentStatus` / `paymentNotes` from the returned object entirely for
-  // any non-owner caller (Phase 6+7 review fix — CRITICAL). `project` below
-  // never contains those keys unless `user.role === "owner"`.
+  // any non-admin caller (Phase 6+7 review fix — CRITICAL). `project` below
+  // never contains those keys unless `user.role === "admin"`.
   const project = await getProjectDetailForUser(user, id);
 
   const client = await getClientById(project.clientId);
@@ -92,11 +92,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     createdAt: d.createdAt,
   }));
 
-  const canChangeStatus = user.role === "owner" || project.assignedSurveyorId === user.id;
+  const canChangeStatus = user.role === "admin" || project.assignedSurveyorId === user.id;
   const allowedNextStatuses = canChangeStatus
     ? getAllowedNextStatuses(
         project.status as ProjectStatus,
-        user.role === "owner" ? "owner" : "surveyor",
+        user.role === "admin" ? "admin" : "surveyor",
       )
     : [];
   const assignedSurveyorName = project.assignedSurveyorId
@@ -124,7 +124,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="secondary">{statusLabel[project.status] ?? project.status}</Badge>
-          {user.role === "owner" ? (
+          {user.role === "admin" ? (
             <ButtonLink variant="outline" href={`/dashboard/projects/${project.id}/edit`}>
               Edit
             </ButtonLink>
@@ -167,7 +167,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             </CardContent>
           </Card>
 
-          {user.role === "owner" ? (
+          {user.role === "admin" ? (
             <Card>
               <CardHeader>
                 <CardTitle>Assign surveyor</CardTitle>
@@ -195,7 +195,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Hanya owner atau surveyor yang ditugaskan yang bisa mengubah status.
+                  Hanya admin atau surveyor yang ditugaskan yang bisa mengubah status.
                 </p>
               )}
               <StatusHistory
@@ -229,7 +229,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <DocumentUpload projectId={project.id} />
           <DocumentsTable
             rows={documentRows}
-            isOwner={user.role === "owner"}
+            isAdmin={user.role === "admin"}
             emptyMessage={
               <EmptyState
                 icon={FileIcon}
@@ -241,7 +241,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         </TabsContent>
 
         {/* Both the trigger above and this panel only exist in the tree when
-            `"projectValue" in project` — which is only true for an owner's
+            `"projectValue" in project` — which is only true for an admin's
             payload (see `getProjectDetailForUser`). A surveyor's `project`
             never has this key, so this branch is unreachable for them and
             no finance data is ever part of their RSC payload. */}

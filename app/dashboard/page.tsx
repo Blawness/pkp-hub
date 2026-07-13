@@ -7,7 +7,7 @@ import { StatusPipeline } from "@/components/dashboard/status-pipeline";
 import { Reveal, Stagger } from "@/components/motion/reveal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { getOwnerDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
+import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
 import { requireStaff } from "@/lib/auth-guards";
 import { formatIDR } from "@/lib/format";
 
@@ -17,7 +17,7 @@ export const metadata = { title: "Dashboard" };
  * Dashboard Ringkasan (PRD §3 Feature 7), per-role content.
  *
  * The role branch below is a Server Component conditional: for a surveyor,
- * `getOwnerDashboardData` (which reads `projectValue`/`paymentStatus`) is
+ * `getAdminDashboardData` (which reads `projectValue`/`paymentStatus`) is
  * never even called, and `getSurveyorDashboardData`'s return type has no
  * finance fields at all (see `dashboard-logic.ts`) — so no finance figure
  * can be serialized into a surveyor's page output, by construction, not by
@@ -26,8 +26,8 @@ export const metadata = { title: "Dashboard" };
 export default async function DashboardPage() {
   const user = await requireStaff();
 
-  if (user.role === "owner") {
-    const data = await getOwnerDashboardData(user);
+  if (user.role === "admin") {
+    const data = await getAdminDashboardData(user);
     const activeCount = data.latestProjects.length;
 
     return (
@@ -147,7 +147,7 @@ export default async function DashboardPage() {
                 <EmptyState
                   icon={FolderKanbanIcon}
                   title="Belum ada proyek yang ditugaskan"
-                  description="Owner akan menugaskan Anda ke proyek survey saat tersedia."
+                  description="Admin akan menugaskan Anda ke proyek survey saat tersedia."
                 />
               ) : (
                 data.projects.map((p) => (

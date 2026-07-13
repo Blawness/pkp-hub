@@ -6,7 +6,7 @@ import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { deleteDocument } from "@/lib/actions/documents";
 
-/** Owner-only control — never render this for a non-owner. */
+/** Admin-only control — never render this for a non-admin. */
 export function DeleteDocumentButton({ documentId }: { documentId: string }) {
   const router = useRouter();
   const { executeAsync, isExecuting } = useAction(deleteDocument);

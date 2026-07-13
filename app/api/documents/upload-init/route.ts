@@ -13,7 +13,7 @@ import { storage } from "@/lib/storage";
  *  - local driver: returns this app's own `/api/storage/[...key]` route,
  *    which accepts the raw bytes via PUT.
  *
- * Same security boundary as everywhere else: `requireStaff` (owner +
+ * Same security boundary as everywhere else: `requireStaff` (admin +
  * surveyor) then `assertProjectAccess` — a surveyor cannot mint an upload
  * target for a project they aren't assigned to.
  */

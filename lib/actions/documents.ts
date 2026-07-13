@@ -11,7 +11,7 @@ import {
   toggleDocumentShareInputSchema,
   uploadDocumentInputSchema,
 } from "@/lib/actions/documents-schemas";
-import { ownerActionClient, staffActionClient } from "@/lib/actions/safe-action";
+import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server actions for the document archive (PRD §3 Feature 4). Business
@@ -35,8 +35,8 @@ export const uploadDocument = staffActionClient
     return { success: true as const, document };
   });
 
-/** Owner-only: set/unset `sharedWithClient`. */
-export const toggleDocumentShare = ownerActionClient
+/** Admin-only: set/unset `sharedWithClient`. */
+export const toggleDocumentShare = adminActionClient
   .inputSchema(toggleDocumentShareInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const document = await toggleDocumentShareForUser(ctx.user, parsedInput);
@@ -45,8 +45,8 @@ export const toggleDocumentShare = ownerActionClient
     return { success: true as const, document };
   });
 
-/** Owner-only: deletes the metadata row AND the object in storage. */
-export const deleteDocument = ownerActionClient
+/** Admin-only: deletes the metadata row AND the object in storage. */
+export const deleteDocument = adminActionClient
   .inputSchema(deleteDocumentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const document = await deleteDocumentForUser(ctx.user, parsedInput);

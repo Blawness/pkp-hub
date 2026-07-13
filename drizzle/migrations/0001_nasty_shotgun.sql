@@ -1,0 +1,11 @@
+-- Rename nilai enum, BUKAN membuat ulang tipenya.
+--
+-- Migrasi hasil `drizzle-kit generate` untuk perubahan ini keliru dan tidak
+-- dipakai: ia mengubah kolom jadi text (isinya masih 'owner'), men-drop tipe
+-- lama, membuat enum baru tanpa 'owner', lalu meng-cast balik — dan
+-- 'owner'::user_role tidak valid di enum baru, sehingga setiap baris owner
+-- yang sudah ada membuat migrasi ini gagal.
+--
+-- ALTER TYPE ... RENAME VALUE mengganti nama nilainya di tempat: baris yang
+-- ada ikut terbawa, tidak ada cast, tidak ada data hilang.
+ALTER TYPE "public"."user_role" RENAME VALUE 'owner' TO 'admin';

@@ -22,7 +22,7 @@ let userId: string;
 
 beforeAll(async () => {
   userId = randomUUID();
-  await db.insert(users).values({ id: userId, name: "Security Test User", email, role: "owner" });
+  await db.insert(users).values({ id: userId, name: "Security Test User", email, role: "admin" });
   await db.insert(accounts).values({
     id: randomUUID(),
     accountId: userId,

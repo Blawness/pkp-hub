@@ -27,7 +27,7 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   emailAndPassword: {
     enabled: true,
-    // No public self-signup: accounts are only created by the owner via
+    // No public self-signup: accounts are only created by the admin via
     // `inviteClientUser` (or by the seed script). This disables Better
     // Auth's `/sign-up/email` endpoint outright, so it can't be called even
     // by a direct, unauthenticated POST.
@@ -58,6 +58,14 @@ export const auth = betterAuth({
         type: "string",
         input: false,
         defaultValue: "client",
+      },
+      // Ikut dibawa ke objek sesi supaya `getSession` di auth-guards bisa
+      // menolak user terarsip tanpa satu query tambahan di setiap request.
+      // `input: false` — tidak ada payload dari klien yang boleh menyetelnya.
+      archivedAt: {
+        type: "date",
+        input: false,
+        required: false,
       },
     },
   },

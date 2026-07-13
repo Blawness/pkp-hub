@@ -1,5 +1,6 @@
 import { getCookieCache } from "better-auth/cookies";
 import { type NextRequest, NextResponse } from "next/server";
+import type { Role } from "@/lib/auth-guards";
 
 /**
  * Coarse route gate. Reads the signed session cookie cache (no DB call) to
@@ -18,7 +19,11 @@ export async function proxy(request: NextRequest) {
   }
 
   const cache = await getCookieCache(request);
-  const role = cache?.user?.role as "owner" | "surveyor" | "client" | undefined;
+  // Type-only import dari auth-guards: `Role` hilang saat kompilasi, jadi
+  // proxy tidak ikut menarik lib/db ke runtime-nya. Menyalin union-nya di sini
+  // justru yang berbahaya — salinan itu tetap menyebut "owner" setelah enum
+  // di-rename, dan tidak ada yang memberitahu.
+  const role = cache?.user?.role as Role | undefined;
 
   if (!role) {
     const loginUrl = new URL("/login", request.url);

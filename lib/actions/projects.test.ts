@@ -12,12 +12,12 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
  * Runs against the real (Neon) dev database. Exercises the mandatory
  * requirement from the Phase 3 brief: `changeProjectStatus` writes exactly
  * one `projectStatusLogs` row per call (fromStatus/toStatus/actor correct),
- * in the same transaction as the project update, and only the owner or the
+ * in the same transaction as the project update, and only the admin or the
  * surveyor ASSIGNED to a project may call it — any other surveyor is
  * rejected via `assertProjectAccess`'s row-level scoping.
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyorAssigned: SessionUser;
 let surveyorOther: SessionUser;
 let clientUser: SessionUser;
@@ -32,13 +32,13 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorAssignedId = randomUUID();
   const surveyorOtherId = randomUUID();
   const clientUserId = randomUUID();
 
   await db.insert(users).values([
-    { id: ownerId, name: "Test Owner", email: "test-owner-projects@fixture.test", role: "owner" },
+    { id: adminId, name: "Test Admin", email: "test-admin-projects@fixture.test", role: "admin" },
     {
       id: surveyorAssignedId,
       name: "Test Surveyor Assigned",
@@ -59,11 +59,11 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = {
-    id: ownerId,
-    name: "Test Owner",
-    email: "test-owner-projects@fixture.test",
-    role: "owner",
+  admin = {
+    id: adminId,
+    name: "Test Admin",
+    email: "test-admin-projects@fixture.test",
+    role: "admin",
   };
   surveyorAssigned = {
     id: surveyorAssignedId,
@@ -140,8 +140,8 @@ describe("changeProjectStatusForUser", () => {
     expect(logs[0].changedById).toBe(surveyorAssigned.id);
   });
 
-  it("the owner can change status too, adding a second, distinct log row", async () => {
-    const updated = await changeProjectStatusForUser(owner, {
+  it("the admin can change status too, adding a second, distinct log row", async () => {
+    const updated = await changeProjectStatusForUser(admin, {
       projectId,
       toStatus: "data_diambil",
     });
@@ -154,7 +154,7 @@ describe("changeProjectStatusForUser", () => {
     expect(logs).toHaveLength(2);
     const latest = logs.find((l) => l.toStatus === "data_diambil");
     expect(latest?.fromStatus).toBe("dijadwalkan");
-    expect(latest?.changedById).toBe(owner.id);
+    expect(latest?.changedById).toBe(admin.id);
   });
 });
 
@@ -200,7 +200,7 @@ describe("changeProjectStatusForUser: status transition table", () => {
     expect(row.status).toBe("baru");
   });
 
-  it("a surveyor CANNOT cancel a project (owner-only)", async () => {
+  it("a surveyor CANNOT cancel a project (admin-only)", async () => {
     const id = await insertFixtureProject("baru");
     await expect(
       changeProjectStatusForUser(surveyorAssigned, { projectId: id, toStatus: "dibatalkan" }),
@@ -224,27 +224,27 @@ describe("changeProjectStatusForUser: status transition table", () => {
     expect(row.status).toBe("selesai");
   });
 
-  it("the owner CAN cancel a project", async () => {
+  it("the admin CAN cancel a project", async () => {
     const id = await insertFixtureProject("baru");
-    const updated = await changeProjectStatusForUser(owner, {
+    const updated = await changeProjectStatusForUser(admin, {
       projectId: id,
       toStatus: "dibatalkan",
     });
     expect(updated.status).toBe("dibatalkan");
   });
 
-  it("the owner CAN reopen a `selesai` project back to `diproses`", async () => {
+  it("the admin CAN reopen a `selesai` project back to `diproses`", async () => {
     const id = await insertFixtureProject("selesai");
-    const updated = await changeProjectStatusForUser(owner, {
+    const updated = await changeProjectStatusForUser(admin, {
       projectId: id,
       toStatus: "diproses",
     });
     expect(updated.status).toBe("diproses");
   });
 
-  it("the owner CAN reactivate a `dibatalkan` project back to `baru`", async () => {
+  it("the admin CAN reactivate a `dibatalkan` project back to `baru`", async () => {
     const id = await insertFixtureProject("dibatalkan");
-    const updated = await changeProjectStatusForUser(owner, {
+    const updated = await changeProjectStatusForUser(admin, {
       projectId: id,
       toStatus: "baru",
     });
@@ -256,7 +256,7 @@ describe("assignSurveyorForUser", () => {
   it("rejects assigning a user whose role is not `surveyor`", async () => {
     const id = await insertFixtureProject("baru");
     await expect(
-      assignSurveyorForUser(owner, { projectId: id, surveyorId: clientUser.id }),
+      assignSurveyorForUser(admin, { projectId: id, surveyorId: clientUser.id }),
     ).rejects.toThrow();
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
@@ -265,7 +265,7 @@ describe("assignSurveyorForUser", () => {
 
   it("accepts assigning a valid surveyor", async () => {
     const id = await insertFixtureProject("baru");
-    const updated = await assignSurveyorForUser(owner, {
+    const updated = await assignSurveyorForUser(admin, {
       projectId: id,
       surveyorId: surveyorOther.id,
     });

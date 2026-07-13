@@ -31,13 +31,13 @@ async function seed() {
   await db.delete(accounts);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyor1Id = randomUUID();
   const surveyor2Id = randomUUID();
   const clientUserId = randomUUID();
 
   await db.insert(users).values([
-    { id: ownerId, name: "Yudha Pratama", email: "owner@pkp.test", role: "owner" },
+    { id: adminId, name: "Yudha Pratama", email: "admin@pkp.test", role: "admin" },
     { id: surveyor1Id, name: "Bagas Nugroho", email: "bagas@pkp.test", role: "surveyor" },
     { id: surveyor2Id, name: "Rizky Ananda", email: "rizky@pkp.test", role: "surveyor" },
     { id: clientUserId, name: "Andi Wijaya", email: "andi@klien.test", role: "client" },
@@ -45,7 +45,7 @@ async function seed() {
 
   const hashedPassword = await hashPassword(SEED_PASSWORD);
   await db.insert(accounts).values(
-    [ownerId, surveyor1Id, surveyor2Id, clientUserId].map((userId) => ({
+    [adminId, surveyor1Id, surveyor2Id, clientUserId].map((userId) => ({
       id: randomUUID(),
       accountId: userId,
       providerId: "credential",
@@ -143,8 +143,8 @@ async function seed() {
   // Riwayat status (PRD Feature 2) untuk proyek yang sudah bergerak.
   const [batas, topografi, kavling] = inserted;
   await db.insert(projectStatusLogs).values([
-    { projectId: batas.id, fromStatus: null, toStatus: "baru", changedById: ownerId },
-    { projectId: batas.id, fromStatus: "baru", toStatus: "dijadwalkan", changedById: ownerId },
+    { projectId: batas.id, fromStatus: null, toStatus: "baru", changedById: adminId },
+    { projectId: batas.id, fromStatus: "baru", toStatus: "dijadwalkan", changedById: adminId },
     {
       projectId: batas.id,
       fromStatus: "dijadwalkan",
@@ -157,13 +157,13 @@ async function seed() {
       toStatus: "diproses",
       changedById: surveyor1Id,
     },
-    { projectId: batas.id, fromStatus: "diproses", toStatus: "selesai", changedById: ownerId },
-    { projectId: topografi.id, fromStatus: null, toStatus: "baru", changedById: ownerId },
+    { projectId: batas.id, fromStatus: "diproses", toStatus: "selesai", changedById: adminId },
+    { projectId: topografi.id, fromStatus: null, toStatus: "baru", changedById: adminId },
     {
       projectId: topografi.id,
       fromStatus: "baru",
       toStatus: "dijadwalkan",
-      changedById: ownerId,
+      changedById: adminId,
     },
     {
       projectId: topografi.id,
@@ -177,7 +177,7 @@ async function seed() {
       toStatus: "diproses",
       changedById: surveyor2Id,
     },
-    { projectId: kavling.id, fromStatus: null, toStatus: "baru", changedById: ownerId },
+    { projectId: kavling.id, fromStatus: null, toStatus: "baru", changedById: adminId },
     {
       projectId: kavling.id,
       fromStatus: "baru",

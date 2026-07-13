@@ -119,7 +119,7 @@ export default async function PortalProjectDetailPage({
         <CardContent>
           <DocumentsTable
             rows={documentTableRows}
-            isOwner={false}
+            isAdmin={false}
             emptyMessage={
               <EmptyState
                 icon={FileIcon}
