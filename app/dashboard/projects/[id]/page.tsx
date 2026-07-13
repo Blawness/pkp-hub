@@ -28,6 +28,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { formatIDR } from "@/lib/format";
 import { paymentStatusLabel, statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { downloadUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -80,17 +81,19 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     : [];
   const uploaderNameById = new Map(uploaderUsers.map((u) => [u.id, u.name]));
 
-  const documentRows = projectDocuments.map((d) => ({
-    id: d.id,
-    name: d.name,
-    category: d.category,
-    fileUrl: d.fileUrl,
-    fileSize: d.fileSize,
-    mimeType: d.mimeType,
-    sharedWithClient: d.sharedWithClient,
-    uploaderName: uploaderNameById.get(d.uploadedById) ?? "—",
-    createdAt: d.createdAt,
-  }));
+  const documentRows = await Promise.all(
+    projectDocuments.map(async (d) => ({
+      id: d.id,
+      name: d.name,
+      category: d.category,
+      downloadUrl: await downloadUrlFor(d.fileUrl),
+      fileSize: d.fileSize,
+      mimeType: d.mimeType,
+      sharedWithClient: d.sharedWithClient,
+      uploaderName: uploaderNameById.get(d.uploadedById) ?? "—",
+      createdAt: d.createdAt,
+    })),
+  );
 
   const canChangeStatus = user.role === "admin" || project.assignedSurveyorId === user.id;
   const allowedNextStatuses = canChangeStatus

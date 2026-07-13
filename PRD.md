@@ -301,7 +301,6 @@ R2_ACCOUNT_ID=
 R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET=
-R2_PUBLIC_URL=
 
 # Email undangan portal klien (Resend) — jika dipakai
 RESEND_API_KEY=

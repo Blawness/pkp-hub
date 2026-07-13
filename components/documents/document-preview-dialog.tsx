@@ -16,11 +16,11 @@ import {
  */
 export function DocumentPreviewDialog({
   name,
-  fileUrl,
+  downloadUrl,
   mimeType,
 }: {
   name: string;
-  fileUrl: string;
+  downloadUrl: string;
   mimeType: string;
 }) {
   const isImage = mimeType.startsWith("image/");
@@ -29,7 +29,7 @@ export function DocumentPreviewDialog({
 
   if (!canPreview) {
     return (
-      <a href={fileUrl} download={name} className="text-sm text-primary hover:underline">
+      <a href={downloadUrl} download={name} className="text-sm text-primary hover:underline">
         Unduh
       </a>
     );
@@ -51,12 +51,12 @@ export function DocumentPreviewDialog({
         <div className="flex max-h-[70vh] items-center justify-center overflow-auto rounded-md bg-muted/30">
           {isImage ? (
             // biome-ignore lint/performance/noImgElement: user-uploaded file, not an optimizable static asset
-            <img src={fileUrl} alt={name} className="max-h-[70vh] w-auto object-contain" />
+            <img src={downloadUrl} alt={name} className="max-h-[70vh] w-auto object-contain" />
           ) : (
-            <object data={fileUrl} type="application/pdf" className="h-[70vh] w-full">
+            <object data={downloadUrl} type="application/pdf" className="h-[70vh] w-full">
               <p className="p-4 text-sm text-muted-foreground">
                 Pratinjau PDF tidak didukung di browser ini.{" "}
-                <a href={fileUrl} download={name} className="text-primary hover:underline">
+                <a href={downloadUrl} download={name} className="text-primary hover:underline">
                   Unduh file
                 </a>
                 .
@@ -64,7 +64,7 @@ export function DocumentPreviewDialog({
             </object>
           )}
         </div>
-        <a href={fileUrl} download={name} className="text-sm text-primary hover:underline">
+        <a href={downloadUrl} download={name} className="text-sm text-primary hover:underline">
           Unduh file asli
         </a>
       </DialogContent>

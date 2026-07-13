@@ -12,6 +12,7 @@ import { assertProjectAccess, requireClient } from "@/lib/auth-guards";
 import { formatIDR } from "@/lib/format";
 import { formatArea } from "@/lib/geo/area";
 import { paymentStatusLabel, statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { downloadUrlFor } from "@/lib/storage";
 
 /**
  * Client portal project detail (PRD §3 Feature 6): status + history, a
@@ -47,17 +48,19 @@ export default async function PortalProjectDetailPage({
 
   const totalAreaSqm = mapLayerRows.reduce((sum, l) => sum + (l.areaSqm ?? 0), 0);
 
-  const documentTableRows = documentRows.map((d) => ({
-    id: d.id,
-    name: d.name,
-    category: d.category,
-    fileUrl: d.fileUrl,
-    fileSize: d.fileSize,
-    mimeType: d.mimeType,
-    sharedWithClient: d.sharedWithClient,
-    uploaderName: "—",
-    createdAt: d.createdAt,
-  }));
+  const documentTableRows = await Promise.all(
+    documentRows.map(async (d) => ({
+      id: d.id,
+      name: d.name,
+      category: d.category,
+      downloadUrl: await downloadUrlFor(d.fileUrl),
+      fileSize: d.fileSize,
+      mimeType: d.mimeType,
+      sharedWithClient: d.sharedWithClient,
+      uploaderName: "—",
+      createdAt: d.createdAt,
+    })),
+  );
 
   return (
     <main className="flex flex-col gap-6 p-8">

@@ -10,7 +10,14 @@ export type DocumentRow = {
   id: string;
   name: string;
   category: string;
-  fileUrl: string;
+  /**
+   * URL bertanda tangan dari `downloadUrlFor()`, BUKAN `documents.fileUrl`
+   * mentah — bucket R2-nya privat, jadi fileUrl tidak bisa dibuka browser.
+   * Bentuknya sengaja `downloadUrl`, bukan `fileUrl`, supaya menyerahkan yang
+   * mentah ke sini gagal di typecheck alih-alih diam-diam menghasilkan tautan
+   * mati (atau, kalau bucket dipublikkan, tautan yang bocor tanpa login).
+   */
+  downloadUrl: string;
   fileSize: number;
   mimeType: string;
   sharedWithClient: boolean;
@@ -93,7 +100,7 @@ export function buildDocumentsColumns({
         <div className="flex items-center gap-2">
           <DocumentPreviewDialog
             name={row.original.name}
-            fileUrl={row.original.fileUrl}
+            downloadUrl={row.original.downloadUrl}
             mimeType={row.original.mimeType}
           />
           {isAdmin ? <DeleteDocumentButton documentId={row.original.id} /> : null}

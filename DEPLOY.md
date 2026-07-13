@@ -51,7 +51,6 @@ optional for Preview — see §4).
 | `R2_ACCESS_KEY_ID` | required for prod | Cloudflare dashboard → R2 → Manage R2 API Tokens → create a token with Object Read & Write on the bucket below. |
 | `R2_SECRET_ACCESS_KEY` | required for prod | Shown once when you create the R2 API token above — copy it immediately. |
 | `R2_BUCKET` | required for prod | The bucket name you create in R2 → Create bucket for PKP Hub documents. |
-| `R2_PUBLIC_URL` | required for prod | Either the bucket's public R2.dev URL, or (recommended) a custom domain connected to the bucket via R2 → bucket → Settings → Custom Domains. |
 | `RESEND_API_KEY` | required only if client-portal invite emails are used | Resend dashboard → API Keys → create a key. Needs a verified sending domain in Resend for real delivery. |
 
 Notes:
@@ -60,7 +59,7 @@ Notes:
   `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`) are the **minimal set required to
   boot** — the build fails immediately if any is missing or malformed.
 - R2 and Resend vars are `.optional()` in `env.ts` so a preview deploy without
-  them still builds and boots. **Production must have all five R2 vars set**
+  them still builds and boots. **Production must have all four R2 vars set**
   — see the storage warning below.
 - Never commit real values for any of the above. `.env.local` is gitignored;
   keep it that way.
@@ -68,7 +67,7 @@ Notes:
 ## 4. Storage driver — R2 is required in production
 
 `lib/storage/index.ts` picks a driver at module load: it uses the R2 driver
-only when **all five** `R2_*` vars are present; otherwise it silently falls
+only when **all four** `R2_*` vars are present; otherwise it silently falls
 back to the local-disk driver (`.storage/` at the repo root), which is what
 makes local dev work without any credentials.
 
@@ -90,9 +89,8 @@ boot if it selects `local` while `NODE_ENV === "production"`:
 !! [storage] WARNING: local disk driver selected in production.   !!
 !! `.storage/` is EPHEMERAL on Vercel — uploaded files WILL BE     !!
 !! LOST. Configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,                !!
-!! R2_SECRET_ACCESS_KEY, R2_BUCKET, and R2_PUBLIC_URL to enable    !!
-!! the R2 driver before relying on document uploads. See          !!
-!! DEPLOY.md for setup steps.                                     !!
+!! R2_SECRET_ACCESS_KEY, and R2_BUCKET to enable the R2 driver     !!
+!! before relying on document uploads. See DEPLOY.md.             !!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ```
 
@@ -100,7 +98,23 @@ It does **not** crash the build or the app — a preview deploy without R2
 configured yet must still boot for everything except document upload. But
 **before real production use**, check the Vercel Function logs after the
 first request and confirm this warning is absent. If it appears, one or more
-of the five `R2_*` env vars is missing or empty in that environment.
+of the four `R2_*` env vars is missing or empty in that environment.
+
+### 4b. The bucket is private, and downloads are signed
+
+The bucket must **not** be made public. `documents.fileUrl` stores the object's
+R2 address, but that address is never handed to the browser: every render path
+passes it through `downloadUrlFor()` (`lib/storage/index.ts`), which returns a
+presigned GET URL valid for one hour. Only rows the caller is already allowed
+to see get signed — `documents-logic.ts` does the scoping first.
+
+Publishing the bucket instead (an r2.dev URL or a public custom domain) would
+make **every** document — including ones with `sharedWithClient: false` —
+downloadable by anyone who has or guesses the URL, with no login. Don't.
+
+This is also why there is no `R2_PUBLIC_URL` variable: with a private bucket
+there is no public URL, and an unused-but-required var is a trap — forget it and
+the driver silently falls back to the local disk, losing documents in production.
 
 ### 4a. CORS on the bucket — required, and easy to miss
 

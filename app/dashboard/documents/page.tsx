@@ -10,6 +10,7 @@ import { documentCategorySchema } from "@/lib/actions/documents-schemas";
 import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { downloadUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Arsip Dokumen" };
 
@@ -53,20 +54,25 @@ export default async function DocumentsSearchPage({
 
   const clientRows = await listClients();
 
-  const rows = results.map((r) => ({
-    id: r.id,
-    name: r.name,
-    category: r.category,
-    fileUrl: r.fileUrl,
-    fileSize: r.fileSize,
-    mimeType: r.mimeType,
-    sharedWithClient: r.sharedWithClient,
-    uploaderName: uploaderNameById.get(r.uploadedById) ?? "—",
-    createdAt: r.createdAt,
-    projectId: r.projectId,
-    projectTitle: r.projectTitle,
-    clientName: r.clientName,
-  }));
+  // `searchDocumentsForUser` sudah menyaring baris sesuai peran; penandatanganan
+  // di sini hanya mengubah baris yang BOLEH dilihat menjadi tautan yang bisa
+  // dibuka. Lihat catatan di `downloadUrlFor`.
+  const rows = await Promise.all(
+    results.map(async (r) => ({
+      id: r.id,
+      name: r.name,
+      category: r.category,
+      downloadUrl: await downloadUrlFor(r.fileUrl),
+      fileSize: r.fileSize,
+      mimeType: r.mimeType,
+      sharedWithClient: r.sharedWithClient,
+      uploaderName: uploaderNameById.get(r.uploadedById) ?? "—",
+      createdAt: r.createdAt,
+      projectId: r.projectId,
+      projectTitle: r.projectTitle,
+      clientName: r.clientName,
+    })),
+  );
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">

@@ -5,24 +5,39 @@ import type { StorageDriver, StorageDriverName } from "./types";
 
 export type { StorageDriver, StorageDriverName, UploadTarget } from "./types";
 
+/** Hanya bagian env yang menentukan pilihan driver. */
+export type R2Config = {
+  R2_ACCOUNT_ID?: string;
+  R2_ACCESS_KEY_ID?: string;
+  R2_SECRET_ACCESS_KEY?: string;
+  R2_BUCKET?: string;
+};
+
 /**
- * R2 is used only when ALL five R2 env vars are present; otherwise we fall
- * back to the local `.storage/` driver so dev works without credentials
- * (Phase 4 brief). Exported so it's independently testable without needing
- * a real driver instance.
+ * R2 dipakai hanya kalau KEEMPAT var-nya ada; kalau tidak, jatuh ke driver
+ * `.storage/` lokal supaya dev jalan tanpa kredensial (Phase 4 brief).
+ *
+ * Dulu ada var kelima, `R2_PUBLIC_URL`. Ia dibuang: sejak unduhan memakai
+ * presigned URL (`downloadUrlFor`), tidak ada yang membacanya — tapi ia tetap
+ * ikut menentukan driver, jadi satu var yang lupa diisi diam-diam melempar
+ * PRODUKSI ke disk ephemeral Vercel dan menghilangkan dokumen. Var yang tidak
+ * dipakai tapi bisa menjatuhkan produksi adalah jebakan, bukan konfigurasi.
+ *
+ * `config` disuntikkan supaya bisa diuji tanpa bergantung pada env ambient —
+ * versi sebelumnya membaca `env` langsung, jadi test-nya lulus hanya selama
+ * `.env.local` kebetulan tidak punya kredensial R2.
  */
-export function hasR2Config(): boolean {
+export function hasR2Config(config: R2Config = env): boolean {
   return Boolean(
-    env.R2_ACCOUNT_ID &&
-      env.R2_ACCESS_KEY_ID &&
-      env.R2_SECRET_ACCESS_KEY &&
-      env.R2_BUCKET &&
-      env.R2_PUBLIC_URL,
+    config.R2_ACCOUNT_ID &&
+      config.R2_ACCESS_KEY_ID &&
+      config.R2_SECRET_ACCESS_KEY &&
+      config.R2_BUCKET,
   );
 }
 
-export function selectStorageDriverName(): StorageDriverName {
-  return hasR2Config() ? "r2" : "local";
+export function selectStorageDriverName(config: R2Config = env): StorageDriverName {
+  return hasR2Config(config) ? "r2" : "local";
 }
 
 function createDriver(): StorageDriver {
@@ -43,10 +58,9 @@ function createDriver(): StorageDriver {
         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n" +
         "!! [storage] WARNING: local disk driver selected in production.   !!\n" +
         "!! `.storage/` is EPHEMERAL on Vercel — uploaded files WILL BE     !!\n" +
-        "!! LOST. Configure R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,                !!\n" +
-        "!! R2_SECRET_ACCESS_KEY, R2_BUCKET, and R2_PUBLIC_URL to enable    !!\n" +
-        "!! the R2 driver before relying on document uploads. See          !!\n" +
-        "!! DEPLOY.md for setup steps.                                     !!\n" +
+        "!! LOST. Set R2_ACCOUNT_ID, R2_ACCESS_KEY_ID,                     !!\n" +
+        "!! R2_SECRET_ACCESS_KEY, and R2_BUCKET to enable the R2 driver     !!\n" +
+        "!! before relying on document uploads. See DEPLOY.md.             !!\n" +
         "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n",
     );
   }
@@ -55,3 +69,26 @@ function createDriver(): StorageDriver {
 }
 
 export const storage: StorageDriver = createDriver();
+
+/**
+ * URL yang boleh diserahkan ke browser untuk melihat / mengunduh satu objek.
+ *
+ * SELALU pakai ini — jangan pernah menyerahkan `documents.fileUrl` mentah ke
+ * klien. `fileUrl` adalah alamat objek di R2, dan bucket-nya PRIVAT, jadi URL
+ * itu tidak bisa dibuka siapa pun tanpa tanda tangan. Membuatnya bisa dibuka
+ * berarti mempublikkan bucket — dan itu membuat SETIAP dokumen (termasuk yang
+ * `sharedWithClient: false`) bisa diunduh siapa saja yang tahu URL-nya, tanpa
+ * login. Dokumen survey klien tidak boleh begitu.
+ *
+ * - driver r2   : presigned GET, berlaku 1 jam.
+ * - driver lokal: `/api/storage/<key>`, rute yang sudah menegakkan
+ *   `assertProjectAccess` + aturan `sharedWithClient` untuk peran klien.
+ *
+ * Ini BUKAN batas keamanan: ia menandatangani apa pun yang diberikan padanya.
+ * Pemanggil wajib sudah menyaring baris sesuai hak akses pengguna — dan itulah
+ * yang dilakukan `documents-logic.ts` (listDocumentsForProject,
+ * listSharedDocumentsForProject, searchDocumentsForUser).
+ */
+export function downloadUrlFor(fileUrl: string): Promise<string> {
+  return storage.getSignedUrl(storage.keyFromUrl(fileUrl));
+}
