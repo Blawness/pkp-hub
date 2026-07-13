@@ -15,7 +15,7 @@ Next.js (latest, App Router, Server Components default) · TypeScript strict · 
 
 **Karakter proyek yang perlu ekstra hati-hati:**
 - **Row-level scoping wajib.** Role `client` hanya boleh mengakses proyek dengan `clientId` miliknya. Uji ini eksplisit — ini risiko keamanan utama karena ada portal eksternal.
-- **Dua area terpisah:** `(dashboard)` untuk staf (owner/surveyor), `(portal)` untuk klien. Guard di middleware.
+- **Dua area terpisah:** `(dashboard)` untuk staf (owner/surveyor), `(portal)` untuk klien. Guard di proxy.ts (coarse) + auth-guards.ts (boundary).
 - **Peta:** komponen Leaflet harus client component; render dinamis (no SSR) untuk hindari error `window`.
 - **Import koordinat:** mulai dari CSV (papaparse). Kalau data lapangan UTM (bukan lat/long), reproyeksi ke WGS84 dulu (proj4js) — ini Open Decision, konfirmasi sebelum implement Phase 5.
 
