@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ViewTransition } from "react";
 import { BrandPanel } from "@/components/brand/brand-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +36,9 @@ export default async function Home() {
 
   return (
     <main className="grid min-h-svh lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <BrandPanel />
+      <ViewTransition name="brand-panel">
+        <BrandPanel />
+      </ViewTransition>
 
       {/* Panel aksi. */}
       <div className="flex items-center justify-center px-8 py-14 lg:px-16">
