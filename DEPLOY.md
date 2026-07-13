@@ -102,6 +102,35 @@ configured yet must still boot for everything except document upload. But
 first request and confirm this warning is absent. If it appears, one or more
 of the five `R2_*` env vars is missing or empty in that environment.
 
+### 4a. CORS on the bucket — required, and easy to miss
+
+Correct credentials are **not enough**. The file bytes never pass through the
+server: `app/api/documents/upload-init/route.ts` hands the browser a presigned
+PUT URL, and `components/documents/document-upload.tsx` `fetch()`es that URL
+directly. That is a cross-origin request from the app's domain to
+`*.r2.cloudflarestorage.com`, so **R2 must allow it or every upload fails** —
+with a CORS error in the browser console and nothing at all in the server logs.
+
+The failure looks like broken credentials but is not, so configure this at the
+same time as the token. In Cloudflare → R2 → your bucket → **Settings → CORS
+Policy**, add:
+
+```json
+[
+  {
+    "AllowedOrigins": ["https://pkp-hub.vercel.app"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["Content-Type"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+`AllowedOrigins` must list every origin the app is served from — add the custom
+domain when one is connected, and a preview origin only if you intend to test
+uploads from preview deploys. `Content-Type` must be allowed because the client
+sends it with the PUT, and it is part of what the URL is signed over.
+
 ## 5. Run database migrations against production
 
 Migrations live in `drizzle/` and are applied with drizzle-kit. Do this
