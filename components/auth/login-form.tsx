@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { DURATION_FAST, EASE_OUT_EXPO } from "@/components/motion/reveal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -102,7 +103,7 @@ export function LoginForm() {
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: DURATION_FAST, ease: EASE_OUT_EXPO }}
           >
             {formError}
           </motion.p>

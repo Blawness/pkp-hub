@@ -17,8 +17,15 @@ import { motion, type Variants } from "motion/react";
  * `y` (transform) dan menyisakan `opacity` secara otomatis.
  */
 const DURATION_BASE = 0.26; // --motion-base: 260ms
+export const DURATION_FAST = 0.15; // --motion-fast: 150ms
 const STAGGER = 0.04; // --motion-stagger: 40ms
-const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const; // --ease-out-expo
+export const EASE_OUT_EXPO = [0.16, 1, 0.3, 1] as const; // --ease-out-expo
+
+/**
+ * Komponen lain harus import DURATION_FAST dan EASE_OUT_EXPO dari sini,
+ * bukan menulis durasi atau easing sendiri. Ini memastikan konsistensi token
+ * di seluruh aplikasi.
+ */
 
 const containerVariants: Variants = {
   hidden: {},
