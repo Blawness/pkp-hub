@@ -17,7 +17,7 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
  * delete, then restores the canonical dev seed.
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyor: SessionUser;
 
 beforeAll(async () => {
@@ -28,11 +28,11 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorId = randomUUID();
 
   await db.insert(users).values([
-    { id: ownerId, name: "Test Owner", email: "test-owner-clients@fixture.test", role: "owner" },
+    { id: adminId, name: "Test Admin", email: "test-admin-clients@fixture.test", role: "admin" },
     {
       id: surveyorId,
       name: "Test Surveyor",
@@ -41,11 +41,11 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = {
-    id: ownerId,
-    name: "Test Owner",
-    email: "test-owner-clients@fixture.test",
-    role: "owner",
+  admin = {
+    id: adminId,
+    name: "Test Admin",
+    email: "test-admin-clients@fixture.test",
+    role: "admin",
   };
   surveyor = {
     id: surveyorId,
@@ -61,8 +61,8 @@ afterAll(() => {
 });
 
 describe("createClientForUser", () => {
-  it("owner can create a client", async () => {
-    const client = await createClientForUser(owner, {
+  it("admin can create a client", async () => {
+    const client = await createClientForUser(admin, {
       name: "Fixture Client",
       type: "individual",
     });
@@ -82,12 +82,12 @@ describe("createClientForUser", () => {
 
 describe("archiveClientForUser", () => {
   it("sets archivedAt, hides from the default list, but the row still exists", async () => {
-    const created = await createClientForUser(owner, {
+    const created = await createClientForUser(admin, {
       name: "To Be Archived",
       type: "company",
     });
 
-    const archived = await archiveClientForUser(owner, { id: created.id });
+    const archived = await archiveClientForUser(admin, { id: created.id });
     expect(archived.archivedAt).not.toBeNull();
 
     const defaultList = await listClients();

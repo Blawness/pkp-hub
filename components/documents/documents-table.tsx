@@ -13,18 +13,18 @@ import { DataTable } from "@/components/ui/data-table";
  */
 export function DocumentsTable({
   rows,
-  isOwner,
+  isAdmin,
   showProject = false,
   emptyMessage = "Belum ada dokumen.",
 }: {
   rows: DocumentRow[];
-  isOwner: boolean;
+  isAdmin: boolean;
   showProject?: boolean;
   emptyMessage?: ReactNode;
 }) {
   return (
     <DataTable
-      columns={buildDocumentsColumns({ isOwner, showProject })}
+      columns={buildDocumentsColumns({ isAdmin, showProject })}
       data={rows}
       emptyMessage={emptyMessage}
     />

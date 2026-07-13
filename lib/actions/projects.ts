@@ -13,7 +13,7 @@ import {
   projectInputSchema,
   updateProjectInputSchema,
 } from "@/lib/actions/projects-schemas";
-import { ownerActionClient, staffActionClient } from "@/lib/actions/safe-action";
+import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server actions for project CRUD + status pipeline (PRD §3 Feature 2).
@@ -22,7 +22,7 @@ import { ownerActionClient, staffActionClient } from "@/lib/actions/safe-action"
  * primary, request-bound enforcement of the same rules.
  */
 
-export const createProject = ownerActionClient
+export const createProject = adminActionClient
   .inputSchema(projectInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const project = await createProjectForUser(ctx.user, parsedInput);
@@ -30,7 +30,7 @@ export const createProject = ownerActionClient
     return { success: true as const, project };
   });
 
-export const updateProject = ownerActionClient
+export const updateProject = adminActionClient
   .inputSchema(updateProjectInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const project = await updateProjectForUser(ctx.user, parsedInput);
@@ -39,8 +39,8 @@ export const updateProject = ownerActionClient
     return { success: true as const, project };
   });
 
-/** Owner-only: (re)assign, or unassign (empty string), the surveyor on a project. */
-export const assignSurveyor = ownerActionClient
+/** Admin-only: (re)assign, or unassign (empty string), the surveyor on a project. */
+export const assignSurveyor = adminActionClient
   .inputSchema(assignSurveyorInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const project = await assignSurveyorForUser(ctx.user, parsedInput);
@@ -50,7 +50,7 @@ export const assignSurveyor = ownerActionClient
   });
 
 /**
- * Owner or the surveyor assigned to the project. Writes a
+ * Admin or the surveyor assigned to the project. Writes a
  * `projectStatusLogs` row in the same transaction as the status update —
  * see `changeProjectStatusForUser`.
  */

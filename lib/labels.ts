@@ -1,7 +1,7 @@
 /** Indonesian display labels for enum values (PRD's UI copy is Indonesian). */
 
 export const roleLabel: Record<string, string> = {
-  owner: "Owner",
+  admin: "Admin",
   surveyor: "Surveyor",
   client: "Klien",
 };

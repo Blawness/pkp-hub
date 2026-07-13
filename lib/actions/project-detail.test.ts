@@ -17,11 +17,11 @@ import { getProjectDetailForUser } from "./projects-logic";
  * the page's data and could leak into the RSC/HTML payload.
  *
  * `getProjectDetailForUser` is the fix: it must OMIT the finance keys
- * entirely (not just leave them unused) for any non-owner caller. This test
+ * entirely (not just leave them unused) for any non-admin caller. This test
  * MUST fail if that server-side omission is ever removed.
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyor: SessionUser;
 let projectId: string;
 
@@ -33,15 +33,15 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorId = randomUUID();
 
   await db.insert(users).values([
     {
-      id: ownerId,
-      name: "Project Detail Test Owner",
-      email: "test-owner-project-detail@fixture.test",
-      role: "owner",
+      id: adminId,
+      name: "Project Detail Test Admin",
+      email: "test-admin-project-detail@fixture.test",
+      role: "admin",
     },
     {
       id: surveyorId,
@@ -51,11 +51,11 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = {
-    id: ownerId,
-    name: "Project Detail Test Owner",
-    email: "test-owner-project-detail@fixture.test",
-    role: "owner",
+  admin = {
+    id: adminId,
+    name: "Project Detail Test Admin",
+    email: "test-admin-project-detail@fixture.test",
+    role: "admin",
   };
   surveyor = {
     id: surveyorId,
@@ -107,18 +107,18 @@ describe("getProjectDetailForUser", () => {
   });
 
   it("an OWNER's project detail payload DOES contain the finance keys, with correct values", async () => {
-    const detail = await getProjectDetailForUser(owner, projectId);
+    const detail = await getProjectDetailForUser(admin, projectId);
     expect(detail).toHaveProperty("projectValue", 85_000_000);
     expect(detail).toHaveProperty("paymentStatus", "sebagian");
     expect(detail).toHaveProperty("paymentNotes", "DP diterima.");
   });
 
   it("non-finance fields are identical for both roles", async () => {
-    const ownerDetail = await getProjectDetailForUser(owner, projectId);
+    const adminDetail = await getProjectDetailForUser(admin, projectId);
     const surveyorDetail = await getProjectDetailForUser(surveyor, projectId);
-    expect(surveyorDetail.id).toBe(ownerDetail.id);
-    expect(surveyorDetail.title).toBe(ownerDetail.title);
-    expect(surveyorDetail.status).toBe(ownerDetail.status);
+    expect(surveyorDetail.id).toBe(adminDetail.id);
+    expect(surveyorDetail.title).toBe(adminDetail.title);
+    expect(surveyorDetail.status).toBe(adminDetail.status);
   });
 
   it("a surveyor not assigned to the project is rejected (row-level scoping still applies)", async () => {

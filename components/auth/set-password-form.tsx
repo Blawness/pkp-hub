@@ -38,7 +38,7 @@ export function SetPasswordForm({ token }: { token: string | undefined }) {
   const onSubmit = async (values: SetPasswordValues) => {
     setFormError(null);
     if (!token) {
-      setFormError("This invite link is missing its token. Ask the owner to resend it.");
+      setFormError("This invite link is missing its token. Ask the admin to resend it.");
       return;
     }
     const { error } = await authClient.resetPassword({

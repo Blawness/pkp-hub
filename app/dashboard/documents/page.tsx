@@ -83,7 +83,7 @@ export default async function DocumentsSearchPage({
 
       <DocumentsTable
         rows={rows}
-        isOwner={user.role === "owner"}
+        isAdmin={user.role === "admin"}
         showProject
         emptyMessage={
           <EmptyState

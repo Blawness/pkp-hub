@@ -27,7 +27,7 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   emailAndPassword: {
     enabled: true,
-    // No public self-signup: accounts are only created by the owner via
+    // No public self-signup: accounts are only created by the admin via
     // `inviteClientUser` (or by the seed script). This disables Better
     // Auth's `/sign-up/email` endpoint outright, so it can't be called even
     // by a direct, unauthenticated POST.

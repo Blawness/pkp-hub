@@ -9,7 +9,7 @@ import type { UpdatePaymentInput } from "./finance-schemas";
  * Server-only business logic for Keuangan Ringan (PRD §3 Feature 5),
  * separated from the "use server" wrapper in `finance.ts` so it's directly
  * unit-testable (see `finance.test.ts`). Re-checks the caller's role itself
- * — defense in depth alongside `ownerActionClient` in `finance.ts`, not a
+ * — defense in depth alongside `adminActionClient` in `finance.ts`, not a
  * replacement for it.
  *
  * CRITICAL: this is OWNER-ONLY, no exceptions — surveyors must never be able
@@ -19,9 +19,9 @@ import type { UpdatePaymentInput } from "./finance-schemas";
  * `projects` guarded only by role.
  */
 
-function requireOwner(user: SessionUser) {
-  if (user.role !== "owner") {
-    throw new Error("Only the owner can manage payments.");
+function requireAdmin(user: SessionUser) {
+  if (user.role !== "admin") {
+    throw new Error("Only the admin can manage payments.");
   }
 }
 
@@ -48,9 +48,9 @@ async function assertProjectAccessOrReject(projectId: string, user: SessionUser)
   }
 }
 
-/** Owner-only. Sets `projectValue` / `paymentStatus` / `paymentNotes` on a project. */
+/** Admin-only. Sets `projectValue` / `paymentStatus` / `paymentNotes` on a project. */
 export async function updatePaymentForUser(user: SessionUser, input: UpdatePaymentInput) {
-  requireOwner(user);
+  requireAdmin(user);
   await assertProjectAccessOrReject(input.projectId, user);
 
   const [updated] = await db

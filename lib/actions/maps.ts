@@ -17,7 +17,7 @@ import { staffActionClient } from "@/lib/actions/safe-action";
  * Server actions for the Peta module (Phase 5 brief, PRD §3 Feature 3).
  * Business logic + role/scoping checks live in `maps-logic.ts` (directly
  * unit tested in `maps.test.ts`); `staffActionClient` here is the primary,
- * request-bound enforcement of the same rules (owner + surveyor only, and
+ * request-bound enforcement of the same rules (admin + surveyor only, and
  * only for a project the caller can access via `assertProjectAccess`).
  */
 

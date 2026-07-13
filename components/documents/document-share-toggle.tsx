@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { toggleDocumentShare } from "@/lib/actions/documents";
 
-/** Owner-only control — never render this for a non-owner. Optimistic UI. */
+/** Admin-only control — never render this for a non-admin. Optimistic UI. */
 export function DocumentShareToggle({
   documentId,
   sharedWithClient,

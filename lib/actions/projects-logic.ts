@@ -22,7 +22,7 @@ export type ProjectStatus = (typeof projectStatusEnum)["options"][number];
  * this table elsewhere.
  *
  * Forward pipeline: baru -> dijadwalkan -> data_diambil -> diproses -> selesai
- * - Any staff member (owner, or the surveyor assigned to the project) may
+ * - Any staff member (admin, or the surveyor assigned to the project) may
  *   move a project exactly ONE STEP FORWARD along that chain.
  * - Cancelling (any status -> dibatalkan) is OWNER ONLY.
  * - Moving backward one step, reopening (selesai -> diproses), and
@@ -40,7 +40,7 @@ const FORWARD_CHAIN: ProjectStatus[] = [
 
 export function getAllowedNextStatuses(
   currentStatus: ProjectStatus,
-  role: "owner" | "surveyor",
+  role: "admin" | "surveyor",
 ): ProjectStatus[] {
   const allowed = new Set<ProjectStatus>();
   const idx = FORWARD_CHAIN.indexOf(currentStatus);
@@ -50,7 +50,7 @@ export function getAllowedNextStatuses(
     allowed.add(FORWARD_CHAIN[idx + 1]);
   }
 
-  if (role === "owner") {
+  if (role === "admin") {
     // Backward one step (also covers reopening `selesai` -> `diproses`).
     if (idx > 0) {
       allowed.add(FORWARD_CHAIN[idx - 1]);
@@ -88,7 +88,7 @@ function isNotFoundDigest(error: unknown): boolean {
  * unit-testable (next-safe-action's `requireUser()` needs `next/headers`'
  * request scope, which plain vitest doesn't have). Every function re-checks
  * the caller's role/scoping itself — defense in depth alongside
- * `ownerActionClient` / `staffActionClient` in `projects.ts`, not a
+ * `adminActionClient` / `staffActionClient` in `projects.ts`, not a
  * replacement for it.
  *
  * CRITICAL: any function here that reads a specific project MUST go through
@@ -97,14 +97,14 @@ function isNotFoundDigest(error: unknown): boolean {
  * only their own).
  */
 
-function requireOwner(user: SessionUser) {
-  if (user.role !== "owner") {
-    throw new Error("Only the owner can perform this action.");
+function requireAdmin(user: SessionUser) {
+  if (user.role !== "admin") {
+    throw new Error("Only the admin can perform this action.");
   }
 }
 
 function requireStaff(user: SessionUser) {
-  if (user.role !== "owner" && user.role !== "surveyor") {
+  if (user.role !== "admin" && user.role !== "surveyor") {
     throw new Error("You do not have permission to perform this action.");
   }
 }
@@ -114,7 +114,7 @@ function nullableText(value?: string): string | null {
 }
 
 export async function createProjectForUser(user: SessionUser, input: ProjectInput) {
-  requireOwner(user);
+  requireAdmin(user);
   return db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(projects)
@@ -139,7 +139,7 @@ export async function createProjectForUser(user: SessionUser, input: ProjectInpu
 }
 
 export async function updateProjectForUser(user: SessionUser, input: UpdateProjectInput) {
-  requireOwner(user);
+  requireAdmin(user);
   const [project] = await db
     .update(projects)
     .set({
@@ -158,7 +158,7 @@ export async function updateProjectForUser(user: SessionUser, input: UpdateProje
 }
 
 export async function assignSurveyorForUser(user: SessionUser, input: AssignSurveyorInput) {
-  requireOwner(user);
+  requireAdmin(user);
 
   const surveyorId = nullableText(input.surveyorId);
   if (surveyorId) {
@@ -181,7 +181,7 @@ export async function assignSurveyorForUser(user: SessionUser, input: AssignSurv
 }
 
 /**
- * Allowed callers: owner, or the surveyor assigned to the project. Writes
+ * Allowed callers: admin, or the surveyor assigned to the project. Writes
  * the project's new status AND a `projectStatusLogs` row in the same
  * transaction.
  */
@@ -205,8 +205,8 @@ export async function changeProjectStatusForUser(
     throw error;
   }
 
-  // `requireStaff` above guarantees role is "owner" | "surveyor".
-  const role = user.role as "owner" | "surveyor";
+  // `requireStaff` above guarantees role is "admin" | "surveyor".
+  const role = user.role as "admin" | "surveyor";
   const allowedNext = getAllowedNextStatuses(project.status as ProjectStatus, role);
   if (!allowedNext.includes(input.toStatus)) {
     const allowedText = allowedNext.length
@@ -260,14 +260,14 @@ export type ProjectDetailBase = {
   updatedAt: Date;
 };
 
-/** Owner-only view: adds the Keuangan Ringan fields. */
-export type ProjectDetailForOwner = ProjectDetailBase & {
+/** Admin-only view: adds the Keuangan Ringan fields. */
+export type ProjectDetailForAdmin = ProjectDetailBase & {
   projectValue: number | null;
   paymentStatus: string;
   paymentNotes: string | null;
 };
 
-export type ProjectDetail = ProjectDetailForOwner | ProjectDetailBase;
+export type ProjectDetail = ProjectDetailForAdmin | ProjectDetailBase;
 
 /**
  * The project detail dashboard page's ONLY source for project data
@@ -275,10 +275,10 @@ export type ProjectDetail = ProjectDetailForOwner | ProjectDetailBase;
  * `getSurveyorDashboardData`, this builds its return value as an explicit
  * field-by-field projection and NEVER spreads the raw `assertProjectAccess`
  * row: `projectValue` / `paymentStatus` / `paymentNotes` are only ever
- * copied onto the returned object when `user.role === "owner"`. For any
+ * copied onto the returned object when `user.role === "admin"`. For any
  * other role those keys are simply never present on the object — not
  * hidden by a client-side conditional, not present-but-unused — so they
- * cannot leak into a non-owner's RSC payload no matter what the page does
+ * cannot leak into a non-admin's RSC payload no matter what the page does
  * with the result. Enforced by `project-detail.test.ts`'s key-absence
  * assertion, the exact regression test for this finding.
  */
@@ -302,7 +302,7 @@ export async function getProjectDetailForUser(
     updatedAt: project.updatedAt,
   };
 
-  if (user.role !== "owner") {
+  if (user.role !== "admin") {
     return base;
   }
 

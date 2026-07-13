@@ -16,11 +16,11 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
  * Runs against the real (Neon) dev database, same convention as
  * `projects.test.ts`. Exercises the Phase 4 brief's REQUIRED tests:
  *  - a surveyor cannot upload a document to a project they're not assigned to
- *  - a surveyor cannot call `toggleDocumentShare` (owner-only)
+ *  - a surveyor cannot call `toggleDocumentShare` (admin-only)
  *  - cross-project document search is scoped to what the caller may see
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyorAssigned: SessionUser;
 let clientA: { id: string };
 let clientB: { id: string };
@@ -35,16 +35,16 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorAssignedId = randomUUID();
   const surveyorOtherId = randomUUID();
 
   await db.insert(users).values([
     {
-      id: ownerId,
-      name: "Doc Test Owner",
-      email: "test-owner-documents@fixture.test",
-      role: "owner",
+      id: adminId,
+      name: "Doc Test Admin",
+      email: "test-admin-documents@fixture.test",
+      role: "admin",
     },
     {
       id: surveyorAssignedId,
@@ -60,11 +60,11 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = {
-    id: ownerId,
-    name: "Doc Test Owner",
-    email: "test-owner-documents@fixture.test",
-    role: "owner",
+  admin = {
+    id: adminId,
+    name: "Doc Test Admin",
+    email: "test-admin-documents@fixture.test",
+    role: "admin",
   };
   surveyorAssigned = {
     id: surveyorAssignedId,
@@ -141,8 +141,8 @@ describe("uploadDocumentForUser", () => {
 });
 
 describe("toggleDocumentShareForUser", () => {
-  it("a surveyor CANNOT toggle sharedWithClient (owner-only)", async () => {
-    const doc = await uploadDocumentForUser(owner, {
+  it("a surveyor CANNOT toggle sharedWithClient (admin-only)", async () => {
+    const doc = await uploadDocumentForUser(admin, {
       projectId: projectAssigned,
       name: "sertifikat.pdf",
       category: "sertifikat",
@@ -159,8 +159,8 @@ describe("toggleDocumentShareForUser", () => {
     expect(row.sharedWithClient).toBe(false);
   });
 
-  it("the owner CAN toggle sharedWithClient", async () => {
-    const doc = await uploadDocumentForUser(owner, {
+  it("the admin CAN toggle sharedWithClient", async () => {
+    const doc = await uploadDocumentForUser(admin, {
       projectId: projectAssigned,
       name: "data.csv",
       category: "data_mentah",
@@ -169,7 +169,7 @@ describe("toggleDocumentShareForUser", () => {
       mimeType: "text/csv",
     });
 
-    const updated = await toggleDocumentShareForUser(owner, { id: doc.id, sharedWithClient: true });
+    const updated = await toggleDocumentShareForUser(admin, { id: doc.id, sharedWithClient: true });
     expect(updated.sharedWithClient).toBe(true);
   });
 });
@@ -178,7 +178,7 @@ describe("searchDocumentsForUser: cross-project scoping", () => {
   it("a surveyor's search only returns documents from projects assigned to them", async () => {
     // `projectAssigned` already has documents from the tests above;
     // add one to `projectOther`, owned by a different surveyor.
-    await uploadDocumentForUser(owner, {
+    await uploadDocumentForUser(admin, {
       projectId: projectOther,
       name: "other-project-doc.pdf",
       category: "laporan",
@@ -193,15 +193,15 @@ describe("searchDocumentsForUser: cross-project scoping", () => {
     expect(results.some((r) => r.name === "other-project-doc.pdf")).toBe(false);
   });
 
-  it("the owner's search returns documents across all projects", async () => {
-    const results = await searchDocumentsForUser(owner, {});
+  it("the admin's search returns documents across all projects", async () => {
+    const results = await searchDocumentsForUser(admin, {});
     const projectIds = new Set(results.map((r) => r.projectId));
     expect(projectIds.has(projectAssigned)).toBe(true);
     expect(projectIds.has(projectOther)).toBe(true);
   });
 
   it("filters by category", async () => {
-    const results = await searchDocumentsForUser(owner, { category: "sertifikat" });
+    const results = await searchDocumentsForUser(admin, { category: "sertifikat" });
     expect(results.length).toBeGreaterThan(0);
     expect(results.every((r) => r.category === "sertifikat")).toBe(true);
   });

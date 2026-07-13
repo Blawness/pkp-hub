@@ -12,7 +12,7 @@ import type { ImportMapCsvInput, SaveMapLayerInput } from "./maps-schemas";
  * the "use server" wrappers in `maps.ts` so it's directly unit-testable
  * (see `maps.test.ts`). Every function re-checks the caller's role/scoping
  * itself — defense in depth alongside `staffActionClient` /
- * `ownerActionClient` in `maps.ts`, not a replacement for it.
+ * `adminActionClient` in `maps.ts`, not a replacement for it.
  *
  * CRITICAL: any function that reads/writes a specific project's map layers
  * MUST go through `assertProjectAccess` — never a raw `db.select()` on
@@ -21,7 +21,7 @@ import type { ImportMapCsvInput, SaveMapLayerInput } from "./maps-schemas";
  */
 
 function requireStaff(user: SessionUser) {
-  if (user.role !== "owner" && user.role !== "surveyor") {
+  if (user.role !== "admin" && user.role !== "surveyor") {
     throw new Error("You do not have permission to perform this action.");
   }
 }
@@ -49,7 +49,7 @@ async function assertProjectAccessOrReject(projectId: string, user: SessionUser)
   }
 }
 
-/** Owner + surveyor, and only for a project they can access. */
+/** Admin + surveyor, and only for a project they can access. */
 export async function saveMapLayerForUser(user: SessionUser, input: SaveMapLayerInput) {
   requireStaff(user);
   await assertProjectAccessOrReject(input.projectId, user);
@@ -71,7 +71,7 @@ export async function saveMapLayerForUser(user: SessionUser, input: SaveMapLayer
 /**
  * Parses+reprojects the CSV (pure `lib/geo` modules), persists the raw file
  * via `lib/storage`, and inserts a `mapLayers` row with source
- * `import_csv`. Owner + surveyor, only for a project they can access.
+ * `import_csv`. Admin + surveyor, only for a project they can access.
  */
 export async function importMapCsvForUser(user: SessionUser, input: ImportMapCsvInput) {
   requireStaff(user);
@@ -112,7 +112,7 @@ export async function importMapCsvForUser(user: SessionUser, input: ImportMapCsv
   };
 }
 
-/** Owner + surveyor, only for a project they can access. Deletes the raw CSV in storage too, best-effort. */
+/** Admin + surveyor, only for a project they can access. Deletes the raw CSV in storage too, best-effort. */
 export async function deleteMapLayerForUser(user: SessionUser, id: string) {
   requireStaff(user);
   const [existing] = await db.select().from(mapLayers).where(eq(mapLayers.id, id));

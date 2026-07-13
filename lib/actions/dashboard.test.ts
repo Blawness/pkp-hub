@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getOwnerDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
+import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
@@ -11,14 +11,14 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
  * `auth-guards.test.ts` — deterministic fixture, real teardown/reseed.
  *
  * Exercises the phase-6/7 brief's REQUIRED tests:
- *  - owner dashboard aggregates (total active value, total unpaid) equal
+ *  - admin dashboard aggregates (total active value, total unpaid) equal
  *    exact expected numbers for a known fixture
  *  - the project payload a surveyor receives contains NO
  *    projectValue/paymentStatus/paymentNotes keys at all
- *  - non-owner/non-surveyor callers are rejected by the wrong dashboard
+ *  - non-admin/non-surveyor callers are rejected by the wrong dashboard
  */
 
-let owner: SessionUser;
+let admin: SessionUser;
 let surveyor: SessionUser;
 let otherSurveyor: SessionUser;
 let clientUser: SessionUser;
@@ -31,17 +31,17 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const surveyorId = randomUUID();
   const otherSurveyorId = randomUUID();
   const clientUserId = randomUUID();
 
   await db.insert(users).values([
     {
-      id: ownerId,
-      name: "Dash Test Owner",
-      email: "test-owner-dashboard@fixture.test",
-      role: "owner",
+      id: adminId,
+      name: "Dash Test Admin",
+      email: "test-admin-dashboard@fixture.test",
+      role: "admin",
     },
     {
       id: surveyorId,
@@ -63,11 +63,11 @@ beforeAll(async () => {
     },
   ]);
 
-  owner = {
-    id: ownerId,
-    name: "Dash Test Owner",
-    email: "test-owner-dashboard@fixture.test",
-    role: "owner",
+  admin = {
+    id: adminId,
+    name: "Dash Test Admin",
+    email: "test-admin-dashboard@fixture.test",
+    role: "admin",
   };
   surveyor = {
     id: surveyorId,
@@ -152,9 +152,9 @@ afterAll(() => {
   execSync("pnpm db:seed", { stdio: "inherit" });
 });
 
-describe("getOwnerDashboardData", () => {
+describe("getAdminDashboardData", () => {
   it("computes exact total active value and total unpaid from the fixture", async () => {
-    const data = await getOwnerDashboardData(owner);
+    const data = await getAdminDashboardData(admin);
     // active (not selesai/dibatalkan): 10M + 20M + 15M = 45M
     expect(data.totalActiveValue).toBe(45_000_000);
     // unpaid (belum|sebagian), excluding dibatalkan: 10M + 20M + 5M = 35M
@@ -163,7 +163,7 @@ describe("getOwnerDashboardData", () => {
   });
 
   it("counts projects per status", async () => {
-    const data = await getOwnerDashboardData(owner);
+    const data = await getAdminDashboardData(admin);
     expect(data.countsByStatus.baru).toBe(1);
     expect(data.countsByStatus.diproses).toBe(1);
     expect(data.countsByStatus.selesai).toBe(1);
@@ -171,12 +171,12 @@ describe("getOwnerDashboardData", () => {
     expect(data.countsByStatus.dijadwalkan).toBe(1);
   });
 
-  it("a surveyor CANNOT read the owner dashboard", async () => {
-    await expect(getOwnerDashboardData(surveyor)).rejects.toThrow();
+  it("a surveyor CANNOT read the admin dashboard", async () => {
+    await expect(getAdminDashboardData(surveyor)).rejects.toThrow();
   });
 
-  it("a client CANNOT read the owner dashboard", async () => {
-    await expect(getOwnerDashboardData(clientUser)).rejects.toThrow();
+  it("a client CANNOT read the admin dashboard", async () => {
+    await expect(getAdminDashboardData(clientUser)).rejects.toThrow();
   });
 });
 
@@ -211,8 +211,8 @@ describe("getSurveyorDashboardData", () => {
     }
   });
 
-  it("an owner CANNOT read the surveyor dashboard function", async () => {
-    await expect(getSurveyorDashboardData(owner)).rejects.toThrow();
+  it("an admin CANNOT read the surveyor dashboard function", async () => {
+    await expect(getSurveyorDashboardData(admin)).rejects.toThrow();
   });
 
   it("a client CANNOT read the surveyor dashboard function", async () => {

@@ -16,7 +16,7 @@ import {
 /* Enums (PRD §5)                                                             */
 /* -------------------------------------------------------------------------- */
 
-export const userRole = pgEnum("user_role", ["owner", "surveyor", "client"]);
+export const userRole = pgEnum("user_role", ["admin", "surveyor", "client"]);
 export const clientType = pgEnum("client_type", ["individual", "company"]);
 export const projectStatus = pgEnum("project_status", [
   "baru",
@@ -140,7 +140,7 @@ export const projects = pgTable(
     status: projectStatus("status").notNull().default("baru"),
     orderDate: timestamp("order_date", { withTimezone: true }).notNull().defaultNow(),
     description: text("description"),
-    // Keuangan ringan — owner-only (PRD Feature 5).
+    // Keuangan ringan — admin-only (PRD Feature 5).
     projectValue: bigint("project_value", { mode: "number" }),
     paymentStatus: paymentStatus("payment_status").notNull().default("belum"),
     paymentNotes: text("payment_notes"),

@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth-guards";
 
 /**
  * Shared next-safe-action client. Every later phase's server actions build
- * on `authActionClient` (or `ownerActionClient`) — never construct a bare
+ * on `authActionClient` (or `adminActionClient`) — never construct a bare
  * `createSafeActionClient()` action elsewhere, or the auth boundary gets
  * bypassed.
  */
@@ -30,8 +30,8 @@ function forRoles(...roles: Role[]) {
   });
 }
 
-/** Requires the `owner` role. */
-export const ownerActionClient = forRoles("owner");
+/** Requires the `admin` role. */
+export const adminActionClient = forRoles("admin");
 
-/** Requires `owner` or `surveyor` (staff). */
-export const staffActionClient = forRoles("owner", "surveyor");
+/** Requires `admin` or `surveyor` (staff). */
+export const staffActionClient = forRoles("admin", "surveyor");

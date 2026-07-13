@@ -28,7 +28,7 @@ export type NavLink = {
  *
  * Aturan role di sini adalah cermin UI dari batas yang sebenarnya: "Klien"
  * disembunyikan dari surveyor, tapi yang benar-benar menjaga adalah guard di
- * server (`requireOwner` pada route klien). Menyembunyikan tautan bukan
+ * server (`requireAdmin` pada route klien). Menyembunyikan tautan bukan
  * pengamanan; ini hanya supaya surveyor tidak ditawari pintu yang terkunci.
  */
 export function buildLinks(role: Role): NavLink[] {
@@ -38,7 +38,7 @@ export function buildLinks(role: Role): NavLink[] {
     { segment: "documents", href: "/dashboard/documents", label: "Dokumen", icon: FileTextIcon },
   ];
 
-  if (role === "owner") {
+  if (role === "admin") {
     links.push({ segment: "clients", href: "/dashboard/clients", label: "Klien", icon: UsersIcon });
   }
 

@@ -15,7 +15,7 @@ import { clients, projects } from "@/lib/db/schema";
  * querying `projects` directly from a route.
  */
 
-export type Role = "owner" | "surveyor" | "client";
+export type Role = "admin" | "surveyor" | "client";
 
 export type SessionUser = {
   id: string;
@@ -35,7 +35,7 @@ export async function getSession(): Promise<{ user: SessionUser } | null> {
   // in `lib/auth.ts` is still enabled for `proxy.ts`'s coarse, cheap
   // gate, but THIS is the security boundary (see file header), so it must
   // never trust the (up to 5-minute stale) signed cookie — a revoked/deleted
-  // session or a role change (owner -> client) has to take effect immediately.
+  // session or a role change (admin -> client) has to take effect immediately.
   const session = await auth.api.getSession({
     headers: await headers(),
     query: { disableCookieCache: true },
@@ -63,12 +63,12 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
   return user;
 }
 
-export function requireOwner() {
-  return requireRole("owner");
+export function requireAdmin() {
+  return requireRole("admin");
 }
 
 export function requireStaff() {
-  return requireRole("owner", "surveyor");
+  return requireRole("admin", "surveyor");
 }
 
 export function requireClient() {
@@ -87,7 +87,7 @@ export async function getClientIdForUser(userId: string): Promise<string | null>
 
 /**
  * Returns the project ONLY if `user` is allowed to see it:
- * - owner: any project
+ * - admin: any project
  * - surveyor: only if `assignedSurveyorId === user.id`
  * - client: only if the project's `clientId` matches the client row linked
  *   to `user.id` via `clients.userId`
@@ -99,7 +99,7 @@ export async function assertProjectAccess(projectId: string, user: SessionUser) 
   const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
   if (!project) notFound();
 
-  if (user.role === "owner") return project;
+  if (user.role === "admin") return project;
 
   if (user.role === "surveyor") {
     if (project.assignedSurveyorId === user.id) return project;
@@ -121,7 +121,7 @@ export async function assertProjectAccess(projectId: string, user: SessionUser) 
  * `assertProjectAccess`.
  */
 export async function listProjectsForUser(user: SessionUser) {
-  if (user.role === "owner") {
+  if (user.role === "admin") {
     return db.select().from(projects);
   }
 

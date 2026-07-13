@@ -22,10 +22,10 @@ type PaymentFormValues = {
 };
 
 /**
- * Owner-only Keuangan form (PRD §3 Feature 5). Only ever rendered inside the
- * project detail page's `user.role === "owner"` branch (a Server Component
+ * Admin-only Keuangan form (PRD §3 Feature 5). Only ever rendered inside the
+ * project detail page's `user.role === "admin"` branch (a Server Component
  * conditional) — never mounted at all for a surveyor, so no finance value
- * is ever serialized into a non-owner's RSC payload via this component.
+ * is ever serialized into a non-admin's RSC payload via this component.
  */
 export function PaymentForm({
   projectId,

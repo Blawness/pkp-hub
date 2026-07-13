@@ -22,12 +22,12 @@ export type DocumentRow = {
   clientName?: string;
 };
 
-/** `isOwner` gates the share-toggle + delete columns (owner-only actions). */
+/** `isAdmin` gates the share-toggle + delete columns (admin-only actions). */
 export function buildDocumentsColumns({
-  isOwner,
+  isAdmin,
   showProject = false,
 }: {
-  isOwner: boolean;
+  isAdmin: boolean;
   showProject?: boolean;
 }): ColumnDef<DocumentRow>[] {
   const columns: ColumnDef<DocumentRow>[] = [
@@ -75,7 +75,7 @@ export function buildDocumentsColumns({
       id: "shared",
       header: "Status",
       cell: ({ row }) =>
-        isOwner ? (
+        isAdmin ? (
           <DocumentShareToggle
             documentId={row.original.id}
             sharedWithClient={row.original.sharedWithClient}
@@ -96,7 +96,7 @@ export function buildDocumentsColumns({
             fileUrl={row.original.fileUrl}
             mimeType={row.original.mimeType}
           />
-          {isOwner ? <DeleteDocumentButton documentId={row.original.id} /> : null}
+          {isAdmin ? <DeleteDocumentButton documentId={row.original.id} /> : null}
         </div>
       ),
     },

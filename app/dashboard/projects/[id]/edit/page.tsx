@@ -1,22 +1,22 @@
 import { eq, isNull, or } from "drizzle-orm";
 import { ProjectForm } from "@/components/projects/project-form";
-import { assertProjectAccess, requireOwner } from "@/lib/auth-guards";
+import { assertProjectAccess, requireAdmin } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireOwner();
+  const user = await requireAdmin();
   const project = await assertProjectAccess(id, user);
   return { title: `Edit ${project.title}` };
 }
 
 export default async function EditProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireOwner();
+  const user = await requireAdmin();
 
   // Mandatory scoping rule: always go through `assertProjectAccess`, never a
-  // raw `db.select()` on `projects` — even on an owner-only page.
+  // raw `db.select()` on `projects` — even on an admin-only page.
   const project = await assertProjectAccess(id, user);
 
   // Exclude archived (soft-deleted) clients from the dropdown, EXCEPT this

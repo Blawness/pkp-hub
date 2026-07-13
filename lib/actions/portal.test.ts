@@ -32,16 +32,16 @@ beforeAll(async () => {
   await db.delete(clients);
   await db.delete(users);
 
-  const ownerId = randomUUID();
+  const adminId = randomUUID();
   const clientUserAId = randomUUID();
   const clientUserBId = randomUUID();
 
   await db.insert(users).values([
     {
-      id: ownerId,
-      name: "Portal Test Owner",
-      email: "test-owner-portal@fixture.test",
-      role: "owner",
+      id: adminId,
+      name: "Portal Test Admin",
+      email: "test-admin-portal@fixture.test",
+      role: "admin",
     },
     {
       id: clientUserAId,
@@ -97,7 +97,7 @@ beforeAll(async () => {
       fileSize: 1024,
       mimeType: "application/pdf",
       sharedWithClient: true,
-      uploadedById: ownerId,
+      uploadedById: adminId,
     },
     {
       projectId: projectA,
@@ -107,7 +107,7 @@ beforeAll(async () => {
       fileSize: 2048,
       mimeType: "application/pdf",
       sharedWithClient: false,
-      uploadedById: ownerId,
+      uploadedById: adminId,
     },
   ]);
 });
@@ -132,13 +132,13 @@ describe("client cross-tenant access", () => {
   });
 
   it("a non-client role is rejected by listPortalProjects", async () => {
-    const owner: SessionUser = {
+    const admin: SessionUser = {
       id: randomUUID(),
       name: "x",
       email: "x@fixture.test",
-      role: "owner",
+      role: "admin",
     };
-    await expect(listPortalProjects(owner)).rejects.toThrow();
+    await expect(listPortalProjects(admin)).rejects.toThrow();
   });
 });
 

@@ -1,0 +1,27 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - generic [ref=e5]:
+        - paragraph [ref=e6]: PKP Hub
+        - paragraph [ref=e7]: Presisi Konsulindo Prima
+      - generic [ref=e8]:
+        - paragraph [ref=e10]: Presisi dalam setiap ukuran.
+        - list [ref=e11]:
+          - listitem [ref=e13]: Survey topografi
+          - listitem [ref=e16]: Pengukuran lahan
+          - listitem [ref=e19]: Pemetaan digital
+      - paragraph [ref=e23]: © 2026 Presisi Konsulindo Prima
+    - generic [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]: Masuk ke PKP Hub
+        - generic [ref=e30]: Dashboard internal untuk staf, portal untuk klien survey.
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - generic [ref=e34]: Email
+          - textbox "Email" [ref=e35]
+        - generic [ref=e36]:
+          - generic [ref=e37]: Password
+          - textbox "Password" [ref=e38]
+        - button "Masuk" [ref=e39]
+  - button "Open Next.js Dev Tools" [ref=e45] [cursor=pointer]:
+    - img [ref=e46]

@@ -16,7 +16,7 @@ import type {
  * separated from the "use server" wrappers in `documents.ts` so it's
  * directly unit-testable (see `documents.test.ts`). Every function here
  * re-checks the caller's role/scoping itself — defense in depth alongside
- * `ownerActionClient` / `staffActionClient` in `documents.ts`, not a
+ * `adminActionClient` / `staffActionClient` in `documents.ts`, not a
  * replacement for it.
  *
  * CRITICAL: any function that reads/writes a specific project's documents
@@ -27,14 +27,14 @@ import type {
  * client sees only their own).
  */
 
-function requireOwner(user: SessionUser) {
-  if (user.role !== "owner") {
-    throw new Error("Only the owner can perform this action.");
+function requireAdmin(user: SessionUser) {
+  if (user.role !== "admin") {
+    throw new Error("Only the admin can perform this action.");
   }
 }
 
 function requireStaff(user: SessionUser) {
-  if (user.role !== "owner" && user.role !== "surveyor") {
+  if (user.role !== "admin" && user.role !== "surveyor") {
     throw new Error("You do not have permission to perform this action.");
   }
 }
@@ -62,7 +62,7 @@ async function assertProjectAccessOrReject(projectId: string, user: SessionUser)
   }
 }
 
-/** Owner + surveyor, and only for a project they can access. */
+/** Admin + surveyor, and only for a project they can access. */
 export async function uploadDocumentForUser(user: SessionUser, input: UploadDocumentInput) {
   requireStaff(user);
   await assertProjectAccessOrReject(input.projectId, user);
@@ -82,12 +82,12 @@ export async function uploadDocumentForUser(user: SessionUser, input: UploadDocu
   return doc;
 }
 
-/** Owner only. */
+/** Admin only. */
 export async function toggleDocumentShareForUser(
   user: SessionUser,
   input: ToggleDocumentShareInput,
 ) {
-  requireOwner(user);
+  requireAdmin(user);
 
   const [existing] = await db.select().from(documents).where(eq(documents.id, input.id));
   if (!existing) throw new Error("Document not found.");
@@ -101,9 +101,9 @@ export async function toggleDocumentShareForUser(
   return doc;
 }
 
-/** Owner only; removes the object from storage too. */
+/** Admin only; removes the object from storage too. */
 export async function deleteDocumentForUser(user: SessionUser, input: DeleteDocumentInput) {
-  requireOwner(user);
+  requireAdmin(user);
 
   const [existing] = await db.select().from(documents).where(eq(documents.id, input.id));
   if (!existing) throw new Error("Document not found.");

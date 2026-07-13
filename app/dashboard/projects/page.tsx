@@ -64,7 +64,7 @@ export default async function ProjectsPage({
           user.role === "surveyor" ? "Proyek yang ditugaskan kepada Anda." : "Semua proyek studio."
         }
         action={
-          user.role === "owner" ? (
+          user.role === "admin" ? (
             <ButtonLink href="/dashboard/projects/new">Proyek baru</ButtonLink>
           ) : undefined
         }
@@ -93,12 +93,12 @@ export default async function ProjectsPage({
             description={
               filters.status || filters.clientId || filters.surveyorId || filters.surveyType
                 ? "Coba ubah atau hapus filter yang aktif."
-                : user.role === "owner"
+                : user.role === "admin"
                   ? "Buat proyek pertama untuk mulai melacak pekerjaan survey."
                   : "Belum ada proyek yang ditugaskan kepada Anda."
             }
             action={
-              user.role === "owner" ? (
+              user.role === "admin" ? (
                 <ButtonLink size="sm" href="/dashboard/projects/new">
                   Proyek baru
                 </ButtonLink>

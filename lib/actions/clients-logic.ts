@@ -10,13 +10,13 @@ import type { ArchiveClientInput, ClientInput, UpdateClientInput } from "./clien
  * directly (next-safe-action's `requireUser()` needs `next/headers`' request
  * scope, which plain vitest doesn't have). Every function re-checks the
  * caller's role itself — this is defense in depth alongside
- * `ownerActionClient` in `clients.ts`, not a replacement for it. If either
+ * `adminActionClient` in `clients.ts`, not a replacement for it. If either
  * check is removed, the corresponding test in `clients.test.ts` fails.
  */
 
-function requireOwner(user: SessionUser) {
-  if (user.role !== "owner") {
-    throw new Error("Only the owner can manage clients.");
+function requireAdmin(user: SessionUser) {
+  if (user.role !== "admin") {
+    throw new Error("Only the admin can manage clients.");
   }
 }
 
@@ -25,7 +25,7 @@ function nullableText(value?: string): string | null {
 }
 
 export async function createClientForUser(user: SessionUser, input: ClientInput) {
-  requireOwner(user);
+  requireAdmin(user);
   const [client] = await db
     .insert(clients)
     .values({
@@ -41,7 +41,7 @@ export async function createClientForUser(user: SessionUser, input: ClientInput)
 }
 
 export async function updateClientForUser(user: SessionUser, input: UpdateClientInput) {
-  requireOwner(user);
+  requireAdmin(user);
   const [client] = await db
     .update(clients)
     .set({
@@ -60,7 +60,7 @@ export async function updateClientForUser(user: SessionUser, input: UpdateClient
 }
 
 export async function archiveClientForUser(user: SessionUser, input: ArchiveClientInput) {
-  requireOwner(user);
+  requireAdmin(user);
   const [client] = await db
     .update(clients)
     .set({ archivedAt: new Date(), updatedAt: new Date() })
