@@ -6,11 +6,13 @@ import {
   archiveUser,
   createStaffUser,
   restoreUser,
+  setUserName,
   setUserPassword,
   setUserRole,
 } from "@/lib/actions/users-logic";
 import {
   createStaffUserSchema,
+  setUserNameSchema,
   setUserPasswordSchema,
   setUserRoleSchema,
   userIdSchema,
@@ -41,6 +43,18 @@ export const setUserRoleAction = adminActionClient
   .action(async ({ parsedInput, ctx }) => {
     await setUserRole(ctx.user, parsedInput.userId, parsedInput.role);
     revalidatePath(USERS_PATH);
+    return { success: true as const };
+  });
+
+export const setUserNameAction = adminActionClient
+  .inputSchema(setUserNameSchema)
+  .action(async ({ parsedInput }) => {
+    await setUserName(parsedInput.userId, parsedInput.name);
+    // Bukan `revalidatePath(USERS_PATH)`: nama user juga dirender oleh sidebar
+    // di layout /dashboard. Kalau admin mengganti namanya sendiri dan kita cuma
+    // membuang cache halaman user, tabelnya berubah tapi namanya di sidebar
+    // tetap yang lama. Membuang cache layout-nya mencakup keduanya.
+    revalidatePath("/dashboard", "layout");
     return { success: true as const };
   });
 

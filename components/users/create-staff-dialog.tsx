@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SelectField } from "@/components/ui/select-field";
 import { createStaffUserAction } from "@/lib/actions/users";
 import { createStaffUserSchema } from "@/lib/actions/users-schemas";
 
@@ -36,6 +37,7 @@ export function CreateStaffDialog() {
   const [formError, setFormError] = useState<string | null>(null);
 
   const {
+    control,
     register,
     handleSubmit,
     reset,
@@ -101,14 +103,26 @@ export function CreateStaffDialog() {
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="role">Role</Label>
-              <select
-                id="role"
-                className="h-9 rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30"
-                {...register("role")}
-              >
-                <option value="surveyor">Surveyor</option>
-                <option value="admin">Admin</option>
-              </select>
+              {/* Hanya staf: `client` sengaja tidak ada di sini — akun portal
+                  klien lahir lewat `inviteClientUser`, yang juga menautkannya
+                  ke baris `clients`. Lihat header `users-logic.ts`. */}
+              <Controller
+                control={control}
+                name="role"
+                render={({ field }) => (
+                  <SelectField
+                    id="role"
+                    className="w-full"
+                    options={[
+                      { value: "surveyor", label: "Surveyor" },
+                      { value: "admin", label: "Admin" },
+                    ]}
+                    value={field.value ?? ""}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
             </div>
 
             <div className="flex flex-col gap-2">

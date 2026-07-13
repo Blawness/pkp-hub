@@ -15,6 +15,7 @@ import { authClient } from "@/lib/auth-client";
 const loginSchema = z.object({
   email: z.email("Enter a valid email address."),
   password: z.string().min(1, "Password is required."),
+  rememberMe: z.boolean(),
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
@@ -45,7 +46,7 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: "", password: "", rememberMe: true },
   });
 
   const onSubmit = async (values: LoginValues) => {
@@ -53,6 +54,10 @@ export function LoginForm() {
     const { data, error } = await authClient.signIn.email({
       email: values.email,
       password: values.password,
+      // `false` membuat Better Auth menyetel cookie sesi TANPA maxAge, jadi ia
+      // ikut mati saat browser ditutup. `true` (default-nya) menyimpannya
+      // selama `session.expiresIn` — 7 hari.
+      rememberMe: values.rememberMe,
     });
 
     if (error || !data) {
@@ -102,6 +107,18 @@ export function LoginForm() {
           </p>
         ) : null}
       </div>
+      <div className="flex items-center gap-2">
+        <input
+          id="rememberMe"
+          type="checkbox"
+          className="size-4 rounded border-input accent-primary"
+          {...register("rememberMe")}
+        />
+        <Label htmlFor="rememberMe" className="text-sm font-normal">
+          Ingat saya
+        </Label>
+      </div>
+
       {/*
         `role="alert"` membuat kegagalan login diumumkan screen reader begitu
         elemennya masuk DOM. Tanpa ini, satu-satunya penanda bahwa login gagal

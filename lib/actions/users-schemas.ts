@@ -24,6 +24,11 @@ export const setUserRoleSchema = z.object({
   role: staffRoleSchema,
 });
 
+export const setUserNameSchema = z.object({
+  userId: z.uuid(),
+  name: z.string().trim().min(1, "Nama wajib diisi.").max(120),
+});
+
 export const setUserPasswordSchema = z.object({
   userId: z.uuid(),
   password: passwordSchema,

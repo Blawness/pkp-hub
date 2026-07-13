@@ -6,6 +6,7 @@ import {
   ArchiveRestoreIcon,
   KeyRoundIcon,
   MoreHorizontalIcon,
+  PencilIcon,
   UserCogIcon,
 } from "lucide-react";
 import { useAction } from "next-safe-action/hooks";
@@ -33,13 +34,15 @@ import { Label } from "@/components/ui/label";
 import {
   archiveUserAction,
   restoreUserAction,
+  setUserNameAction,
   setUserPasswordAction,
   setUserRoleAction,
 } from "@/lib/actions/users";
 import type { ManagedUser } from "@/lib/actions/users-logic";
-import { setUserPasswordSchema } from "@/lib/actions/users-schemas";
+import { setUserNameSchema, setUserPasswordSchema } from "@/lib/actions/users-schemas";
 
 type PasswordValues = z.infer<typeof setUserPasswordSchema>;
+type NameValues = z.infer<typeof setUserNameSchema>;
 
 /**
  * Aksi per-baris untuk seorang user.
@@ -61,6 +64,8 @@ export function UserRowActions({
 }) {
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [nameOpen, setNameOpen] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   const setRole = useAction(setUserRoleAction, {
     onError: ({ error }) => window.alert(error.serverError ?? "Gagal mengubah role."),
@@ -91,6 +96,32 @@ export function UserRowActions({
     onError: ({ error }) => setFormError(error.serverError ?? "Gagal menyetel password."),
   });
 
+  const {
+    register: registerName,
+    handleSubmit: handleSubmitName,
+    reset: resetName,
+    formState: { errors: nameErrors },
+  } = useForm<NameValues>({
+    resolver: zodResolver(setUserNameSchema),
+    defaultValues: { userId: user.id, name: user.name },
+  });
+
+  const setName = useAction(setUserNameAction, {
+    onSuccess: () => {
+      setNameError(null);
+      setNameOpen(false);
+    },
+    onError: ({ error }) => setNameError(error.serverError ?? "Gagal mengganti nama."),
+  });
+
+  function openNameDialog() {
+    // Isi ulang dari prop, bukan dari sisa ketikan sebelumnya: dialog yang
+    // ditutup tanpa disimpan harus dibuka lagi menampilkan nama yang berlaku.
+    resetName({ userId: user.id, name: user.name });
+    setNameError(null);
+    setNameOpen(true);
+  }
+
   // Klien dikelola di halaman Klien; di sini mereka hanya ditampilkan.
   const isClient = user.role === "client";
   const nextRole = user.role === "admin" ? "surveyor" : "admin";
@@ -107,6 +138,15 @@ export function UserRowActions({
           }
         />
         <DropdownMenuContent align="end" className="w-56">
+          {/* Berlaku untuk semua role, termasuk diri sendiri dan klien: nama
+              tampilan tidak memindahkan akses siapa pun, jadi tak ada invarian
+              yang perlu dijaga di sini. `clients.name` (nama di halaman Klien)
+              adalah kolom lain dan tidak ikut berubah. */}
+          <DropdownMenuItem onClick={openNameDialog}>
+            <PencilIcon />
+            Ganti nama
+          </DropdownMenuItem>
+
           <DropdownMenuItem
             disabled={isClient || isSelf || lockedByLastAdmin || setRole.isPending}
             onClick={() => setRole.execute({ userId: user.id, role: nextRole })}
@@ -142,6 +182,44 @@ export function UserRowActions({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Dialog open={nameOpen} onOpenChange={setNameOpen}>
+        <DialogContent>
+          <form onSubmit={handleSubmitName((values) => setName.execute(values))}>
+            <DialogHeader>
+              <DialogTitle>Ganti nama</DialogTitle>
+              <DialogDescription>
+                Nama tampilan untuk {user.email}. Email dan role-nya tidak berubah.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex flex-col gap-2 py-4">
+              {nameError ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {nameError}
+                </p>
+              ) : null}
+
+              <Label htmlFor={`name-${user.id}`}>Nama</Label>
+              <Input
+                id={`name-${user.id}`}
+                autoComplete="off"
+                aria-invalid={!!nameErrors.name}
+                {...registerName("name")}
+              />
+              {nameErrors.name ? (
+                <p className="text-xs text-destructive">{nameErrors.name.message}</p>
+              ) : null}
+            </div>
+
+            <DialogFooter>
+              <Button type="submit" disabled={setName.isPending}>
+                {setName.isPending ? "Menyimpan…" : "Simpan"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
         <DialogContent>

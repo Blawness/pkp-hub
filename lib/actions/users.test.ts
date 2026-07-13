@@ -8,6 +8,7 @@ import {
   createStaffUser,
   listUsers,
   restoreUser,
+  setUserName,
   setUserPassword,
   setUserRole,
 } from "@/lib/actions/users-logic";
@@ -184,6 +185,37 @@ describe("archiveUser", () => {
     expect(live).toHaveLength(0);
 
     await restoreUser(surveyor.id);
+  });
+});
+
+describe("setUserName", () => {
+  it("mengganti nama user lain", async () => {
+    await setUserName(surveyor.id, "Surveyor Baru");
+    const [row] = await db.select().from(users).where(eq(users.id, surveyor.id));
+    expect(row.name).toBe("Surveyor Baru");
+  });
+
+  it("membolehkan admin mengganti namanya SENDIRI (tidak seperti setUserRole)", async () => {
+    await setUserName(adminA.id, "Admin A Baru");
+    const [row] = await db.select().from(users).where(eq(users.id, adminA.id));
+    expect(row.name).toBe("Admin A Baru");
+  });
+
+  it("memangkas spasi di ujung", async () => {
+    await setUserName(adminB.id, "  Admin B  ");
+    const [row] = await db.select().from(users).where(eq(users.id, adminB.id));
+    expect(row.name).toBe("Admin B");
+  });
+
+  it("tidak menyentuh role atau email", async () => {
+    await setUserName(surveyor.id, "Nama Lain");
+    const [row] = await db.select().from(users).where(eq(users.id, surveyor.id));
+    expect(row.role).toBe("surveyor");
+    expect(row.email).toBe("surveyor@fixture.test");
+  });
+
+  it("menolak user yang tidak ada", async () => {
+    await expect(setUserName(randomUUID(), "Hantu")).rejects.toThrow("User tidak ditemukan.");
   });
 });
 
