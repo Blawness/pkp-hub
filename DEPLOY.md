@@ -183,6 +183,13 @@ dev only. Create the first real owner account directly (see §6).
    by design (accounts are only ever created by an owner via the client-invite
    flow, or by the seed script, neither of which apply to the very first
    account). To bootstrap the first owner in production:
+
+   **Akun portal klien:** klien mendapat akun portal lewat dua jalan — (1)
+   diundang dari halaman Klien ("Undang ke portal", mengirim email
+   set-password), atau (2) dibuat manual oleh admin di Settings → Users
+   ("Tambah klien", password awal ditentukan admin). Keduanya login di
+   `/login` dan diarahkan ke `/portal`. Invite butuh `RESEND_API_KEY` untuk
+   mengirim email; tanpanya, URL set-password tercatat di log server.
    - Insert a row into the `user` table directly (Neon SQL editor) with
      `role = 'owner'` and a real email.
    - Use Better Auth's server-side API to set a password for that user (e.g.

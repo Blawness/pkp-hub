@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { adminActionClient } from "@/lib/actions/safe-action";
 import {
   archiveUser,
+  createClientUser,
   createStaffUser,
   restoreUser,
   setUserName,
@@ -11,6 +12,7 @@ import {
   setUserRole,
 } from "@/lib/actions/users-logic";
 import {
+  createClientUserSchema,
   createStaffUserSchema,
   setUserNameSchema,
   setUserPasswordSchema,
@@ -36,6 +38,15 @@ export const createStaffUserAction = adminActionClient
     const { id } = await createStaffUser(parsedInput);
     revalidatePath(USERS_PATH);
     return { success: true as const, id };
+  });
+
+export const createClientUserAction = adminActionClient
+  .inputSchema(createClientUserSchema)
+  .action(async ({ parsedInput }) => {
+    const { id, clientId } = await createClientUser(parsedInput);
+    revalidatePath(USERS_PATH);
+    revalidatePath("/dashboard/clients");
+    return { success: true as const, id, clientId };
   });
 
 export const setUserRoleAction = adminActionClient

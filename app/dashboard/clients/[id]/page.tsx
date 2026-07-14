@@ -2,6 +2,7 @@ import { FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
+import { InviteClientButton } from "@/components/clients/invite-client-button";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,12 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
           </p>
         </div>
         <div className="flex gap-2">
+          <InviteClientButton
+            clientId={client.id}
+            email={client.email}
+            hasUser={Boolean(client.userId)}
+            archived={Boolean(client.archivedAt)}
+          />
           <ButtonLink variant="outline" href={`/dashboard/clients/${client.id}/edit`}>
             Edit
           </ButtonLink>

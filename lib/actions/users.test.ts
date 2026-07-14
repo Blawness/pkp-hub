@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   archiveUser,
+  createClientUser,
   createStaffUser,
   listUsers,
   restoreUser,
@@ -115,6 +116,50 @@ describe("createStaffUser", () => {
         name: "Kembar",
         email: "admin-a@fixture.test",
         role: "surveyor",
+        password: "rahasia-kuat-123",
+      }),
+    ).rejects.toThrow(/sudah dipakai/i);
+  });
+});
+
+describe("createClientUser", () => {
+  it("membuat clients + user(client) + credential, dan menautkannya (bukan akun yatim)", async () => {
+    const { id, clientId } = await createClientUser({
+      name: "Klien Baru",
+      email: "klien-baru@fixture.test",
+      password: "rahasia-kuat-123",
+      type: "company",
+      phone: "021-555",
+      address: "Jl. Contoh 1",
+    });
+
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    expect(user.role).toBe("client");
+    expect(user.email).toBe("klien-baru@fixture.test");
+
+    const [client] = await db.select().from(clients).where(eq(clients.id, clientId));
+    // Tautan inilah yang membedakan akun berguna dari akun yatim.
+    expect(client.userId).toBe(id);
+    expect(client.type).toBe("company");
+    expect(client.phone).toBe("021-555");
+    expect(client.address).toBe("Jl. Contoh 1");
+
+    const [credential] = await db
+      .select({ password: accounts.password })
+      .from(accounts)
+      .where(and(eq(accounts.userId, id), eq(accounts.providerId, "credential")));
+
+    expect(credential?.password).toBeTruthy();
+    await expect(
+      verifyPassword({ hash: credential.password as string, password: "rahasia-kuat-123" }),
+    ).resolves.toBe(true);
+  });
+
+  it("menolak email yang sudah dipakai", async () => {
+    await expect(
+      createClientUser({
+        name: "Klien Kembar",
+        email: "admin-a@fixture.test",
         password: "rahasia-kuat-123",
       }),
     ).rejects.toThrow(/sudah dipakai/i);

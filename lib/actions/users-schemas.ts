@@ -19,6 +19,21 @@ export const createStaffUserSchema = z.object({
   password: passwordSchema,
 });
 
+/**
+ * Pembuatan akun klien manual (Settings → Users). Berbeda dari `createStaffUser`,
+ * ia juga menciptakan baris `clients` dan menautkannya via `clients.userId` —
+ * user `client` yang yatim (tanpa tautan) tidak bisa melihat apa pun di portal.
+ * `email` wajib karena dipakai untuk login.
+ */
+export const createClientUserSchema = z.object({
+  name: z.string().trim().min(1, "Nama wajib diisi.").max(120),
+  email: z.email("Format email tidak valid."),
+  password: passwordSchema,
+  type: z.enum(["individual", "company"]),
+  phone: z.string().trim().optional(),
+  address: z.string().trim().optional(),
+});
+
 export const setUserRoleSchema = z.object({
   userId: z.uuid(),
   role: staffRoleSchema,

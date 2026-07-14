@@ -3,7 +3,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import type { Role, SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { accounts, sessions, users } from "@/lib/db/schema";
+import { accounts, clients, sessions, users } from "@/lib/db/schema";
 
 /**
  * Server-only business logic manajemen user (admin-only), diuji langsung di
@@ -118,6 +118,59 @@ export async function createStaffUser(input: {
   });
 
   return { id: userId };
+}
+
+/**
+ * Buat akun portal klien manual: sekaligus menciptakan baris `clients` dan
+ * user `client` yang tertaut, plus kredential dengan password awal yang
+ * di-hash. Ini jalan bagi admin membuat akun klien tanpa mengandalkan email
+ * undangan. `clients.userId` selalu diisi agar tidak jadi akun yatim.
+ */
+export async function createClientUser(input: {
+  name: string;
+  email: string;
+  password: string;
+  type?: "individual" | "company";
+  phone?: string | null;
+  address?: string | null;
+}): Promise<{ id: string; clientId: string }> {
+  const email = input.email.trim().toLowerCase();
+
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+  if (existing) {
+    throw new Error("Email ini sudah dipakai akun lain.");
+  }
+
+  const clientId = randomUUID();
+  await db.insert(clients).values({
+    id: clientId,
+    name: input.name.trim(),
+    type: input.type ?? "individual",
+    email,
+    phone: input.phone ?? null,
+    address: input.address ?? null,
+  });
+
+  const userId = randomUUID();
+  await db.insert(users).values({
+    id: userId,
+    name: input.name.trim(),
+    email,
+    role: "client",
+  });
+
+  // Tautkan user ke baris klien — ini yang membedakan akun berguna dari akun yatim.
+  await db.update(clients).set({ userId }).where(eq(clients.id, clientId));
+
+  await db.insert(accounts).values({
+    id: randomUUID(),
+    accountId: userId,
+    providerId: "credential",
+    userId,
+    password: await hashPassword(input.password),
+  });
+
+  return { id: userId, clientId };
 }
 
 /** Ganti role seorang user. Tidak bisa dipakai untuk membuat/mengubah client. */

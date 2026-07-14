@@ -19,20 +19,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
-import { createStaffUserAction } from "@/lib/actions/users";
-import { createStaffUserSchema } from "@/lib/actions/users-schemas";
+import { createClientUserAction } from "@/lib/actions/users";
+import { createClientUserSchema } from "@/lib/actions/users-schemas";
 
-type FormValues = z.infer<typeof createStaffUserSchema>;
+type FormValues = z.infer<typeof createClientUserSchema>;
 
 /**
- * Tambah akun staf. Admin mengetik password awalnya sendiri dan menyampaikannya
- * ke orangnya lewat jalur di luar sistem ini.
+ * Tambah akun portal klien secara manual. Admin mengisi nama/email/password awal
+ * (dan opsional telepon/alamat tipe), lalu sistem membuat baris `clients` +
+ * user `client` + kredential sekaligus — teraut secara langsung, tanpa email.
  *
- * Password yang diketik di sini TIDAK pernah disimpan mentah dan tidak bisa
- * dilihat lagi setelah dialog ditutup — yang masuk database hanya hash Better
- * Auth. Kalau lupa, jalannya bukan "lihat password", melainkan setel ulang.
+ * Password yang diketik di sini tidak pernah disimpan mentah; yang masuk DB
+ * hanya hash Better Auth.
  */
-export function CreateStaffDialog() {
+export function CreateClientDialog() {
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -43,18 +43,25 @@ export function CreateStaffDialog() {
     reset,
     formState: { errors },
   } = useForm<FormValues>({
-    resolver: zodResolver(createStaffUserSchema),
-    defaultValues: { name: "", email: "", role: "surveyor", password: "" },
+    resolver: zodResolver(createClientUserSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+      type: "individual",
+      phone: "",
+      address: "",
+    },
   });
 
-  const { execute, isPending } = useAction(createStaffUserAction, {
+  const { execute, isPending } = useAction(createClientUserAction, {
     onSuccess: () => {
       reset();
       setFormError(null);
       setOpen(false);
     },
     onError: ({ error }) => {
-      setFormError(error.serverError ?? "Gagal membuat akun.");
+      setFormError(error.serverError ?? "Gagal membuat akun klien.");
     },
   });
 
@@ -62,19 +69,19 @@ export function CreateStaffDialog() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
-          <Button>
+          <Button variant="outline">
             <PlusIcon />
-            Tambah staf
+            Tambah klien
           </Button>
         }
       />
       <DialogContent>
         <form onSubmit={handleSubmit((values) => execute(values))}>
           <DialogHeader>
-            <DialogTitle>Tambah akun staf</DialogTitle>
+            <DialogTitle>Tambah akun klien</DialogTitle>
             <DialogDescription>
-              Sampaikan password awal ini ke yang bersangkutan lewat jalur pribadi. Password tidak
-              bisa dilihat lagi setelah dialog ditutup.
+              Membuat akun portal klien sekaligus datanya. Sampaikan password awal ini ke klien
+              lewat jalur pribadi. Password tidak bisa dilihat lagi setelah dialog ditutup.
             </DialogDescription>
           </DialogHeader>
 
@@ -102,30 +109,6 @@ export function CreateStaffDialog() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="role">Role</Label>
-              {/* Hanya staf: akun portal klien dibuat lewat `createClientUser`
-                  (tombol "Tambah klien" di sebelah), yang menautkannya ke baris
-                  `clients` sekaligus. Lihat `users-logic.ts`. */}
-              <Controller
-                control={control}
-                name="role"
-                render={({ field }) => (
-                  <SelectField
-                    id="role"
-                    className="w-full"
-                    options={[
-                      { value: "surveyor", label: "Surveyor" },
-                      { value: "admin", label: "Admin" },
-                    ]}
-                    value={field.value ?? ""}
-                    onValueChange={field.onChange}
-                    onBlur={field.onBlur}
-                  />
-                )}
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
               <Label htmlFor="password">Password awal</Label>
               <Input
                 id="password"
@@ -141,6 +124,37 @@ export function CreateStaffDialog() {
                   Minimal 10 karakter. Sengaja ditampilkan agar bisa disalin sekarang.
                 </p>
               )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="type">Tipe</Label>
+              <Controller
+                control={control}
+                name="type"
+                render={({ field }) => (
+                  <SelectField
+                    id="type"
+                    className="w-full"
+                    options={[
+                      { value: "individual", label: "Perorangan" },
+                      { value: "company", label: "Perusahaan" },
+                    ]}
+                    value={field.value ?? "individual"}
+                    onValueChange={field.onChange}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="phone">Telepon (opsional)</Label>
+              <Input id="phone" aria-invalid={!!errors.phone} {...register("phone")} />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="address">Alamat (opsional)</Label>
+              <Input id="address" aria-invalid={!!errors.address} {...register("address")} />
             </div>
           </div>
 
