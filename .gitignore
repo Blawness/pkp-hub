@@ -49,3 +49,9 @@ next-env.d.ts
 
 # Artefak sesi playwright-cli (bukan bagian dari proyek)
 .playwright-cli/
+
+# Playwright e2e
+e2e/.auth/
+test-results/
+playwright-report/
+.playwright/
