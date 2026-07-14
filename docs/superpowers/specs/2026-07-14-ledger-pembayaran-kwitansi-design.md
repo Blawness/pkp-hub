@@ -141,8 +141,8 @@ kwitansi yang sudah pernah terbit tidak boleh muncul lagi dengan angka berbeda.
 Kwitansi Indonesia yang layak:
 
 ```
-[logo]  PT PRESISI KONSULINDO PRIMA
-        {alamat}  ·  {telepon}  ·  {email}
+PT PRESISI KONSULINDO PRIMA
+{alamat}  ·  {telepon}  ·  {email}
 ────────────────────────────────────────────
                 K W I T A N S I
                 No. KW/PKP/2026/0007
@@ -170,7 +170,11 @@ Sisa         : Rp7.500.000
 "seratus", "seribu" (bukan "satu ribu") — jadi ia diuji langsung dengan tabel kasus.
 
 **Identitas studio** = konstanta di `lib/studio-identity.ts` (nama, alamat, telepon, email,
-kota, penanda tangan, jabatan, path logo). Menggantinya = satu commit.
+kota, penanda tangan, jabatan). Menggantinya = satu commit.
+
+Logo **tidak** disematkan di v1: kop teks sudah mengidentifikasi studio, dan menyematkan
+gambar menambah berkas aset + jalur error (file hilang, format salah) demi hiasan. Tambahkan
+nanti kalau PKP memintanya.
 
 ### Generasi & penyimpanan
 
@@ -213,7 +217,7 @@ Ini bagian yang paling gampang bocor, jadi ia eksplisit.
 | Peran | Boleh |
 |---|---|
 | **admin** | Lihat, catat, batalkan pembayaran. Unduh semua kwitansi. Lihat piutang. |
-| **client** | Lihat pembayaran **proyeknya sendiri** (read-only) + unduh kwitansinya. |
+| **client** | Lihat pembayaran **proyeknya sendiri** (read-only) + unduh kwitansinya — kecuali baris yang dibatalkan, yang tidak ditampilkan **dan** tidak bisa diunduh. |
 | **surveyor** | **Tidak ada apa pun.** Tidak ada daftar, tidak ada angka, tidak ada kwitansi. |
 
 Aturan surveyor bukan kosmetik. Jaminan yang sudah ada — `projectValue` / `paymentStatus` /
@@ -316,29 +320,37 @@ Nilai tiap test: apa yang gagal kalau kodenya salah.
 | Berkas | Tanggung jawab |
 |---|---|
 | `lib/db/schema.ts` (modify) | Tabel `payment`, enum `payment_method`, relasi. |
-| `drizzle/00xx_*.sql` (generate) | Migrasi + `CREATE SEQUENCE receipt_number_seq`. |
+| `drizzle/00xx_*.sql` (generate + hand-edit) | Migrasi + `CREATE SEQUENCE receipt_number_seq`. |
 | `lib/db/seed.ts` (modify) | Baris pembayaran yang konsisten dengan status demo. |
 | `lib/terbilang.ts` + `.test.ts` (create) | Angka → kata Bahasa Indonesia. Murni. |
+| `lib/payments/derive.ts` + `.test.ts` (create) | `derivePaymentStatus`, `buildReceiptNumber`, `receiptStorageKey`. Murni. |
+| `lib/format.ts` (modify) | `formatTanggalIndo` — tanpa `Date`, supaya tanggal tidak bergeser karena timezone. |
 | `lib/studio-identity.ts` (create) | Konstanta kop kwitansi. |
 | `lib/receipts/template.ts` + `.test.ts` (create) | `buildReceiptPdf(data) → Uint8Array`. Murni. |
-| `lib/receipts/index.ts` (create) | `generateAndStoreReceipt`, `regenerateAsVoided`. I/O. |
-| `lib/actions/payments-schemas.ts` (create) | Skema input record/void. |
-| `lib/actions/payments-logic.ts` + `.test.ts` (create) | Guard + transaksi + derivasi. |
+| `lib/receipts/index.ts` + `.test.ts` (create) | `generateAndStoreReceipt` — satu-satunya yang menyentuh storage. |
+| `lib/storage/keys.ts` + `.test.ts` (create) | `parseStorageKey` — bedakan `documents/` vs `receipts/`. Murni. |
+| `lib/actions/payments-schemas.ts` (create) | Skema input record/void/regenerate. |
+| `lib/actions/payments-logic.ts` + `payments.test.ts` (create) | Guard + transaksi + derivasi. |
 | `lib/actions/payments.ts` (create) | `adminActionClient` wrappers. |
 | `lib/actions/finance-schemas.ts` (modify) | Buang `paymentStatus` dari input. |
 | `lib/actions/finance-logic.ts` (modify) | `updatePayment` ikut menghitung ulang status. |
 | `lib/actions/dashboard-logic.ts` (modify) | `totalUnpaid` eksak. |
-| `lib/actions/portal-logic.ts` (modify) | Pembayaran non-batal untuk proyek klien. |
 | `components/projects/payment-form.tsx` (modify) | Dropdown status dibuang. |
 | `components/payments/payments-panel.tsx` (create) | Panel owner. |
 | `components/payments/record-payment-dialog.tsx` (create) | Form catat pembayaran. |
 | `components/payments/void-payment-dialog.tsx` (create) | Konfirmasi + alasan. |
-| `components/portal/payments-section.tsx` (create) | Read-only untuk klien. |
+| `components/payments/portal-payments.tsx` (create) | Read-only untuk klien. |
 | `app/dashboard/projects/[id]/page.tsx` (modify) | Render panel (admin saja). |
 | `app/portal/projects/[id]/page.tsx` (modify) | Render bagian pembayaran. |
 | `app/api/storage/[...key]/route.ts` (modify) | Prefix `receipts/` + guard keuangan. |
 | `lib/labels.ts` (modify) | `paymentMethodLabel`. |
 | `package.json` | + `pdf-lib`. |
+
+**`portal-logic.ts` sengaja tidak disentuh.** Portal memanggil `listPaymentsForProject` /
+`getPaymentSummary` dari `payments-logic.ts` langsung — keduanya sudah menyaring baris batal
+untuk peran `client` dan sudah lewat `assertProjectAccess`. Menyalin aturan itu ke berkas
+kedua berarti dua tempat yang harus tetap sepakat soal siapa boleh lihat apa; satu tempat
+lebih aman.
 
 ## Keputusan terbuka
 
