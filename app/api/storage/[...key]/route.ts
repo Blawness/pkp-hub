@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { assertProjectAccess, requireStaff, requireUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { documents } from "@/lib/db/schema";
+import { documents, payments } from "@/lib/db/schema";
 import { storage } from "@/lib/storage";
+import { parseStorageKey } from "@/lib/storage/keys";
 import { readLocalFile } from "@/lib/storage/local-driver";
 
 /**
@@ -12,10 +13,15 @@ import { readLocalFile } from "@/lib/storage/local-driver";
  * r2 driver is active this route 404s: R2 objects are uploaded to /
  * downloaded from R2 directly via presigned URLs, never through the app.
  *
- * Both verbs re-derive the owning project from the key
- * (`documents/<projectId>/...`) and go through `assertProjectAccess` — the
- * same scoping boundary as everywhere else. GET additionally enforces that
- * a `client` role may only read documents explicitly `sharedWithClient`.
+ * Kunci objek punya DUA prefix, masing-masing dengan aturan akses berbeda:
+ *
+ * - `documents/<projectId>/...` — staf (admin + surveyor yang di-assign) dan,
+ *   kalau `sharedWithClient`, klien pemiliknya.
+ * - `receipts/<projectId>/...`  — admin dan klien pemiliknya. SURVEYOR TIDAK,
+ *   meski proyeknya di-assign ke dia: kwitansi memuat nilai proyek, dan surveyor
+ *   tidak boleh melihat keuangan. `assertProjectAccess` di bawah MELOLOSKAN
+ *   surveyor yang di-assign, jadi penolakan surveyor harus berdiri sendiri,
+ *   SEBELUM guard itu.
  */
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -39,12 +45,6 @@ function guessContentType(key: string): string {
   return MIME_BY_EXT[ext] ?? "application/octet-stream";
 }
 
-/** `documents/<projectId>/<rest...>` -> `<projectId>`, else null for a malformed key. */
-function projectIdFromKey(key: string): string | null {
-  const [prefix, projectId] = key.split("/");
-  return prefix === "documents" && projectId ? projectId : null;
-}
-
 export async function GET(_request: Request, { params }: { params: Promise<{ key: string[] }> }) {
   if (storage.name !== "local") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
@@ -53,23 +53,46 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
   const key = keyParts.join("/");
 
   const user = await requireUser();
-  const projectId = projectIdFromKey(key);
-  if (!projectId) {
+  const parsed = parseStorageKey(key);
+  if (!parsed) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
+  // Kwitansi memuat nilai proyek. Surveyor TIDAK boleh melihat keuangan —
+  // dan `assertProjectAccess` di bawah MELOLOSKAN surveyor yang di-assign,
+  // jadi penolakan ini harus berdiri sendiri, sebelum guard itu.
+  if (parsed.kind === "receipt" && user.role === "surveyor") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   try {
-    await assertProjectAccess(projectId, user);
+    await assertProjectAccess(parsed.projectId, user);
   } catch {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  if (user.role === "client") {
+  if (parsed.kind === "document" && user.role === "client") {
     const [doc] = await db
       .select({ sharedWithClient: documents.sharedWithClient })
       .from(documents)
       .where(eq(documents.fileUrl, `/api/storage/${key}`));
     if (!doc?.sharedWithClient) {
+      return NextResponse.json({ error: "Not found." }, { status: 404 });
+    }
+  }
+
+  if (parsed.kind === "receipt") {
+    // Klien boleh mengunduh kwitansi proyeknya sendiri — `assertProjectAccess`
+    // sudah memastikan proyek ini miliknya — TAPI bukan kwitansi yang sudah
+    // dibatalkan: baris batal bukan bagian dari catatan uangnya.
+    const [row] = await db
+      .select({ voidedAt: payments.voidedAt })
+      .from(payments)
+      .where(eq(payments.receiptFileUrl, `/api/storage/${key}`));
+    if (!row) {
+      return NextResponse.json({ error: "Not found." }, { status: 404 });
+    }
+    if (user.role === "client" && row.voidedAt !== null) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
   }
@@ -95,13 +118,16 @@ export async function PUT(request: Request, { params }: { params: Promise<{ key:
   const key = keyParts.join("/");
 
   const user = await requireStaff();
-  const projectId = projectIdFromKey(key);
-  if (!projectId) {
+  const parsed = parseStorageKey(key);
+  // Kwitansi TIDAK PERNAH diunggah lewat HTTP — ia ditulis server-side lewat
+  // `storage.put`. Menerima PUT ke `receipts/` berarti membiarkan siapa pun
+  // yang berstatus staf menimpa kwitansi dengan berkas karangannya sendiri.
+  if (!parsed || parsed.kind !== "document") {
     return NextResponse.json({ error: "Invalid key." }, { status: 400 });
   }
 
   try {
-    await assertProjectAccess(projectId, user);
+    await assertProjectAccess(parsed.projectId, user);
   } catch {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
