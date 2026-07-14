@@ -40,7 +40,7 @@ async function seed() {
   const clientUserId = randomUUID();
 
   await db.insert(users).values([
-    { id: adminId, name: "Yudha Pratama", email: "admin@pkp.test", role: "admin" },
+    { id: adminId, name: "Yudha Hafiz", email: "admin@pkp.test", role: "admin" },
     { id: surveyor1Id, name: "Bagas Nugroho", email: "bagas@pkp.test", role: "surveyor" },
     { id: surveyor2Id, name: "Rizky Ananda", email: "rizky@pkp.test", role: "surveyor" },
     { id: clientUserId, name: "Andi Wijaya", email: "andi@klien.test", role: "client" },
