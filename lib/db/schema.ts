@@ -453,9 +453,7 @@ export const equipmentUsage = pgTable(
      * satunya menulis — dan alat tercatat di dua tangan. Pengecekan di kode
      * hanya untuk memberi pesan error yang enak dibaca; INI yang menegakkan.
      */
-    uniqueIndex("equipment_active_usage_uniq")
-      .on(t.equipmentId)
-      .where(sql`${t.endedAt} is null`),
+    uniqueIndex("equipment_active_usage_uniq").on(t.equipmentId).where(sql`${t.endedAt} is null`),
   ],
 );
 
