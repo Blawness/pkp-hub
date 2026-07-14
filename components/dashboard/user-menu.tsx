@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOutIcon } from "lucide-react";
+import { LogOutIcon, UserIcon } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ThemeMenuItems } from "@/components/theme/theme-menu-items";
@@ -100,6 +101,19 @@ export function UserMenu({
           <span className="truncate text-sm font-medium">{user.name}</span>
           <span className="truncate text-xs text-muted-foreground">{user.email}</span>
         </div>
+        <DropdownMenuSeparator />
+
+        {/* Klien hidup di /portal, staf di /dashboard — dua shell berbeda, jadi
+            dua route. Komponen ini dirender di keduanya, jadi href-nya ikut
+            role. `render` (bukan `asChild`) karena dropdown di sini Base UI. */}
+        <DropdownMenuItem
+          render={
+            <Link href={user.role === "client" ? "/portal/profile" : "/dashboard/profile"}>
+              <UserIcon className="size-4" />
+              Profil saya
+            </Link>
+          }
+        />
         <DropdownMenuSeparator />
 
         <ThemeMenuItems />
