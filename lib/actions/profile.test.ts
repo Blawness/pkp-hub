@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { updateOwnNameSchema } from "@/lib/actions/profile-schemas";
 import { setUserName } from "@/lib/actions/users-logic";
@@ -162,7 +162,10 @@ async function signIn(email: string, pass: string): Promise<Headers> {
 
 /** Ambil hash password (tabel `accounts`, providerId "credential") milik `userId`. */
 async function credentialHashFor(userId: string): Promise<string | null> {
-  const [account] = await db.select().from(accounts).where(eq(accounts.userId, userId));
+  const [account] = await db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")));
   return account?.password ?? null;
 }
 
