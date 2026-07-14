@@ -10,10 +10,7 @@ import type { PaymentStatus } from "@/lib/actions/finance-schemas";
  * memutuskan nilainya; siapa pun yang menulis status tanpa lewat sini sedang
  * membuat kolom itu berbohong.
  */
-export function derivePaymentStatus(
-  totalPaid: number,
-  projectValue: number | null,
-): PaymentStatus {
+export function derivePaymentStatus(totalPaid: number, projectValue: number | null): PaymentStatus {
   if (totalPaid <= 0) return "belum";
   if (projectValue == null || projectValue <= 0) return "sebagian";
   return totalPaid >= projectValue ? "lunas" : "sebagian";

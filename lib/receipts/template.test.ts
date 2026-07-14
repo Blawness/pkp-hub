@@ -40,7 +40,12 @@ describe("buildReceiptPdf", () => {
   });
 
   it("nominal nol tidak membuatnya meledak", async () => {
-    const bytes = await buildReceiptPdf({ ...data, amount: 0, totalPaid: 0, remaining: 15_000_000 });
+    const bytes = await buildReceiptPdf({
+      ...data,
+      amount: 0,
+      totalPaid: 0,
+      remaining: 15_000_000,
+    });
     expect(bytes.length).toBeGreaterThan(0);
   });
 });

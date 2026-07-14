@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
+import { sql } from "drizzle-orm";
 import { db } from "./index";
 import {
   accounts,
