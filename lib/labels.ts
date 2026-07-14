@@ -43,6 +43,12 @@ export const paymentStatusLabel: Record<string, string> = {
   lunas: "Lunas",
 };
 
+export const paymentMethodLabel: Record<string, string> = {
+  transfer: "Transfer",
+  tunai: "Tunai",
+  lainnya: "Lainnya",
+};
+
 export const projectStatusOrder = [
   "baru",
   "dijadwalkan",

@@ -37,3 +37,30 @@ export function formatFileSize(bytes: number): string {
   }
   return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
+
+const BULAN = [
+  "Januari",
+  "Februari",
+  "Maret",
+  "April",
+  "Mei",
+  "Juni",
+  "Juli",
+  "Agustus",
+  "September",
+  "Oktober",
+  "November",
+  "Desember",
+];
+
+/**
+ * `"2026-07-14"` -> `"14 Juli 2026"`.
+ *
+ * Sengaja mem-parse string, BUKAN `new Date(iso).toLocaleDateString()`:
+ * `new Date("2026-07-14")` adalah tengah malam UTC, dan di server ber-offset
+ * negatif ia dirender jadi 13 Juli. Tanggal pembayaran tidak boleh bergeser.
+ */
+export function formatTanggalIndo(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${d} ${BULAN[m - 1]} ${y}`;
+}
