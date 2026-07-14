@@ -1,11 +1,9 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { Resend } from "resend";
 import { env } from "@/env";
 import { db } from "@/lib/db";
 import { accounts, sessions, users, verifications } from "@/lib/db/schema";
-
-const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
+import { sendEmail } from "@/lib/email";
 
 /**
  * Better Auth configuration, wired to the EXISTING Drizzle tables defined in
@@ -43,14 +41,9 @@ export const auth = betterAuth({
     // `/reset-password/:token` callback route.
     sendResetPassword: async ({ user, token }) => {
       const setPasswordUrl = `${env.NEXT_PUBLIC_APP_URL}/set-password?token=${token}`;
-      if (!resend) {
-        // RESEND_API_KEY is not configured in this environment — log instead
-        // of crashing or silently dropping the invite.
-        console.log(`[auth] password reset link for ${user.email}: ${setPasswordUrl}`);
-        return;
-      }
-      await resend.emails.send({
-        from: "PKP Hub <onboarding@resend.dev>",
+      // `sendEmail` yang mengurus fallback console-log saat RESEND_API_KEY
+      // kosong — undangan tetap berhasil, tidak crash dan tidak hilang diam-diam.
+      await sendEmail({
         to: user.email,
         subject: "Set your PKP Hub password",
         text: `Set your password here: ${setPasswordUrl}`,

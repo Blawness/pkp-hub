@@ -4,6 +4,7 @@ import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projectStatusLogs, projects, users } from "@/lib/db/schema";
 import { statusLabel } from "@/lib/labels";
+import { notifyClientOfStatusChange } from "@/lib/notifications/project-status";
 import type {
   AssignSurveyorInput,
   ChangeProjectStatusInput,
@@ -183,11 +184,15 @@ export async function assignSurveyorForUser(user: SessionUser, input: AssignSurv
 /**
  * Allowed callers: admin, or the surveyor assigned to the project. Writes
  * the project's new status AND a `projectStatusLogs` row in the same
- * transaction.
+ * transaction, then emails the client (PRD §9).
+ *
+ * `notify` is injectable so tests can assert on the notification without
+ * reaching Resend.
  */
 export async function changeProjectStatusForUser(
   user: SessionUser,
   input: ChangeProjectStatusInput,
+  notify: typeof notifyClientOfStatusChange = notifyClientOfStatusChange,
 ) {
   requireStaff(user);
 
@@ -219,8 +224,8 @@ export async function changeProjectStatusForUser(
     );
   }
 
-  return db.transaction(async (tx) => {
-    const [updated] = await tx
+  const updated = await db.transaction(async (tx) => {
+    const [row] = await tx
       .update(projects)
       .set({ status: input.toStatus, updatedAt: new Date() })
       .where(eq(projects.id, project.id))
@@ -231,8 +236,29 @@ export async function changeProjectStatusForUser(
       toStatus: input.toStatus,
       changedById: user.id,
     });
-    return updated;
+    return row;
   });
+
+  // Sengaja DI LUAR transaksi, dan sengaja ditelan.
+  //
+  // Notifikasi adalah efek samping, bukan bagian dari perubahan status. Kalau
+  // dikirim di dalam transaksi, Resend yang lambat akan menahan lock baris
+  // proyek; kalau errornya dibiarkan naik, Resend yang down membuat studio
+  // tidak bisa memajukan status sama sekali — email gagal mengalahkan pekerjaan
+  // sungguhan. Kegagalannya dicatat, statusnya tetap berubah.
+  try {
+    await notify({
+      projectId: updated.id,
+      projectTitle: updated.title,
+      clientId: updated.clientId,
+      fromStatus: project.status as ProjectStatus,
+      toStatus: input.toStatus,
+    });
+  } catch (error) {
+    console.error(`[notifikasi] gagal mengabari klien soal proyek ${updated.id}:`, error);
+  }
+
+  return updated;
 }
 
 export async function getStatusLogsForProject(projectId: string) {
