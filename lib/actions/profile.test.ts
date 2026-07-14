@@ -288,4 +288,34 @@ describe("userHasCredential", () => {
 
     await db.delete(users).where(eq(users.id, orphanId));
   });
+
+  // Dua test di atas hanya membedakan "punya baris accounts" dari "tidak punya
+  // sama sekali" — keduanya tetap hijau kalau filter `providerId` dihapus dari
+  // fungsinya (dibuktikan lewat mutasi saat review). Padahal filter itulah satu-
+  // satunya yang membuat fungsi ini bukan sekadar "punya baris accounts". Test
+  // ini yang menjaganya: hari ini `lib/auth.ts` belum punya socialProviders, jadi
+  // baris non-credential tak bisa lahir lewat aplikasi — tapi begitu OAuth
+  // ditambahkan, tanpa test ini user OAuth-only akan dianggap punya password dan
+  // form ganti password dirender untuk mereka, diam-diam.
+  it("false untuk user yang punya baris accounts non-credential", async () => {
+    const oauthId = randomUUID();
+    await db.insert(users).values({
+      id: oauthId,
+      name: "OAuth Saja",
+      email: `oauth-${oauthId}@fixture.test`,
+      role: "client",
+    });
+    await db.insert(accounts).values({
+      id: randomUUID(),
+      accountId: oauthId,
+      providerId: "google",
+      userId: oauthId,
+      // tanpa password — persis keadaan user OAuth-only
+    });
+
+    expect(await userHasCredential(oauthId)).toBe(false);
+
+    await db.delete(accounts).where(eq(accounts.userId, oauthId));
+    await db.delete(users).where(eq(users.id, oauthId));
+  });
 });
