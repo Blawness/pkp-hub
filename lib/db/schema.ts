@@ -5,6 +5,7 @@ import {
   date,
   doublePrecision,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -45,6 +46,11 @@ export const documentCategory = pgEnum("document_category", [
   "lainnya",
 ]);
 export const mapLayerSource = pgEnum("map_layer_source", ["manual", "import_csv", "import_dxf"]);
+export const projectPhaseStatus = pgEnum("project_phase_status", [
+  "belum",
+  "berjalan",
+  "selesai",
+]);
 
 /* -------------------------------------------------------------------------- */
 /* Better Auth core tables (wired up in Phase 2) + `role`                     */
@@ -225,6 +231,50 @@ export const documents = pgTable(
   ],
 );
 
+/**
+ * Fase pekerjaan per proyek (spec 2026-07-14). Melengkapi `projects.status`,
+ * BUKAN menggantikannya: status pipeline tetap ringkasan kasar yang dipakai
+ * filter, papan, dan notifikasi.
+ *
+ * `completedAt` diisi/dikosongkan OTOMATIS oleh transisi status (lihat
+ * `phases-logic.ts`) — tidak pernah diketik manusia. Tanggal selesai yang bisa
+ * diketik akan berbeda dari statusnya, dan salah satunya pasti bohong.
+ *
+ * Persen progres TIDAK disimpan di sini: ia diturunkan dari `weight` +
+ * `status` (`lib/phases/derive.ts`), pelajaran yang sama dengan
+ * `paymentStatus` di Phase 12.
+ */
+export const projectPhases = pgTable(
+  "project_phase",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    // Catatan INTERNAL — tidak pernah dikirim ke klien (dipangkas di query portal).
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull(),
+    status: projectPhaseStatus("status").notNull().default("belum"),
+    // Bobot progres. Default 1 = semua fase setara, sehingga studio yang tidak
+    // peduli bobot tetap dapat persen yang masuk akal tanpa isian tambahan.
+    weight: integer("weight").notNull().default(1),
+    assignedSurveyorId: text("assigned_surveyor_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    // Tanggal KALENDER, mode string (`YYYY-MM-DD`) — alasan sama dengan
+    // `payment.paidAt`: `Date` di server ber-offset negatif bisa menggesernya sehari.
+    targetDate: date("target_date", { mode: "string" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("project_phase_project_id_idx").on(t.projectId),
+    index("project_phase_assigned_surveyor_id_idx").on(t.assignedSurveyorId),
+  ],
+);
+
 /* -------------------------------------------------------------------------- */
 /* Relations                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -249,6 +299,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   mapLayers: many(mapLayers),
   documents: many(documents),
   payments: many(payments),
+  phases: many(projectPhases),
 }));
 
 export const projectStatusLogsRelations = relations(projectStatusLogs, ({ one }) => ({
@@ -264,6 +315,14 @@ export const mapLayersRelations = relations(mapLayers, ({ one }) => ({
 export const documentsRelations = relations(documents, ({ one }) => ({
   project: one(projects, { fields: [documents.projectId], references: [projects.id] }),
   uploadedBy: one(users, { fields: [documents.uploadedById], references: [users.id] }),
+}));
+
+export const projectPhasesRelations = relations(projectPhases, ({ one }) => ({
+  project: one(projects, { fields: [projectPhases.projectId], references: [projects.id] }),
+  assignedSurveyor: one(users, {
+    fields: [projectPhases.assignedSurveyorId],
+    references: [users.id],
+  }),
 }));
 
 /**
