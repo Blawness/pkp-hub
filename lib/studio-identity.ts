@@ -17,6 +17,6 @@ export const STUDIO = {
   phone: "(021) 3928018",
   email: "presisikonsulindo@gmail.com",
   city: "Jakarta Pusat",
-  signerName: "Yudha",
+  signerName: "Adam Maulana Hafiz, S.H.",
   signerTitle: "Direktur",
 } as const;

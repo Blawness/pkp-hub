@@ -155,9 +155,8 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [x] Piutang dashboard jadi eksak (nilai proyek − uang yang benar-benar masuk); dulu
       menghitung `projectValue` PENUH untuk proyek yang DP-nya sudah 80% masuk.
 - [x] Portal klien: riwayat pembayaran, sisa tagihan, unduh kwitansi sendiri.
-- [ ] **Human action** — `lib/studio-identity.ts` sudah berisi alamat/telepon/email/kota
-      asli (dari presisikonsulindo.com). Yang belum dikonfirmasi: `signerName` (nama
-      direktur penanda tangan) — ganti sebelum kwitansi pertama dikirim ke klien.
+- [x] **Human action** — `lib/studio-identity.ts` berisi data PKP asli (alamat/telepon/
+      email/kota dari situs resmi) + nama penanda tangan "Adam Maulana Hafiz, S.H."
 
 ---
 
