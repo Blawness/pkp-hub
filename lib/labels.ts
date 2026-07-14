@@ -49,6 +49,12 @@ export const paymentMethodLabel: Record<string, string> = {
   lainnya: "Lainnya",
 };
 
+export const phaseStatusLabel: Record<string, string> = {
+  belum: "Belum Mulai",
+  berjalan: "Berjalan",
+  selesai: "Selesai",
+};
+
 export const projectStatusOrder = [
   "baru",
   "dijadwalkan",

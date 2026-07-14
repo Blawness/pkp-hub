@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { FileIcon } from "lucide-react";
 import Link from "next/link";
 import { DocumentUpload } from "@/components/documents/document-upload";
@@ -7,6 +7,7 @@ import { PetaTab } from "@/components/map/peta-tab";
 import { PaymentsPanel } from "@/components/payments/payments-panel";
 import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
 import { PaymentForm } from "@/components/projects/payment-form";
+import { PhaseTimeline } from "@/components/projects/phase-timeline";
 import { StatusChanger } from "@/components/projects/status-changer";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +19,7 @@ import { getClientById } from "@/lib/actions/clients-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
+import { getProjectProgress, listPhasesForProject } from "@/lib/actions/phases-logic";
 import {
   getAllowedNextStatuses,
   getProjectDetailForUser,
@@ -28,6 +30,7 @@ import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { todayString } from "@/lib/phases/derive";
 import { downloadUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -91,6 +94,19 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .select({ id: users.id, name: users.name })
     .from(users)
     .where(eq(users.role, "surveyor"));
+
+  const phases = await listPhasesForProject(user, project.id);
+  const progress = await getProjectProgress(user, project.id);
+  // Daftar surveyor untuk dropdown penanggung jawab fase — hanya admin yang
+  // butuh. Query inline, pola yang sama dengan `app/dashboard/projects/new/page.tsx:18`.
+  // BEDANYA: kita saring `archivedAt` — menugaskan fase ke surveyor yang sudah
+  // diarsipkan berarti menugaskannya ke orang yang tidak bisa login.
+  const phaseSurveyors = isAdmin
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.role, "surveyor"), isNull(users.archivedAt)))
+    : [];
 
   const uploaderIds = [...new Set(projectDocuments.map((d) => d.uploadedById))];
   const uploaderUsers = uploaderIds.length
@@ -158,6 +174,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       <Tabs defaultValue="overview">
         <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="fase">Fase</TabsTrigger>
           <TabsTrigger value="peta">Peta</TabsTrigger>
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
           {"projectValue" in project ? <TabsTrigger value="keuangan">Keuangan</TabsTrigger> : null}
@@ -232,6 +249,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="fase" className="pt-4">
+          <PhaseTimeline
+            projectId={project.id}
+            phases={phases}
+            progress={progress}
+            today={todayString(new Date())}
+            canEditPlan={isAdmin}
+            canReportWork={user.role === "admin" || user.role === "surveyor"}
+            surveyors={phaseSurveyors}
+          />
         </TabsContent>
 
         <TabsContent value="peta" className="pt-4">
