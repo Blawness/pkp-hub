@@ -122,7 +122,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ key:
   // Kwitansi TIDAK PERNAH diunggah lewat HTTP — ia ditulis server-side lewat
   // `storage.put`. Menerima PUT ke `receipts/` berarti membiarkan siapa pun
   // yang berstatus staf menimpa kwitansi dengan berkas karangannya sendiri.
-  if (!parsed || parsed.kind !== "document") {
+  if (parsed?.kind !== "document") {
     return NextResponse.json({ error: "Invalid key." }, { status: 400 });
   }
 

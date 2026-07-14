@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, inArray, isNull, sql } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth-guards";
 import { listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";

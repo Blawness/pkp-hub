@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaTab } from "@/components/map/peta-tab";
+import { PaymentsPanel } from "@/components/payments/payments-panel";
 import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
 import { PaymentForm } from "@/components/projects/payment-form";
 import { StatusChanger } from "@/components/projects/status-changer";
@@ -16,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
+import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
 import {
   getAllowedNextStatuses,
   getProjectDetailForUser,
@@ -25,8 +27,7 @@ import {
 import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { formatIDR } from "@/lib/format";
-import { paymentStatusLabel, statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { statusLabel, surveyTypeLabel } from "@/lib/labels";
 import { downloadUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -56,6 +57,26 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const statusLogs = await getStatusLogsForProject(project.id);
   const projectDocuments = await listDocumentsForProject(user, project.id);
   const mapLayerRows = await listMapLayersForProject(user, project.id);
+
+  // Ledger pembayaran HANYA untuk admin. Memanggilnya untuk surveyor akan
+  // ditolak server-side — tapi jangan bergantung pada itu: jangan panggil sama
+  // sekali, supaya tidak ada apa pun yang bisa masuk ke payload non-admin.
+  const isAdmin = user.role === "admin";
+  const paymentRows = isAdmin ? await listPaymentsForProject(user, project.id) : [];
+  const paymentSummary = isAdmin ? await getPaymentSummary(user, project.id) : null;
+  const paymentPanelRows = await Promise.all(
+    paymentRows.map(async (p) => ({
+      id: p.id,
+      amount: p.amount,
+      paidAt: p.paidAt,
+      method: p.method,
+      note: p.note,
+      receiptNumber: p.receiptNumber,
+      downloadUrl: p.receiptFileUrl ? await downloadUrlFor(p.receiptFileUrl) : null,
+      voidedReason: p.voidedReason,
+      isVoided: p.voidedAt !== null,
+    })),
+  );
 
   const changedByIds = [...new Set(statusLogs.map((l) => l.changedById))];
   const changedByUsers = changedByIds.length
@@ -249,27 +270,27 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             no finance data is ever part of their RSC payload. */}
         {"projectValue" in project ? (
           <TabsContent value="keuangan" className="flex flex-col gap-6 pt-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Status saat ini</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2 sm:grid-cols-2">
-                <div>
-                  <p className="text-xs text-muted-foreground">Nilai proyek</p>
-                  <p className="text-sm">{formatIDR(project.projectValue)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground">Status pembayaran</p>
-                  <p className="text-sm">
-                    {paymentStatusLabel[project.paymentStatus] ?? project.paymentStatus}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+            {paymentSummary ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Pembayaran</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <PaymentsPanel
+                    projectId={project.id}
+                    rows={paymentPanelRows}
+                    projectValue={paymentSummary.projectValue}
+                    totalPaid={paymentSummary.totalPaid}
+                    remaining={paymentSummary.remaining}
+                    status={paymentSummary.status}
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
 
             <Card>
               <CardHeader>
-                <CardTitle>Ubah nilai & status pembayaran</CardTitle>
+                <CardTitle>Nilai proyek & catatan</CardTitle>
               </CardHeader>
               <CardContent>
                 <PaymentForm
