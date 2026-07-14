@@ -46,11 +46,7 @@ export const documentCategory = pgEnum("document_category", [
   "lainnya",
 ]);
 export const mapLayerSource = pgEnum("map_layer_source", ["manual", "import_csv", "import_dxf"]);
-export const projectPhaseStatus = pgEnum("project_phase_status", [
-  "belum",
-  "berjalan",
-  "selesai",
-]);
+export const projectPhaseStatus = pgEnum("project_phase_status", ["belum", "berjalan", "selesai"]);
 
 /* -------------------------------------------------------------------------- */
 /* Better Auth core tables (wired up in Phase 2) + `role`                     */

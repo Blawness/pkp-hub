@@ -19,9 +19,7 @@ export function calculateProgress(phases: PhaseProgressInput[]): number | null {
   const total = phases.reduce((sum, p) => sum + p.weight, 0);
   if (total <= 0) return null;
 
-  const done = phases
-    .filter((p) => p.status === "selesai")
-    .reduce((sum, p) => sum + p.weight, 0);
+  const done = phases.filter((p) => p.status === "selesai").reduce((sum, p) => sum + p.weight, 0);
 
   return Math.round((done / total) * 100);
 }
@@ -67,11 +65,7 @@ export function todayString(now: Date): string {
 }
 
 /** `completedAt` diturunkan dari status — tidak pernah diketik manusia. */
-export function completedAtFor(
-  status: PhaseStatus,
-  now: Date,
-  previous: Date | null,
-): Date | null {
+export function completedAtFor(status: PhaseStatus, now: Date, previous: Date | null): Date | null {
   if (status !== "selesai") return null;
   return previous ?? now;
 }
