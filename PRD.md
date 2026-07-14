@@ -109,6 +109,17 @@ Landing setelah login, disesuaikan per role.
 - [ ] Surveyor: proyek yang di-assign, yang butuh tindakan.
 - [ ] Client: ringkasan proyeknya.
 
+### Feature 8: Timeline Fase Proyek
+Fase pekerjaan dinamis per proyek (nama, urutan, bobot, penanggung jawab, target) yang menghasilkan persen progres turunan — melengkapi status pipeline (Feature 2) yang cuma menunjukkan tahap kasar, bukan seberapa jauh. Terlihat read-only oleh klien di portal. Spec: `docs/superpowers/specs/2026-07-14-timeline-fase-proyek-design.md`.
+
+**Acceptance criteria:**
+- [x] Admin bisa tambah/edit/hapus/susun-ulang fase per proyek: nama, catatan internal, bobot, penanggung jawab (surveyor), target tanggal.
+- [x] Admin atau surveyor yang ber-akses ke proyek bisa mengubah status fase (`Belum Mulai` / `Berjalan` / `Selesai`) dan catatannya — surveyor TIDAK bisa mengubah rencana (susun ulang, bobot, hapus).
+- [x] Persen progres proyek adalah kolom TURUNAN (bobot fase `Selesai` ÷ total bobot), bukan isian manual. Proyek tanpa fase menampilkan empty state, BUKAN "0%".
+- [x] Fase dengan target tanggal yang sudah lewat dan belum selesai ditandai "Telat".
+- [x] Klien melihat timeline read-only di portal: nama fase, status, target, penanda telat, persen progres — TANPA catatan internal, bobot, atau nama penanggung jawab (dipangkas di level query, bukan di render).
+- [x] Surveyor yang di-assign ke sebuah fase (bukan hanya `assignedSurveyorId` di level proyek) mendapat akses ke proyek itu.
+
 ---
 
 ## 4. Tech Stack

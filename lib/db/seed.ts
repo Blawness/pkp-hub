@@ -8,6 +8,7 @@ import {
   documents,
   mapLayers,
   payments,
+  projectPhases,
   projectStatusLogs,
   projects,
   sessions,
@@ -28,6 +29,7 @@ async function seed() {
   await db.delete(documents);
   await db.delete(mapLayers);
   await db.delete(projectStatusLogs);
+  await db.delete(projectPhases);
   await db.delete(projects);
   await db.delete(clients);
   await db.delete(sessions);
@@ -225,11 +227,49 @@ async function seed() {
     },
   ]);
 
+  // Timeline fase demo (spec 2026-07-14) — di proyek "topografi" (PT Cahaya
+  // Properti, TIDAK punya akun portal), sengaja BUKAN proyek "batas" milik
+  // andi@klien.test: `e2e/project-phases.spec.ts` menambah fasenya sendiri ke
+  // proyek "batas" lewat UI dan butuh proyek itu tanpa fase yang sudah ada.
+  // Satu fase `selesai`, satu `berjalan` dengan target SUDAH LEWAT (demo
+  // penanda "Telat"), satu `belum` dengan target di masa depan.
+  await db.insert(projectPhases).values([
+    {
+      projectId: topografi.id,
+      name: "Survei lapangan",
+      sortOrder: 0,
+      status: "selesai",
+      weight: 2,
+      assignedSurveyorId: surveyor2Id,
+      targetDate: "2026-05-01",
+      completedAt: new Date("2026-05-02T09:00:00Z"),
+    },
+    {
+      projectId: topografi.id,
+      name: "Pengolahan data & gambar",
+      sortOrder: 1,
+      status: "berjalan",
+      weight: 2,
+      assignedSurveyorId: surveyor2Id,
+      targetDate: "2026-06-15", // sudah lewat dari hari ini (2026-07-15) -> "Telat"
+      description: "Menunggu revisi poligon dari surveyor.",
+    },
+    {
+      projectId: topografi.id,
+      name: "Serah terima laporan",
+      sortOrder: 2,
+      status: "belum",
+      weight: 1,
+      targetDate: "2026-08-01",
+    },
+  ]);
+
   console.log("seed OK:", {
     users: 4,
     clients: 3,
     projects: inserted.length,
     statusLogs: 11,
+    phases: 3,
   });
   process.exit(0);
 }

@@ -163,6 +163,53 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
       dihitung di level halaman. Dipisah dari tabel `documents` agar surveyor tak melihat
       nilai proyek. Commit `4dd0403`, push ke `master`.
 
+## Phase 13 — Timeline fase proyek  *(kode selesai)*
+> Spec: `docs/superpowers/specs/2026-07-14-timeline-fase-proyek-design.md`.
+> Plan: `docs/superpowers/plans/2026-07-14-timeline-fase-proyek.md`.
+> Melengkapi `projects.status` (pipeline kasar) dengan fase kerja yang lebih
+> granular — nama, urutan, bobot, penanggung jawab, target — sehingga persen
+> progres bisa ditunjukkan ke klien tanpa membocorkan detail internal.
+- [x] Tabel `project_phase` + enum `project_phase_status` (`belum` | `berjalan`
+      | `selesai`). Fungsi murni progres/telat/urutan di `lib/phases/derive.ts`
+      (tanpa DB, tanpa fixture).
+- [x] **Progres adalah kolom TURUNAN**, sama seperti `paymentStatus` di Phase 12:
+      `calculateProgress` = Σ bobot fase `selesai` ÷ Σ bobot semua fase × 100,
+      dibulatkan. Fase `berjalan` dihitung NOL (bukan setengah — "setengah
+      selesai" adalah klaim, bukan fakta). Tanpa fase, atau total bobot 0 →
+      **`null`**, bukan `0`. UI (dashboard & portal) merender `null` sebagai
+      empty state / bagian yang tidak ditampilkan, TIDAK PERNAH sebagai "0%".
+- [x] **Fase memberi surveyor akses ke proyeknya.** `assertProjectAccess` dan
+      `listProjectsForUser` diperluas: surveyor yang di-assign ke SALAH SATU
+      fase sebuah proyek mendapat akses proyek itu, meski `project.assignedSurveyorId`
+      tidak mengarah ke dia. Tanpa ini, menugaskan surveyor ke sebuah fase
+      cuma hiasan.
+- [x] Pembagian hak load-bearing: admin memegang RENCANA (buat/hapus/susun
+      urutan/bobot/target/penanggung jawab); admin ATAU surveyor ber-akses
+      melapor PEKERJAAN (status + catatan). Kalau surveyor bisa menyusun ulang
+      atau mengubah bobot, persen progres berhenti berarti apa pun — orang
+      yang dinilai olehnya juga yang menyusunnya.
+- [x] `completedAt` diisi/dikosongkan OTOMATIS oleh transisi status
+      (`completedAtFor`), tidak pernah diketik manusia — mundur dari `selesai`
+      mengosongkannya lagi.
+- [x] Tab "Fase" di `/dashboard/projects/[id]`: `PhaseTimeline` (server-safe,
+      dipakai ulang di portal) + `PhaseCard`/`PhaseFormDialog`/`PhaseReorderButtons`
+      (client). Tombol kelola sama sekali tidak dirender untuk non-admin —
+      kenyamanan UI, penolakan sungguhannya ada di `phases-logic.ts`.
+- [x] **Klien TIDAK PERNAH melihat catatan internal, bobot, atau penanggung
+      jawab fase.** `listPortalPhases` memangkas `description` / `weight` /
+      `assignedSurveyorId` **di level SELECT query** (bukan di render) — dikunci
+      test yang menegaskan `not.toHaveProperty` pada bentuk hasil query, bukan
+      pada HTML. Progres portal (`getPortalProgress`) dihitung dari fase lengkap
+      di server; hanya angkanya yang keluar ke pemanggil.
+- [x] Portal klien: timeline read-only di `/portal/projects/[id]`. Kalau proyek
+      belum punya fase, bagian timeline tidak dirender sama sekali — timeline
+      kosong terlihat seperti proyek yang tidak dikerjakan.
+- [x] Seed demo: 3 fase (`selesai`/`berjalan`/`belum`) di proyek "Topografi
+      lahan perumahan tahap 2", satu dengan target yang sudah lewat supaya
+      penanda "Telat" kelihatan.
+- [x] E2E `e2e/project-phases.spec.ts`: admin menambah fase + menandai selesai
+      → klien melihat progres & nama fase, catatan internal tidak ada di HTML.
+
 ---
 
 ## Open Decisions (dari PRD §10)
