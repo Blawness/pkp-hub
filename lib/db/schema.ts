@@ -1,4 +1,4 @@
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -11,6 +11,7 @@ import {
   pgTable,
   text,
   timestamp,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 
@@ -47,6 +48,20 @@ export const documentCategory = pgEnum("document_category", [
 ]);
 export const mapLayerSource = pgEnum("map_layer_source", ["manual", "import_csv", "import_dxf"]);
 export const projectPhaseStatus = pgEnum("project_phase_status", ["belum", "berjalan", "selesai"]);
+export const equipmentCategory = pgEnum("equipment_category", [
+  "total_station",
+  "gps_rtk",
+  "drone",
+  "waterpass",
+  "theodolite",
+  "lainnya",
+]);
+export const equipmentCondition = pgEnum("equipment_condition", [
+  "tersedia",
+  "perawatan",
+  "rusak",
+  "pensiun",
+]);
 
 /* -------------------------------------------------------------------------- */
 /* Better Auth core tables (wired up in Phase 2) + `role`                     */
@@ -358,4 +373,102 @@ export const payments = pgTable(
 export const paymentsRelations = relations(payments, ({ one }) => ({
   project: one(projects, { fields: [payments.projectId], references: [projects.id] }),
   recordedBy: one(users, { fields: [payments.recordedById], references: [users.id] }),
+}));
+
+/**
+ * Inventaris alat (spec 2026-07-14). SATU BARIS = SATU UNIT FISIK — dua total
+ * station sejenis adalah dua baris. Hanya dengan begitu sistem bisa menjamin
+ * satu alat dipegang satu orang, dan riwayat pakai menempel ke unit yang benar.
+ *
+ * Alat TIDAK PERNAH dihapus permanen, hanya diarsipkan (`archivedAt`): baris
+ * `equipment_usage` menunjuk ke sini lewat FK, jadi DELETE akan gagal — atau,
+ * kalau dipaksa cascade, ikut menghapus jejak siapa pernah memegang apa.
+ * Alasan yang sama dengan `users.archivedAt`.
+ *
+ * `condition` TERPISAH dari status pinjam. Alat rusak bukan "sedang dipakai"
+ * dan bukan "tersedia"; tanpa kolom ini, satu-satunya cara menandainya adalah
+ * menghapusnya.
+ */
+export const equipment = pgTable(
+  "equipment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(),
+    category: equipmentCategory("category").notNull(),
+    serialNumber: text("serial_number"),
+    condition: equipmentCondition("condition").notNull().default("tersedia"),
+    // ADMIN-ONLY. Dipangkas di level query untuk surveyor (equipment-logic.ts).
+    purchaseDate: date("purchase_date", { mode: "string" }),
+    purchasePrice: bigint("purchase_price", { mode: "number" }),
+    notes: text("notes"),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("equipment_condition_idx").on(t.condition),
+    index("equipment_archived_at_idx").on(t.archivedAt),
+  ],
+);
+
+/**
+ * Sesi pakai. `endedAt` NULL = SEDANG DIPAKAI — status pakai adalah turunan dari
+ * adanya sesi terbuka, bukan dropdown terpisah (pelajaran `paymentStatus`
+ * Phase 12). Durasi juga tidak disimpan: ia `endedAt − startedAt`, supaya
+ * mengoreksi jam mulai tidak meninggalkan durasi lama yang sudah jadi bohong.
+ *
+ * `usedById` (yang MEMEGANG) sengaja dipisah dari `recordedById` (yang
+ * MENGINPUT): admin sering mencatat dari kantor untuk surveyor di lapangan.
+ * Menggabungkannya membuat riwayat mencatat admin sebagai pemegang alat yang
+ * tidak pernah ia sentuh.
+ */
+export const equipmentUsage = pgTable(
+  "equipment_usage",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    equipmentId: uuid("equipment_id")
+      .notNull()
+      .references(() => equipment.id, { onDelete: "restrict" }),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    usedById: text("used_by_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    note: text("note"),
+    recordedById: text("recorded_by_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("equipment_usage_equipment_id_idx").on(t.equipmentId),
+    index("equipment_usage_project_id_idx").on(t.projectId),
+    /**
+     * PERTAHANAN SUNGGUHAN terhadap sesi ganda. Kalau hanya dicek di kode
+     * ("apakah ada sesi terbuka?" lalu insert), dua surveyor yang menekan
+     * "Pakai" hampir bersamaan bisa DUA-DUANYA lolos pengecekan sebelum salah
+     * satunya menulis — dan alat tercatat di dua tangan. Pengecekan di kode
+     * hanya untuk memberi pesan error yang enak dibaca; INI yang menegakkan.
+     */
+    uniqueIndex("equipment_active_usage_uniq")
+      .on(t.equipmentId)
+      .where(sql`${t.endedAt} is null`),
+  ],
+);
+
+export const equipmentRelations = relations(equipment, ({ many }) => ({
+  usages: many(equipmentUsage),
+}));
+
+export const equipmentUsageRelations = relations(equipmentUsage, ({ one }) => ({
+  equipment: one(equipment, {
+    fields: [equipmentUsage.equipmentId],
+    references: [equipment.id],
+  }),
+  project: one(projects, { fields: [equipmentUsage.projectId], references: [projects.id] }),
+  usedBy: one(users, { fields: [equipmentUsage.usedById], references: [users.id] }),
+  recordedBy: one(users, { fields: [equipmentUsage.recordedById], references: [users.id] }),
 }));
