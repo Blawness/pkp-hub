@@ -72,20 +72,76 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [x] Storage driver beri peringatan (tidak crash) bila lokal dipakai di production
 - [x] **Verifikasi lokal hijau**: `pnpm typecheck`, `pnpm lint`, `pnpm test` (96 test),
       `pnpm build` (production build sukses dengan env placeholder) — semua pass
-- [ ] **Human action** — buat project Vercel, set env production (DB, Better Auth, R2, Resend)
-- [ ] **Human action** — jalankan migrasi ke Neon prod (`DATABASE_URL` prod, jangan seed)
-- [ ] **Human action** — smoke test end-to-end per role di prod (lihat checklist DEPLOY.md §7)
+- [x] **Human action** — project Vercel dibuat (`blawness-projects/pkp-hub`), live di
+      https://pkp-hub.vercel.app. Env production terpasang: `DATABASE_URL`,
+      `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, `R2_*`.
+      **`RESEND_API_KEY` belum dipasang** — lihat Phase 11.
+- [x] **Human action** — migrasi ke Neon prod (deploy production `● Ready`, aplikasi
+      berjalan; env prod di-mark *Sensitive* sehingga tidak bisa diverifikasi ulang
+      dari luar Vercel).
+- [~] **Human action** — smoke test end-to-end per role di prod (checklist DEPLOY.md §7)
+  - [x] Bagian anonim (2026-07-14, terhadap https://pkp-hub.vercel.app):
+        `/` gerbang tampil 200 · `/login` 200 · `/dashboard`, `/dashboard/projects`,
+        `/portal` semua 307 ke `/login?redirectTo=...` · `<meta name="robots">` =
+        `noindex, nofollow`.
+  - [ ] Bagian per-role (owner / surveyor / client) — **belum jalan, butuh manusia.**
+        Semua env production di-mark *Sensitive* di Vercel, jadi `vercel env pull`
+        mengembalikan nilai kosong: DB prod tidak bisa disentuh dari luar dan kredensial
+        login per role tidak tersedia untuk agent. Butuh seseorang dengan akun prod
+        menjalankan DEPLOY.md §7 (Owner / Surveyor / Client) di browser.
 
-> Semua langkah kode & verifikasi selesai. Tiga item terakhir butuh akses akun
-> Vercel / Neon prod / Cloudflare R2 / Resend milik manusia — tidak bisa dijalankan
-> dari environment build. `vercel` CLI sudah ter-autentikasi (`blawness`); deploy
-> bisa dipicu begitu env production tersedia.
+> Kode & verifikasi lokal selesai; aplikasi sudah live di production. Yang tersisa
+> murni butuh akses manusia: smoke test per role, dan `RESEND_API_KEY` + domain
+> pengirim (Phase 11).
+
+---
+
+## Phase 10 — Pasca-v1: UX & akun  *(selesai, merged ke `master`)*
+> Tidak ada di PRD asli — muncul setelah v1 dipakai. Masing-masing punya spec + plan
+> di `docs/superpowers/`.
+- [x] Homepage sebagai gerbang internal: split-screen, redirect otomatis ke area sesuai
+      role untuk user yang sudah login (`docs/superpowers/specs/2026-07-13-homepage-gateway-design.md`)
+- [x] Sistem motion: token durasi/easing di `globals.css`, kebijakan `prefers-reduced-motion`
+      global, primitif `Reveal`/`Stagger`, `BrandPanel` bersama `/` + `/login`
+      (`docs/superpowers/specs/2026-07-13-motion-system-design.md`)
+- [x] Halaman profil: user mengganti nama & password sendiri (staf + klien), minimal 10
+      karakter ditegakkan **di server**, bukan cuma klien
+      (`docs/superpowers/specs/2026-07-13-halaman-profil-design.md`)
+- [x] Unduhan dokumen lewat presigned URL — bucket R2 tetap privat
+
+## Phase 11 — Notifikasi status ke klien  *(kode selesai; belum aktif di prod)*
+> Menyerang success metric PRD §9 ("berkurangnya chat manual *gimana progress?*").
+> Riwayat status sudah tampil di portal sejak Phase 7 — yang hilang adalah dorongannya:
+> klien tidak pernah tahu ada perubahan kecuali ia membuka portal sendiri.
+- [x] `lib/email.ts` — `sendEmail()` membungkus Resend, fallback console-log saat
+      `RESEND_API_KEY` kosong. Flow undangan klien (`lib/auth.ts`) ikut memakainya, jadi
+      alamat pengirim & perilaku fallback cuma didefinisikan di satu tempat.
+- [x] `buildStatusChangeEmail()` — murni, tanpa I/O; pakai `statusLabel` sehingga enum
+      mentah (`data_diambil`) tidak pernah bocor ke klien. Tautan portal hanya disertakan
+      kalau klien punya akun portal.
+- [x] `notifyClientOfStatusChange()` — penerima SELALU diturunkan dari `project.clientId`
+      di server, tidak pernah dari input pemanggil.
+- [x] Dipicu di `changeProjectStatusForUser` **di luar transaksi**, errornya ditelan +
+      di-log. Alasan: kalau email dikirim di dalam transaksi, Resend yang down bikin studio
+      tidak bisa memajukan status sama sekali — notifikasi tidak boleh mengalahkan
+      pekerjaan sungguhan. Dikunci test: "status TETAP berubah walau pengiriman email
+      gagal" — terbukti jeblok kalau `try/catch`-nya dicabut.
+- [ ] **Human action** — verifikasi domain pengirim di Resend, lalu ganti `EMAIL_FROM`
+      di `lib/email.ts`. Sekarang masih `onboarding@resend.dev` (domain sandbox Resend:
+      **hanya bisa mengirim ke alamat pemilik akun**, bukan ke klien sungguhan).
+- [ ] **Human action** — pasang `RESEND_API_KEY` di env production Vercel. Tanpa ini
+      notifikasi cuma ter-log ke konsol server, tidak terkirim.
 
 ---
 
 ## Open Decisions (dari PRD §10)
-- [ ] Geospasial storage: `jsonb` + turf (default) vs PostGIS — putuskan sebelum Phase 5
-- [ ] Sistem koordinat import: lat/long langsung vs perlu reproyeksi UTM→WGS84 (proj4js) — konfirmasi format alat studio
-- [ ] Import DXF: format alat (total station/GPS RTK) apa? Tunda ke setelah v1
-- [ ] Storage: Cloudflare R2 (default) vs UploadThing
-- [ ] Undangan portal: semua klien vs opsional per klien (asumsi: opsional)
+- [x] Geospasial storage → **`jsonb` + turf.js**. PostGIS belum diperlukan: tidak ada
+      query spasial, hanya display & arsip.
+- [x] Sistem koordinat import → **perlu reproyeksi**. Sudah diimplementasikan (proj4js,
+      UTM zona 46–54, default 48S), bukan lat/long langsung.
+- [x] Storage → **Cloudflare R2**, bucket privat + unduhan via presigned URL. Fallback
+      disk lokal `.storage/` hanya untuk dev (memberi peringatan kalau dipakai di prod).
+- [x] Undangan portal → **opsional per klien** (`clients.userId` nullable; admin mengundang
+      manual lewat `inviteClientUser`).
+- [ ] Import DXF: format alat (total station/GPS RTK) apa? Masih ditunda — butuh konfirmasi
+      alat yang dipakai studio sebelum bisa dimulai.
