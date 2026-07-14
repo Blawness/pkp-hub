@@ -1,17 +1,18 @@
 import { FileIcon } from "lucide-react";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaView } from "@/components/map/peta-view";
+import { PortalPayments } from "@/components/payments/portal-payments";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
+import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
 import { getStatusLogsForProject } from "@/lib/actions/projects-logic";
 import { assertProjectAccess, requireClient } from "@/lib/auth-guards";
-import { formatIDR } from "@/lib/format";
 import { formatArea } from "@/lib/geo/area";
-import { paymentStatusLabel, statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { statusLabel, surveyTypeLabel } from "@/lib/labels";
 import { downloadUrlFor } from "@/lib/storage";
 
 /**
@@ -45,6 +46,18 @@ export default async function PortalProjectDetailPage({
   const statusLogs = await getStatusLogsForProject(project.id);
   const mapLayerRows = await listMapLayersForProject(user, project.id);
   const documentRows = await listSharedDocumentsForProject(user, project.id);
+  const paymentRows = await listPaymentsForProject(user, project.id);
+  const paymentSummary = await getPaymentSummary(user, project.id);
+  const paymentTableRows = await Promise.all(
+    paymentRows.map(async (p) => ({
+      id: p.id,
+      amount: p.amount,
+      paidAt: p.paidAt,
+      method: p.method,
+      receiptNumber: p.receiptNumber,
+      downloadUrl: p.receiptFileUrl ? await downloadUrlFor(p.receiptFileUrl) : null,
+    })),
+  );
 
   const totalAreaSqm = mapLayerRows.reduce((sum, l) => sum + (l.areaSqm ?? 0), 0);
 
@@ -138,23 +151,15 @@ export default async function PortalProjectDetailPage({
         <CardHeader>
           <CardTitle>Nilai & pembayaran</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-2 sm:grid-cols-2">
-          <div>
-            <p className="text-xs text-muted-foreground">Nilai proyek</p>
-            <p className="text-sm">{formatIDR(project.projectValue)}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Status pembayaran</p>
-            <p className="text-sm">
-              {paymentStatusLabel[project.paymentStatus] ?? project.paymentStatus}
-            </p>
-          </div>
-          {project.paymentNotes ? (
-            <div className="sm:col-span-2">
-              <p className="text-xs text-muted-foreground">Catatan</p>
-              <p className="text-sm">{project.paymentNotes}</p>
-            </div>
-          ) : null}
+        <CardContent>
+          <PortalPayments
+            rows={paymentTableRows}
+            projectValue={paymentSummary.projectValue}
+            totalPaid={paymentSummary.totalPaid}
+            remaining={paymentSummary.remaining}
+            status={paymentSummary.status}
+            paymentNotes={project.paymentNotes}
+          />
         </CardContent>
       </Card>
     </main>
