@@ -132,6 +132,33 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [ ] **Human action** — pasang `RESEND_API_KEY` di env production Vercel. Tanpa ini
       notifikasi cuma ter-log ke konsol server, tidak terkirim.
 
+## Phase 12 — Ledger pembayaran & kwitansi  *(kode selesai)*
+> Spec: `docs/superpowers/specs/2026-07-14-ledger-pembayaran-kwitansi-design.md`.
+> Menyerang keluhan "nilai proyek tanpa bukti bayar": `paymentStatus` dulu cuma
+> dropdown yang tidak terhubung ke uang mana pun, dan `sebagian` tidak menyimpan
+> BERAPA yang sudah masuk.
+- [x] Tabel `payment` append-only (koreksi = batalkan + terbitkan ulang, bukan edit)
+      — jejak uang tidak pernah ditimpa diam-diam.
+- [x] `paymentStatus` jadi kolom TURUNAN, dihitung ulang di dalam transaksi yang sama
+      dengan setiap perubahan yang memicunya. Dropdown manualnya dibuang: owner tidak
+      bisa lagi menandai proyek lunas tanpa mencatat uangnya.
+- [x] Kwitansi PDF ber-nomor (sequence Postgres — tidak bisa kembar), disimpan di R2 di
+      bawah prefix `receipts/`. Pembatalan menerbitkan ulang PDF dengan cap DIBATALKAN.
+- [x] Kwitansi **bukan** baris `documents`: modul Arsip terlihat surveyor, dan kwitansi
+      memuat nilai proyek. Ia hidup di `payment.receiptFileUrl`, di balik guard keuangan.
+      Rute storage lokal menolak surveyor untuk prefix `receipts/` secara eksplisit —
+      `assertProjectAccess` MELOLOSKAN surveyor yang di-assign, jadi ia tidak cukup.
+- [x] Kwitansi di-generate DI LUAR transaksi, errornya ditelan + di-log. Dikunci test:
+      "pembayaran TETAP tercatat walau kwitansi gagal dibuat" — jeblok kalau try/catch
+      dicabut. Alasan sama dengan notifikasi Phase 11: pekerjaan sampingan tidak boleh
+      mengalahkan pekerjaan sungguhan.
+- [x] Piutang dashboard jadi eksak (nilai proyek − uang yang benar-benar masuk); dulu
+      menghitung `projectValue` PENUH untuk proyek yang DP-nya sudah 80% masuk.
+- [x] Portal klien: riwayat pembayaran, sisa tagihan, unduh kwitansi sendiri.
+- [ ] **Human action** — ganti `lib/studio-identity.ts` dengan data PKP sungguhan (alamat,
+      telepon, penanda tangan) sebelum kwitansi pertama dikirim ke klien. Sekarang masih
+      berisi placeholder.
+
 ---
 
 ## Open Decisions (dari PRD §10)
