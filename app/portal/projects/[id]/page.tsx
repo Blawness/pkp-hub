@@ -2,6 +2,7 @@ import { FileIcon } from "lucide-react";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaView } from "@/components/map/peta-view";
 import { PortalPayments } from "@/components/payments/portal-payments";
+import { PhaseTimeline } from "@/components/projects/phase-timeline";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,10 +10,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
+import { getPortalProgress, listPortalPhases } from "@/lib/actions/portal-logic";
 import { getStatusLogsForProject } from "@/lib/actions/projects-logic";
 import { assertProjectAccess, requireClient } from "@/lib/auth-guards";
 import { formatArea } from "@/lib/geo/area";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { todayString } from "@/lib/phases/derive";
 import { downloadUrlFor } from "@/lib/storage";
 
 /**
@@ -44,6 +47,8 @@ export default async function PortalProjectDetailPage({
 
   const project = await assertProjectAccess(id, user);
   const statusLogs = await getStatusLogsForProject(project.id);
+  const phases = await listPortalPhases(user, project.id);
+  const phaseProgress = await getPortalProgress(user, project.id);
   const mapLayerRows = await listMapLayersForProject(user, project.id);
   const documentRows = await listSharedDocumentsForProject(user, project.id);
   const paymentRows = await listPaymentsForProject(user, project.id);
@@ -104,6 +109,25 @@ export default async function PortalProjectDetailPage({
           />
         </CardContent>
       </Card>
+
+      {phases.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Timeline fase</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PhaseTimeline
+              projectId={project.id}
+              phases={phases}
+              progress={phaseProgress}
+              today={todayString(new Date())}
+              canEditPlan={false}
+              canReportWork={false}
+              surveyors={[]}
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
