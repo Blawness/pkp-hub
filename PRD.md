@@ -120,6 +120,18 @@ Fase pekerjaan dinamis per proyek (nama, urutan, bobot, penanggung jawab, target
 - [x] Klien melihat timeline read-only di portal: nama fase, status, target, penanda telat, persen progres — TANPA catatan internal, bobot, atau nama penanggung jawab (dipangkas di level query, bukan di render).
 - [x] Surveyor yang di-assign ke sebuah fase (bukan hanya `assignedSurveyorId` di level proyek) mendapat akses ke proyek itu.
 
+### Feature 9: Inventaris Alat
+CRUD alat ukur (total station, GPS RTK, drone, waterpass, theodolite, dst.) dengan pinjam/kembalikan per proyek — satu baris data = satu unit fisik, bukan stok. Status pakai dan durasi adalah turunan, bukan isian manual. Spec: `docs/superpowers/specs/2026-07-14-inventaris-alat-design.md`.
+
+**Acceptance criteria:**
+- [x] Admin bisa tambah/edit/arsipkan alat: nama, kategori, nomor seri, kondisi (tersedia/perawatan/rusak/pensiun), tanggal & harga beli, catatan. Alat tidak pernah dihapus permanen, hanya diarsipkan.
+- [x] Admin atau surveyor ber-akses ke proyek bisa mencatat sesi pinjam (menempel ke satu proyek) dan mengembalikan alat. Surveyor mencatat sesi atas nama dirinya sendiri — server memaksa ini, bukan hanya form yang tidak menawarkannya.
+- [x] Satu alat hanya bisa dipegang satu orang dalam satu waktu, ditegakkan oleh partial unique index di database (bukan hanya pengecekan aplikasi) — permintaan pinjam yang bentrok ditolak dengan pesan yang menyebut pemegangnya.
+- [x] Alat yang berkondisi bukan "tersedia", atau sudah diarsipkan, tidak bisa dipinjam.
+- [x] Status pakai ("Tersedia" / "Dipakai") dan durasi pakai adalah kolom TURUNAN dari sesi (`endedAt IS NULL` = dipakai; durasi = selisih waktu), bukan isian manual — mengoreksi jam mulai tidak meninggalkan durasi lama yang sudah jadi bohong.
+- [x] Harga beli & tanggal beli hanya terlihat oleh admin, dipangkas di level query untuk surveyor (bentuk hasil query, bukan disembunyikan di UI).
+- [x] Klien tidak punya akses apa pun ke modul ini — tidak ada rute di `/portal`, tidak ada query inventaris dipanggil dari sana.
+
 ---
 
 ## 4. Tech Stack

@@ -212,6 +212,58 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 
 ---
 
+## Phase 14 — Inventaris alat  *(kode selesai)*
+> Spec: `docs/superpowers/specs/2026-07-14-inventaris-alat-design.md`.
+> Plan: `docs/superpowers/plans/2026-07-14-inventaris-alat.md`.
+> CRUD alat ukur (total station, GPS RTK, drone, dst.) dengan
+> pinjam/kembalikan yang menghasilkan status pakai realtime dan durasi
+> terhitung, tiap sesi menunjuk satu proyek.
+- [x] Tabel `equipment` (SATU BARIS = SATU UNIT FISIK — dua total station
+      sejenis adalah dua baris, bukan satu baris dengan stok 2) + `equipment_usage`
+      (sesi pakai). Fungsi murni durasi/kelayakan pinjam/validasi waktu di
+      `lib/equipment/derive.ts` (tanpa DB, tanpa fixture).
+- [x] **Durasi & status pakai TIDAK PERNAH disimpan sebagai kolom** — keduanya
+      turunan. `endedAt IS NULL` = sedang dipakai; durasi = `endedAt − startedAt`
+      (atau `now − startedAt` untuk sesi berjalan). Menyimpannya berarti
+      mengoreksi jam mulai meninggalkan durasi lama yang sudah jadi bohong —
+      pelajaran `paymentStatus` (Phase 12) dan `progress` (Phase 13).
+- [x] **Sesi ganda dicegah oleh partial unique index di database**
+      (`equipment_active_usage_uniq` on `equipment_id` WHERE `ended_at IS NULL`),
+      bukan hanya pengecekan di kode. Dikunci test yang sengaja MELEWATI logic
+      layer dan menulis langsung ke tabel — kalau index-nya dicabut dari
+      skema, test itu berhenti jeblok.
+- [x] **Harga beli & tanggal beli admin-only, dipangkas di level query**
+      (pola `projectValue` Phase 6/7): surveyor menerima baris alat yang secara
+      BENTUK tidak punya `purchasePrice`/`purchaseDate` sama sekali, bukan versi
+      yang disembunyikan di UI. Dikunci test yang menegaskan `not.toHaveProperty`
+      pada hasil query, dan `JSON.stringify` tidak memuat angka harganya.
+- [x] `usedById` (yang MEMEGANG alat) dipisah dari `recordedById` (yang
+      MENGINPUT sesi) — admin sering mencatat dari kantor untuk surveyor di
+      lapangan. Untuk surveyor, `usedById` DIPAKSA jadi id dirinya sendiri di
+      server (`borrowEquipmentForUser`), terlepas dari apa pun yang dikirim
+      request — form yang tidak merender pilihan itu untuk surveyor bukan
+      penegakan, hanya kenyamanan UI.
+- [x] Alat TIDAK PERNAH dihapus permanen, hanya diarsipkan (`archivedAt`) —
+      `equipment_usage` menunjuk ke `equipment` lewat FK `onDelete: "restrict"`,
+      dan riwayat siapa-pernah-memegang-apa tidak boleh ikut hilang.
+- [x] `/dashboard/equipment` (daftar, filter kategori/kondisi/status pakai),
+      detail + riwayat pakai, form tambah/edit (admin-only). Tab "Alat" di
+      `/dashboard/projects/[id]` dengan dialog pinjam. Menu "Inventaris" di
+      nav staf (admin + surveyor) — halaman & logic tetap gerbang sungguhannya,
+      bukan menu yang disembunyikan.
+- [x] **Klien tidak punya permukaan apa pun ke modul ini**: tidak ada rute di
+      bawah `/portal`, tidak ada query inventaris dipanggil dari sana, menu
+      "Inventaris" tidak muncul untuk klien. Halaman dashboard equipment
+      memanggil `requireStaff()`.
+- [x] Seed demo: 5 alat (`tersedia` × 3, `perawatan` × 1, `rusak` × 1, semua
+      dengan harga beli terisi), 2 sesi pakai (satu masih berjalan supaya
+      status "Dipakai" kelihatan langsung, satu sudah ditutup).
+- [x] E2E `e2e/equipment.spec.ts`: admin menambah alat → pinjam di tab Alat
+      proyek → status "Dipakai" + nama pemegang tampil → kembalikan → durasi
+      tampil di riwayat. Idempoten (nama alat diberi akhiran `Date.now()`).
+
+---
+
 ## Open Decisions (dari PRD §10)
 - [x] Geospasial storage → **`jsonb` + turf.js**. PostGIS belum diperlukan: tidak ada
       query spasial, hanya display & arsip.
