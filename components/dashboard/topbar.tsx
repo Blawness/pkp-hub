@@ -15,6 +15,11 @@ const ACTION_LABELS: Record<string, string> = {
   users: "User",
 };
 
+/** Segmen tingkat pertama yang punya halaman tapi bukan item sidebar. */
+const SECTION_LABELS: Record<string, string> = {
+  profile: "Profil Saya",
+};
+
 type Crumb = { key: string; label: string; href?: string };
 
 /**
@@ -35,7 +40,10 @@ function buildCrumbs(segments: string[], user: SessionUser): Crumb[] {
   const link = buildLinks(user.role).find((l) => l.segment === section);
   crumbs.push({
     key: sectionPath,
-    label: link?.label ?? section,
+    // `profile` sengaja bukan item nav (ia dijangkau lewat menu pengguna), jadi
+    // `buildLinks` tidak punya labelnya dan fallback `?? section` akan menulis
+    // "profile" — huruf kecil, Inggris, di remah yang seluruhnya Indonesia.
+    label: link?.label ?? SECTION_LABELS[section] ?? section,
     href: rest.length > 0 ? (link?.href ?? sectionPath) : undefined,
   });
 

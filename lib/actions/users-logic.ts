@@ -161,6 +161,25 @@ export async function setUserName(userId: string, name: string): Promise<void> {
     .where(eq(users.id, userId));
 }
 
+/**
+ * Apakah user punya baris credential (password) sama sekali?
+ *
+ * Dipakai halaman profil untuk memutuskan apakah form ganti password layak
+ * dirender. Lewat aplikasi, jawabannya SELALU true bagi siapa pun yang bisa
+ * membuka halaman itu: login email/password mensyaratkan baris credential, dan
+ * `reset-password` Better Auth membuatnya kalau belum ada. Penjaga ini hanya
+ * menahan keadaan yang lahir dari luar aplikasi — baris `accounts` yang dihapus
+ * langsung di database.
+ */
+export async function userHasCredential(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: accounts.id })
+    .from(accounts)
+    .where(and(eq(accounts.userId, userId), eq(accounts.providerId, "credential")))
+    .limit(1);
+  return Boolean(row);
+}
+
 /** Setel ulang password seorang user. Sesi lamanya diputus. */
 export async function setUserPassword(userId: string, password: string): Promise<void> {
   await getUserOrThrow(userId);
