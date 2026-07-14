@@ -1,8 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
+import { recomputePaymentStatus } from "@/lib/actions/payments-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { projects } from "@/lib/db/schema";
+import { payments, projects } from "@/lib/db/schema";
 import type { UpdatePaymentInput } from "./finance-schemas";
 
 /**
@@ -48,21 +49,49 @@ async function assertProjectAccessOrReject(projectId: string, user: SessionUser)
   }
 }
 
-/** Admin-only. Sets `projectValue` / `paymentStatus` / `paymentNotes` on a project. */
+/** Uang yang sudah masuk per proyek (baris batal TIDAK dihitung). */
+async function totalPaidForProject(projectId: string): Promise<number> {
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${payments.amount}), 0)`.mapWith(Number) })
+    .from(payments)
+    .where(and(eq(payments.projectId, projectId), isNull(payments.voidedAt)));
+  return row?.total ?? 0;
+}
+
+/**
+ * Admin-only. Mengatur `projectValue` / `paymentNotes`. TIDAK lagi menerima
+ * `paymentStatus` — status diturunkan dari ledger (`recomputePaymentStatus`),
+ * dan mengubah nilai proyek bisa memindahkannya (nilai turun bisa membuat
+ * proyek jadi lunas; naik bisa membuatnya kembali sebagian), jadi hitung ulang
+ * itu terjadi di dalam transaksi yang sama.
+ */
 export async function updatePaymentForUser(user: SessionUser, input: UpdatePaymentInput) {
   requireAdmin(user);
   await assertProjectAccessOrReject(input.projectId, user);
 
-  const [updated] = await db
-    .update(projects)
-    .set({
-      projectValue: input.projectValue,
-      paymentStatus: input.paymentStatus,
-      paymentNotes: input.paymentNotes && input.paymentNotes.length > 0 ? input.paymentNotes : null,
-      updatedAt: new Date(),
-    })
-    .where(eq(projects.id, input.projectId))
-    .returning();
-  if (!updated) throw new Error("Project not found.");
-  return updated;
+  const totalPaid = await totalPaidForProject(input.projectId);
+  if ((input.projectValue == null || input.projectValue === 0) && totalPaid > 0) {
+    // Menghapus nilai proyek yang sudah ada uangnya membuat "sisa tagihan" dan
+    // "lunas" kehilangan arti — dan diam-diam menghapus piutang dari dashboard.
+    throw new Error(
+      "Nilai proyek tidak bisa dikosongkan: proyek ini sudah punya pembayaran tercatat.",
+    );
+  }
+
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(projects)
+      .set({
+        projectValue: input.projectValue,
+        paymentNotes:
+          input.paymentNotes && input.paymentNotes.length > 0 ? input.paymentNotes : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(projects.id, input.projectId))
+      .returning();
+    if (!updated) throw new Error("Project not found.");
+
+    const status = await recomputePaymentStatus(tx, input.projectId);
+    return { ...updated, paymentStatus: status };
+  });
 }

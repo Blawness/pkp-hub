@@ -15,7 +15,6 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
-import type { PaymentStatus } from "@/lib/actions/finance-schemas";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import {
   getAllowedNextStatuses,
@@ -276,7 +275,6 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 <PaymentForm
                   projectId={project.id}
                   projectValue={project.projectValue}
-                  paymentStatus={project.paymentStatus as PaymentStatus}
                   paymentNotes={project.paymentNotes}
                 />
               </CardContent>

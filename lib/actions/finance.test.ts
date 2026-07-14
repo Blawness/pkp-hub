@@ -3,9 +3,18 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { updatePaymentForUser } from "@/lib/actions/finance-logic";
+import { recordPaymentForUser } from "@/lib/actions/payments-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import {
+  clients,
+  documents,
+  mapLayers,
+  payments,
+  projectStatusLogs,
+  projects,
+  users,
+} from "@/lib/db/schema";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -19,6 +28,7 @@ let surveyor: SessionUser;
 let projectId: string;
 
 beforeAll(async () => {
+  await db.delete(payments);
   await db.delete(documents);
   await db.delete(mapLayers);
   await db.delete(projectStatusLogs);
@@ -87,7 +97,6 @@ describe("updatePaymentForUser", () => {
       updatePaymentForUser(surveyor, {
         projectId,
         projectValue: 999_999_999,
-        paymentStatus: "lunas",
         paymentNotes: "should not apply",
       }),
     ).rejects.toThrow();
@@ -97,16 +106,27 @@ describe("updatePaymentForUser", () => {
     expect(row.paymentStatus).toBe("belum");
   });
 
-  it("the admin CAN update payment info", async () => {
+  it("the admin CAN update payment info — dan status TIDAK bisa lagi diketik", async () => {
     const updated = await updatePaymentForUser(admin, {
       projectId,
       projectValue: 5_000_000,
-      paymentStatus: "lunas",
-      paymentNotes: "Lunas via transfer.",
+      paymentNotes: "Menunggu transfer.",
     });
     expect(updated.projectValue).toBe(5_000_000);
-    expect(updated.paymentStatus).toBe("lunas");
-    expect(updated.paymentNotes).toBe("Lunas via transfer.");
+    expect(updated.paymentNotes).toBe("Menunggu transfer.");
+    // Belum ada satu pun baris pembayaran, jadi status HARUS `belum` —
+    // tidak peduli apa yang diinginkan pemanggil.
+    expect(updated.paymentStatus).toBe("belum");
+  });
+
+  it("nilai proyek tidak bisa dikosongkan kalau sudah ada pembayaran", async () => {
+    await recordPaymentForUser(
+      admin,
+      { projectId, amount: 1_000_000, paidAt: "2026-07-14", method: "tunai" },
+      { put: async (key: string) => `/api/storage/${key}` },
+    );
+
+    await expect(updatePaymentForUser(admin, { projectId, projectValue: null })).rejects.toThrow();
   });
 
   it("an admin updating a project that does not exist is rejected", async () => {
@@ -114,7 +134,6 @@ describe("updatePaymentForUser", () => {
       updatePaymentForUser(admin, {
         projectId: randomUUID(),
         projectValue: 1,
-        paymentStatus: "belum",
       }),
     ).rejects.toThrow();
   });
