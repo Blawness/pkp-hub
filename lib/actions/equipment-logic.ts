@@ -338,7 +338,13 @@ export async function borrowEquipmentForUser(
   // Paksa: surveyor tidak pernah bisa mencatat alat di tangan orang lain.
   const usedById = user.role === "admin" ? (input.usedById ?? user.id) : user.id;
 
-  const [item] = await db.select().from(equipment).where(eq(equipment.id, input.equipmentId));
+  // Kolom eksplisit: `borrowRejection` hanya butuh `condition`/`archivedAt`.
+  // Ini dipanggil surveyor lewat `staffActionClient` — `purchasePrice`/
+  // `purchaseDate` (admin-only) tidak boleh sampai ke memori server di sini.
+  const [item] = await db
+    .select({ id: equipment.id, condition: equipment.condition, archivedAt: equipment.archivedAt })
+    .from(equipment)
+    .where(eq(equipment.id, input.equipmentId));
   if (!item) throw new Error("Alat tidak ditemukan.");
 
   const [activeSession] = await db

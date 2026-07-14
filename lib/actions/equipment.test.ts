@@ -1,10 +1,12 @@
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { EquipmentRow } from "@/lib/actions/equipment-logic";
 import {
   archiveEquipmentForUser,
   borrowEquipmentForUser,
+  correctUsageForUser,
   createEquipmentForUser,
   getEquipmentForUser,
   listEquipmentForUser,
@@ -361,5 +363,105 @@ describe("kunci sesi ganda di level database", () => {
     const cause = (caught as { cause?: unknown }).cause;
     const causeMessage = cause instanceof Error ? cause.message : String(cause);
     expect(causeMessage).toMatch(/equipment_active_usage_uniq|unique/i);
+  });
+});
+
+describe("koreksi sesi (admin-only)", () => {
+  it("surveyor tidak bisa mengoreksi sesi", async () => {
+    const item = await createEquipmentForUser(admin, {
+      name: "TS-Koreksi",
+      category: "total_station",
+      condition: "tersedia",
+    });
+    const usage = await borrowEquipmentForUser(admin, {
+      equipmentId: item.id,
+      projectId,
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    await returnEquipmentForUser(admin, { usageId: usage.id });
+
+    await expect(
+      correctUsageForUser(surveyor, {
+        usageId: usage.id,
+        startedAt: new Date(Date.now() - 30 * 60 * 1000),
+        endedAt: new Date(),
+      }),
+    ).rejects.toThrow(/admin/i);
+  });
+
+  it("klien tidak bisa mengoreksi sesi", async () => {
+    const item = await createEquipmentForUser(admin, {
+      name: "TS-Koreksi",
+      category: "total_station",
+      condition: "tersedia",
+    });
+    const usage = await borrowEquipmentForUser(admin, {
+      equipmentId: item.id,
+      projectId,
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    await returnEquipmentForUser(admin, { usageId: usage.id });
+
+    await expect(
+      correctUsageForUser(clientUser, {
+        usageId: usage.id,
+        startedAt: new Date(Date.now() - 30 * 60 * 1000),
+        endedAt: new Date(),
+      }),
+    ).rejects.toThrow(/admin/i);
+  });
+
+  it("admin bisa mengoreksi startedAt/endedAt sesi yang sudah ditutup, dan nilainya berubah di DB", async () => {
+    const item = await createEquipmentForUser(admin, {
+      name: "TS-Koreksi",
+      category: "total_station",
+      condition: "tersedia",
+    });
+    const originalStart = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    const usage = await borrowEquipmentForUser(admin, {
+      equipmentId: item.id,
+      projectId,
+      startedAt: originalStart,
+    });
+    const originalEnd = new Date(Date.now() - 2 * 60 * 60 * 1000);
+    await returnEquipmentForUser(admin, { usageId: usage.id, endedAt: originalEnd });
+
+    const correctedStart = new Date(Date.now() - 90 * 60 * 1000);
+    const correctedEnd = new Date(Date.now() - 30 * 60 * 1000);
+    const corrected = await correctUsageForUser(admin, {
+      usageId: usage.id,
+      startedAt: correctedStart,
+      endedAt: correctedEnd,
+    });
+
+    expect(corrected.startedAt.getTime()).toBe(correctedStart.getTime());
+    expect(corrected.endedAt?.getTime()).toBe(correctedEnd.getTime());
+
+    const [rowInDb] = await db.select().from(equipmentUsage).where(eq(equipmentUsage.id, usage.id));
+    expect(rowInDb.startedAt.getTime()).toBe(correctedStart.getTime());
+    expect(rowInDb.endedAt?.getTime()).toBe(correctedEnd.getTime());
+  });
+
+  it("koreksi dengan endedAt <= startedAt ditolak", async () => {
+    const item = await createEquipmentForUser(admin, {
+      name: "TS-Koreksi",
+      category: "total_station",
+      condition: "tersedia",
+    });
+    const usage = await borrowEquipmentForUser(admin, {
+      equipmentId: item.id,
+      projectId,
+      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    await returnEquipmentForUser(admin, { usageId: usage.id });
+
+    const sameTime = new Date(Date.now() - 30 * 60 * 1000);
+    await expect(
+      correctUsageForUser(admin, {
+        usageId: usage.id,
+        startedAt: sameTime,
+        endedAt: sameTime,
+      }),
+    ).rejects.toThrow(/selesai/i);
   });
 });
