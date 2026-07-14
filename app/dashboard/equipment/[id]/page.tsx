@@ -1,0 +1,159 @@
+import { inArray } from "drizzle-orm";
+import { ArchiveEquipmentButton } from "@/components/equipment/archive-equipment-button";
+import { UsageHistory, type UsageHistoryRow } from "@/components/equipment/usage-history";
+import { Badge } from "@/components/ui/badge";
+import { ButtonLink } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getEquipmentForUser, listUsageForEquipment } from "@/lib/actions/equipment-logic";
+import { requireStaff } from "@/lib/auth-guards";
+import { db } from "@/lib/db";
+import { projects, users } from "@/lib/db/schema";
+import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
+import { formatIDR } from "@/lib/format";
+import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await requireStaff();
+  const item = await getEquipmentForUser(user, id);
+  return { title: item.name };
+}
+
+/**
+ * Detail alat + riwayat pakai. `requireStaff()` adalah gerbang halaman ini —
+ * klien tidak pernah sampai kemari.
+ *
+ * Harga & tanggal beli hanya dirender kalau `"purchasePrice" in item` — yang
+ * hanya benar untuk payload admin (`getEquipmentForUser` memangkas dua field
+ * itu dari bentuk objeknya sendiri untuk surveyor, bukan cuma
+ * menyembunyikannya di UI).
+ */
+export default async function EquipmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const user = await requireStaff();
+  const isAdmin = user.role === "admin";
+
+  const item = await getEquipmentForUser(user, id);
+  const usages = await listUsageForEquipment(user, id);
+
+  const projectIds = [...new Set(usages.map((u) => u.projectId))];
+  const userIds = [...new Set(usages.map((u) => u.usedById))];
+
+  const [projectRows, userRows] = await Promise.all([
+    projectIds.length
+      ? db
+          .select({ id: projects.id, title: projects.title })
+          .from(projects)
+          .where(inArray(projects.id, projectIds))
+      : Promise.resolve([]),
+    userIds.length
+      ? db.select({ id: users.id, name: users.name }).from(users).where(inArray(users.id, userIds))
+      : Promise.resolve([]),
+  ]);
+  const projectTitleById = new Map(projectRows.map((p) => [p.id, p.title]));
+  const userNameById = new Map(userRows.map((u) => [u.id, u.name]));
+
+  const now = new Date();
+  const usageRows: UsageHistoryRow[] = usages.map((usage) => ({
+    id: usage.id,
+    projectId: usage.projectId,
+    projectTitle: projectTitleById.get(usage.projectId) ?? "—",
+    usedByName: userNameById.get(usage.usedById) ?? "—",
+    startedAt: usage.startedAt,
+    endedAt: usage.endedAt,
+    // Durasi dihitung di SERVER — bukan di komponen klien, supaya tidak ada
+    // mismatch hidrasi antara jam render server dan jam browser.
+    duration: formatDuration(usageDurationMs(usage, now)),
+    note: usage.note,
+    canReturn: usage.endedAt === null && (isAdmin || usage.usedById === user.id),
+  }));
+
+  return (
+    <main className="flex flex-col gap-6 p-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-medium">{item.name}</h1>
+          <p className="text-sm text-muted-foreground">
+            {equipmentCategoryLabel[item.category] ?? item.category}
+            {item.serialNumber ? ` · SN ${item.serialNumber}` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary">
+            {equipmentConditionLabel[item.condition] ?? item.condition}
+          </Badge>
+          {isAdmin && !item.archivedAt ? (
+            <>
+              <ButtonLink variant="outline" href={`/dashboard/equipment/${item.id}/edit`}>
+                Edit
+              </ButtonLink>
+              <ArchiveEquipmentButton equipmentId={item.id} equipmentName={item.name} />
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {item.archivedAt ? (
+        <p className="text-sm text-muted-foreground">Alat ini sudah diarsipkan.</p>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Status pakai</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {item.activeUsage ? (
+            <p className="text-sm">
+              Sedang dipakai oleh <span className="font-medium">{item.activeUsage.usedByName}</span>{" "}
+              untuk proyek <span className="font-medium">{item.activeUsage.projectTitle}</span> ·
+              berjalan{" "}
+              {formatDuration(
+                usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
+              )}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">Tersedia — tidak sedang dipakai.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      {"purchasePrice" in item ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Data pembelian</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">Tanggal beli</p>
+              <p className="text-sm">{item.purchaseDate ?? "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Harga beli</p>
+              <p className="text-sm">{formatIDR(item.purchasePrice)}</p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {item.notes ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Catatan</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm">{item.notes}</p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Riwayat pakai</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <UsageHistory rows={usageRows} />
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

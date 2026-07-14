@@ -55,6 +55,22 @@ export const phaseStatusLabel: Record<string, string> = {
   selesai: "Selesai",
 };
 
+export const equipmentCategoryLabel: Record<string, string> = {
+  total_station: "Total Station",
+  gps_rtk: "GPS RTK",
+  drone: "Drone",
+  waterpass: "Waterpass",
+  theodolite: "Theodolite",
+  lainnya: "Lainnya",
+};
+
+export const equipmentConditionLabel: Record<string, string> = {
+  tersedia: "Tersedia",
+  perawatan: "Perawatan",
+  rusak: "Rusak",
+  pensiun: "Pensiun",
+};
+
 export const projectStatusOrder = [
   "baru",
   "dijadwalkan",
