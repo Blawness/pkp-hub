@@ -4,7 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import {
+  clients,
+  documents,
+  mapLayers,
+  payments,
+  projectStatusLogs,
+  projects,
+  users,
+} from "@/lib/db/schema";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -22,8 +30,10 @@ let admin: SessionUser;
 let surveyor: SessionUser;
 let otherSurveyor: SessionUser;
 let clientUser: SessionUser;
+let fixtureClientId: string;
 
 beforeAll(async () => {
+  await db.delete(payments);
   await db.delete(documents);
   await db.delete(mapLayers);
   await db.delete(projectStatusLogs);
@@ -92,6 +102,7 @@ beforeAll(async () => {
     .insert(clients)
     .values([{ name: "Dashboard Fixture Client", type: "individual" }])
     .returning();
+  fixtureClientId = client.id;
 
   // Known fixture, deterministic aggregates:
   //  - active (not selesai/dibatalkan): baru 10M + diproses 20M + dijadwalkan 15M = 45_000_000
@@ -100,52 +111,71 @@ beforeAll(async () => {
   //    deliberately excluded — a cancelled project must not inflate "total
   //    unpaid")
   //  - lunas project (dijadwalkan, 15M): counted in active value, NOT in unpaid
-  await db.insert(projects).values([
-    {
-      title: "Fixture: baru, belum, assigned to surveyor",
-      clientId: client.id,
-      surveyType: "batas_tanah",
-      assignedSurveyorId: surveyorId,
-      status: "baru",
-      projectValue: 10_000_000,
-      paymentStatus: "belum",
-    },
-    {
-      title: "Fixture: diproses, sebagian, assigned to surveyor",
-      clientId: client.id,
-      surveyType: "topografi",
-      assignedSurveyorId: surveyorId,
-      status: "diproses",
-      projectValue: 20_000_000,
-      paymentStatus: "sebagian",
-    },
-    {
-      title: "Fixture: selesai, sebagian (unpaid but inactive)",
-      clientId: client.id,
-      surveyType: "kavling",
-      assignedSurveyorId: otherSurveyorId,
-      status: "selesai",
-      projectValue: 5_000_000,
-      paymentStatus: "sebagian",
-    },
-    {
-      title: "Fixture: dibatalkan, belum (excluded from active value AND from total unpaid)",
-      clientId: client.id,
-      surveyType: "lainnya",
-      status: "dibatalkan",
-      projectValue: 8_000_000,
-      paymentStatus: "belum",
-    },
-    {
-      title: "Fixture: dijadwalkan, lunas (active value, not unpaid), assigned to surveyor",
-      clientId: client.id,
-      surveyType: "luas_bangunan",
-      assignedSurveyorId: surveyorId,
-      status: "dijadwalkan",
-      projectValue: 15_000_000,
-      paymentStatus: "lunas",
-    },
-  ]);
+  const insertedProjects = await db
+    .insert(projects)
+    .values([
+      {
+        title: "Fixture: baru, belum, assigned to surveyor",
+        clientId: fixtureClientId,
+        surveyType: "batas_tanah",
+        assignedSurveyorId: surveyorId,
+        status: "baru",
+        projectValue: 10_000_000,
+        paymentStatus: "belum",
+      },
+      {
+        title: "Fixture: diproses, sebagian, assigned to surveyor",
+        clientId: fixtureClientId,
+        surveyType: "topografi",
+        assignedSurveyorId: surveyorId,
+        status: "diproses",
+        projectValue: 20_000_000,
+        paymentStatus: "sebagian",
+      },
+      {
+        title: "Fixture: selesai, sebagian (unpaid but inactive)",
+        clientId: fixtureClientId,
+        surveyType: "kavling",
+        assignedSurveyorId: otherSurveyorId,
+        status: "selesai",
+        projectValue: 5_000_000,
+        paymentStatus: "sebagian",
+      },
+      {
+        title: "Fixture: dibatalkan, belum (excluded from active value AND from total unpaid)",
+        clientId: fixtureClientId,
+        surveyType: "lainnya",
+        status: "dibatalkan",
+        projectValue: 8_000_000,
+        paymentStatus: "belum",
+      },
+      {
+        title: "Fixture: dijadwalkan, lunas (active value, not unpaid), assigned to surveyor",
+        clientId: fixtureClientId,
+        surveyType: "luas_bangunan",
+        assignedSurveyorId: surveyorId,
+        status: "dijadwalkan",
+        projectValue: 15_000_000,
+        paymentStatus: "lunas",
+      },
+    ])
+    .returning();
+
+  // Proyek "lunas" fixture HARUS punya pembayaran penuh, supaya di bawah logic
+  // piutang eksak ia benar-benar menyumbang 0 ke `totalUnpaid` (seperti yang
+  // diharapkan test "computes exact" di bawah). Tanpa ini, status "lunas" yang
+  // tidak didukung uang akan tetap dihitung piutang penuh.
+  const lunasProject = insertedProjects.find((p) => p.paymentStatus === "lunas");
+  if (lunasProject) {
+    await db.insert(payments).values({
+      projectId: lunasProject.id,
+      amount: lunasProject.projectValue ?? 0,
+      paidAt: "2026-07-01",
+      method: "transfer",
+      receiptNumber: `KW/PKP/2026/${Date.now()}`,
+      recordedById: adminId,
+    });
+  }
 });
 
 afterAll(() => {
@@ -169,6 +199,66 @@ describe("getAdminDashboardData", () => {
     expect(data.countsByStatus.selesai).toBe(1);
     expect(data.countsByStatus.dibatalkan).toBe(1);
     expect(data.countsByStatus.dijadwalkan).toBe(1);
+  });
+
+  it("totalUnpaid memotong uang yang sudah masuk, bukan menghitung nilai proyek penuh", async () => {
+    // Proyek 10jt, DP 4jt sudah masuk. Piutangnya 6jt — bukan 10jt. Karena fixture
+    // di atas sudah punya piutang sendiri, kita ukur SELISIH-nya: +6.000.000.
+    const before = (await getAdminDashboardData(admin)).totalUnpaid;
+
+    const [project] = await db
+      .insert(projects)
+      .values({
+        title: "Piutang Fixture",
+        clientId: fixtureClientId,
+        surveyType: "kavling",
+        status: "diproses",
+        projectValue: 10_000_000,
+        paymentStatus: "sebagian",
+      })
+      .returning();
+
+    await db.insert(payments).values({
+      projectId: project.id,
+      amount: 4_000_000,
+      paidAt: "2026-07-14",
+      method: "transfer",
+      receiptNumber: `KW/PKP/2026/${Date.now()}`,
+      recordedById: admin.id,
+    });
+
+    const after = (await getAdminDashboardData(admin)).totalUnpaid;
+    expect(after - before).toBe(6_000_000);
+  });
+
+  it("pembayaran yang dibatalkan tidak mengurangi piutang", async () => {
+    const [project] = await db
+      .insert(projects)
+      .values({
+        title: "Piutang Batal Fixture",
+        clientId: fixtureClientId,
+        surveyType: "kavling",
+        status: "diproses",
+        projectValue: 3_000_000,
+        paymentStatus: "belum",
+      })
+      .returning();
+
+    await db.insert(payments).values({
+      projectId: project.id,
+      amount: 3_000_000,
+      paidAt: "2026-07-14",
+      method: "transfer",
+      receiptNumber: `KW/PKP/2026/${Date.now() + 1}`,
+      recordedById: admin.id,
+      voidedAt: new Date(),
+      voidedReason: "Salah proyek",
+      voidedById: admin.id,
+    });
+
+    const data = await getAdminDashboardData(admin);
+    // Uangnya dibatalkan, jadi piutangnya utuh 3jt — bukan 0.
+    expect(data.totalUnpaid).toBeGreaterThanOrEqual(3_000_000);
   });
 
   it("a surveyor CANNOT read the admin dashboard", async () => {

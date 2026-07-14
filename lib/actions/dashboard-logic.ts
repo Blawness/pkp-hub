@@ -1,17 +1,19 @@
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth-guards";
 import { listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, users } from "@/lib/db/schema";
+import { clients, payments, users } from "@/lib/db/schema";
 
 /**
  * Server-only business logic for the per-role Dashboard Ringkasan (PRD §3
  * Feature 7), directly unit-tested in `dashboard.test.ts`.
  *
- * `totalUnpaid` sums `projectValue` for projects with `paymentStatus` in
- * belum|sebagian, EXCLUDING `dibatalkan` (cancelled) projects — a cancelled
- * project's unpaid balance is not real outstanding revenue and must not
- * inflate the admin dashboard's "total unpaid" figure.
+ * `totalUnpaid` adalah piutang EKSAK: `projectValue − uang yang sudah masuk`
+ * untuk tiap proyek non-`dibatalkan` yang belum lunas (spec 2026-07-14). Dulu
+ * ia menjumlahkan `projectValue` PENUH untuk proyek berstatus belum|sebagian,
+ * jadi proyek yang DP-nya sudah 80% masuk tetap dihitung piutang penuh —
+ * angkanya selalu lebih besar dari kenyataan. `dibatalkan` tetap dikecualikan:
+ * piutang proyek batal bukan pendapatan yang tertunda.
  *
  * CRITICAL, security-load-bearing: `getSurveyorDashboardData` builds its
  * output as an explicit field-by-field projection — it NEVER spreads a raw
@@ -27,9 +29,22 @@ import { clients, users } from "@/lib/db/schema";
  */
 
 const INACTIVE_STATUSES = new Set(["selesai", "dibatalkan"]);
-const UNPAID_STATUSES = new Set(["belum", "sebagian"]);
 const CANCELLED_STATUS = "dibatalkan";
 const NEEDS_ACTION_STATUSES = new Set(["baru", "dijadwalkan", "data_diambil"]);
+
+/** Uang yang sudah masuk per proyek (baris batal TIDAK dihitung). */
+async function paidByProject(projectIds: string[]): Promise<Map<string, number>> {
+  if (projectIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      projectId: payments.projectId,
+      paid: sql<number>`coalesce(sum(${payments.amount}), 0)`.mapWith(Number),
+    })
+    .from(payments)
+    .where(and(inArray(payments.projectId, projectIds), isNull(payments.voidedAt)))
+    .groupBy(payments.projectId);
+  return new Map(rows.map((r) => [r.projectId, r.paid]));
+}
 
 function requireAdmin(user: SessionUser) {
   if (user.role !== "admin") {
@@ -85,6 +100,8 @@ export async function getAdminDashboardData(user: SessionUser): Promise<AdminDas
   requireAdmin(user);
   const allProjects = await listProjectsForUser(user);
 
+  const paid = await paidByProject(allProjects.map((p) => p.id));
+
   const countsByStatus: Record<string, number> = {};
   let totalActiveValue = 0;
   let totalUnpaid = 0;
@@ -93,8 +110,13 @@ export async function getAdminDashboardData(user: SessionUser): Promise<AdminDas
     if (!INACTIVE_STATUSES.has(p.status)) {
       totalActiveValue += p.projectValue ?? 0;
     }
-    if (UNPAID_STATUSES.has(p.paymentStatus) && p.status !== CANCELLED_STATUS) {
-      totalUnpaid += p.projectValue ?? 0;
+    // Piutang EKSAK: nilai proyek dikurangi uang yang sudah benar-benar masuk.
+    // Dulu ini menjumlahkan `projectValue` PENUH untuk setiap proyek yang belum
+    // lunas, jadi proyek yang DP-nya 80% masuk tetap dihitung sebagai piutang
+    // penuh — angkanya selalu lebih besar dari kenyataan. `dibatalkan` tetap
+    // dikecualikan: piutang proyek batal bukan pendapatan yang tertunda.
+    if (p.status !== CANCELLED_STATUS) {
+      totalUnpaid += Math.max(0, (p.projectValue ?? 0) - (paid.get(p.id) ?? 0));
     }
   }
 
