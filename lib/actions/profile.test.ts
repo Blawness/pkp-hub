@@ -4,7 +4,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { updateOwnNameSchema } from "@/lib/actions/profile-schemas";
-import { setUserName } from "@/lib/actions/users-logic";
+import { setUserName, userHasCredential } from "@/lib/actions/users-logic";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { accounts, sessions, users } from "@/lib/db/schema";
@@ -267,5 +267,25 @@ describe("ganti password sendiri", () => {
       headers: laptopBaru,
       body: { currentPassword: "password-baru-yang-panjang", newPassword: password },
     });
+  });
+});
+
+describe("userHasCredential", () => {
+  it("true untuk user yang punya baris credential", async () => {
+    expect(await userHasCredential(meId)).toBe(true);
+  });
+
+  it("false untuk user tanpa baris credential", async () => {
+    const orphanId = randomUUID();
+    await db.insert(users).values({
+      id: orphanId,
+      name: "Belum Set Password",
+      email: `orphan-${orphanId}@fixture.test`,
+      role: "client",
+    });
+
+    expect(await userHasCredential(orphanId)).toBe(false);
+
+    await db.delete(users).where(eq(users.id, orphanId));
   });
 });
