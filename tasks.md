@@ -157,6 +157,11 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
 - [x] Portal klien: riwayat pembayaran, sisa tagihan, unduh kwitansi sendiri.
 - [x] **Human action** — `lib/studio-identity.ts` berisi data PKP asli (alamat/telepon/
       email/kota dari situs resmi) + nama penanda tangan "Adam Maulana Hafiz, S.H."
+- [x] Tab "Kwitansi" khusus admin di Arsip Dokumen (`/dashboard/documents`): semua
+      kwitansi lintas proyek, baris dibatalkan otomatis tersingkir. `listReceiptsForAdmin`
+      (guard `requireAdmin`) + `components/payments/receipts-archive.tsx`; presigned URL
+      dihitung di level halaman. Dipisah dari tabel `documents` agar surveyor tak melihat
+      nilai proyek. Commit `4dd0403`, push ke `master`.
 
 ---
 
