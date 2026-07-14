@@ -24,6 +24,34 @@ const passwordFormSchema = z.object({
 });
 type PasswordValues = z.infer<typeof passwordFormSchema>;
 
+/**
+ * Better Auth memulangkan pesan berbahasa Inggris ("Invalid password",
+ * "Unauthorized") — di UI yang seluruhnya Indonesia, itu bocoran teknis, bukan
+ * pesan untuk pengguna. Yang dicocokkan `code`, bukan `message`: kode-nya
+ * stabil antar versi, kalimatnya tidak.
+ *
+ * UNAUTHORIZED bukan kasus mengada-ada: /api/auth/change-password sengaja
+ * memeriksa sesi langsung ke database (`sensitiveSessionMiddleware`), melewati
+ * cookie cache 5 menit. Jadi sesi yang sudah dicabut di perangkat lain masih
+ * "terlihat hidup" oleh halaman ini, tapi ditolak saat ganti password.
+ */
+function passwordErrorMessage(code: string | undefined): string {
+  switch (code) {
+    case "INVALID_PASSWORD":
+      return "Password saat ini salah.";
+    case "PASSWORD_TOO_SHORT":
+      return "Password baru terlalu pendek.";
+    case "PASSWORD_TOO_LONG":
+      return "Password baru terlalu panjang.";
+    case "CREDENTIAL_ACCOUNT_NOT_FOUND":
+      return "Akun ini belum punya password.";
+    case "UNAUTHORIZED":
+      return "Sesi Anda sudah tidak berlaku. Masuk ulang, lalu coba lagi.";
+    default:
+      return "Gagal mengganti password. Coba lagi.";
+  }
+}
+
 export function ProfileForm({ user, hasPassword }: { user: SessionUser; hasPassword: boolean }) {
   const router = useRouter();
   const [nameDone, setNameDone] = useState(false);
@@ -36,8 +64,12 @@ export function ProfileForm({ user, hasPassword }: { user: SessionUser; hasPassw
   });
 
   const updateName = useAction(updateOwnNameAction, {
-    onSuccess: () => {
+    onSuccess: ({ input }) => {
       setNameDone(true);
+      // Jadikan nilai yang baru tersimpan sebagai titik nol form, supaya begitu
+      // user mengetik lagi form jadi `isDirty` dan "Nama tersimpan." hilang —
+      // pesan sukses yang menempel di atas field yang sudah berubah itu bohong.
+      nameForm.reset({ name: input.name });
       // Sidebar/topbar merender nama ini dari sesi; server sudah membuang cache
       // layout-nya, refresh yang menariknya ulang.
       router.refresh();
@@ -65,7 +97,7 @@ export function ProfileForm({ user, hasPassword }: { user: SessionUser; hasPassw
     });
 
     if (error) {
-      setPasswordError(error.message ?? "Password saat ini salah.");
+      setPasswordError(passwordErrorMessage(error.code));
       return;
     }
 
@@ -110,7 +142,9 @@ export function ProfileForm({ user, hasPassword }: { user: SessionUser; hasPassw
                 {updateName.result.serverError}
               </p>
             ) : null}
-            {nameDone ? <p className="text-sm text-muted-foreground">Nama tersimpan.</p> : null}
+            {nameDone && !nameForm.formState.isDirty ? (
+              <p className="text-sm text-muted-foreground">Nama tersimpan.</p>
+            ) : null}
 
             <Button type="submit" disabled={updateName.isPending} className="w-fit">
               {updateName.isPending ? "Menyimpan…" : "Simpan nama"}
