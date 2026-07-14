@@ -2,6 +2,7 @@ import { relations } from "drizzle-orm";
 import {
   bigint,
   boolean,
+  date,
   doublePrecision,
   index,
   jsonb,
@@ -34,6 +35,7 @@ export const surveyType = pgEnum("survey_type", [
   "lainnya",
 ]);
 export const paymentStatus = pgEnum("payment_status", ["belum", "sebagian", "lunas"]);
+export const paymentMethod = pgEnum("payment_method", ["transfer", "tunai", "lainnya"]);
 export const documentCategory = pgEnum("document_category", [
   "laporan",
   "berita_acara",
@@ -246,6 +248,7 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
   statusLogs: many(projectStatusLogs),
   mapLayers: many(mapLayers),
   documents: many(documents),
+  payments: many(payments),
 }));
 
 export const projectStatusLogsRelations = relations(projectStatusLogs, ({ one }) => ({
@@ -261,4 +264,43 @@ export const mapLayersRelations = relations(mapLayers, ({ one }) => ({
 export const documentsRelations = relations(documents, ({ one }) => ({
   project: one(projects, { fields: [documents.projectId], references: [projects.id] }),
   uploadedBy: one(users, { fields: [documents.uploadedById], references: [users.id] }),
+}));
+
+/**
+ * Ledger pembayaran — APPEND-ONLY. Baris tidak pernah di-UPDATE angkanya:
+ * ia hanya lahir (insert) atau dibatalkan (isi `voidedAt`/`voidedReason`).
+ * Koreksi = batalkan lalu catat ulang, sehingga nomor kwitansi yang sudah
+ * beredar di tangan klien tidak pernah berubah arti diam-diam.
+ *
+ * `paidAt` sengaja `date` mode STRING (`YYYY-MM-DD`), bukan `Date`: tahun pada
+ * nomor kwitansi diambil dari sini, dan `Date.getFullYear()` memakai timezone
+ * lokal — 1 Januari bisa mundur setahun di server ber-offset negatif.
+ */
+export const payments = pgTable(
+  "payment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    paidAt: date("paid_at", { mode: "string" }).notNull(),
+    method: paymentMethod("method").notNull(),
+    note: text("note"),
+    receiptNumber: text("receipt_number").notNull().unique(),
+    receiptFileUrl: text("receipt_file_url"),
+    recordedById: text("recorded_by_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    voidedAt: timestamp("voided_at", { withTimezone: true }),
+    voidedReason: text("voided_reason"),
+    voidedById: text("voided_by_id").references(() => users.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("payment_project_id_idx").on(t.projectId)],
+);
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  project: one(projects, { fields: [payments.projectId], references: [projects.id] }),
+  recordedBy: one(users, { fields: [payments.recordedById], references: [users.id] }),
 }));

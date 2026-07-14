@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { sql } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import { db } from "./index";
 import {
@@ -6,6 +7,7 @@ import {
   clients,
   documents,
   mapLayers,
+  payments,
   projectStatusLogs,
   projects,
   sessions,
@@ -22,6 +24,7 @@ const SEED_PASSWORD = "password123";
  */
 async function seed() {
   // FK-safe teardown so the seed is re-runnable.
+  await db.delete(payments);
   await db.delete(documents);
   await db.delete(mapLayers);
   await db.delete(projectStatusLogs);
@@ -142,6 +145,42 @@ async function seed() {
 
   // Riwayat status (PRD Feature 2) untuk proyek yang sudah bergerak.
   const [batas, topografi, kavling] = inserted;
+
+  // Ledger pembayaran demo. Angkanya sengaja dibuat cocok dengan
+  // `paymentStatus` tiap proyek — status itu sekarang TURUNAN, jadi seed yang
+  // tidak konsisten akan langsung terlihat salah di UI.
+  const lunasProject = inserted.find((p) => p.paymentStatus === "lunas");
+  const sebagianProject = inserted.find((p) => p.paymentStatus === "sebagian");
+
+  if (lunasProject) {
+    await db.insert(payments).values({
+      projectId: lunasProject.id,
+      amount: 7_500_000, // = projectValue, jadi lunas
+      paidAt: "2026-05-02",
+      method: "transfer",
+      note: "Pelunasan via transfer BCA.",
+      receiptNumber: "KW/PKP/2026/0001",
+      recordedById: adminId,
+    });
+  }
+
+  if (sebagianProject) {
+    await db.insert(payments).values({
+      projectId: sebagianProject.id,
+      amount: 21_000_000, // DP 50% dari 42.000.000
+      paidAt: "2026-06-20",
+      method: "transfer",
+      note: "DP 50%.",
+      receiptNumber: "KW/PKP/2026/0002",
+      recordedById: adminId,
+    });
+  }
+
+  // Sequence nomor kwitansi tidak di-increment oleh seed di atas (ia memakai
+  // nomor hardcode), jadi dorong ke angka di atas nomor demo agar pembayaran
+  // sungguhan pertama tidak menabrak constraint UNIQUE `receipt_number`.
+  await db.execute(sql`SELECT setval('receipt_number_seq', 2)`);
+
   await db.insert(projectStatusLogs).values([
     { projectId: batas.id, fromStatus: null, toStatus: "baru", changedById: adminId },
     { projectId: batas.id, fromStatus: "baru", toStatus: "dijadwalkan", changedById: adminId },
