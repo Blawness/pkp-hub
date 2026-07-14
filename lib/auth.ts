@@ -27,6 +27,11 @@ export const auth = betterAuth({
   baseURL: env.BETTER_AUTH_URL,
   emailAndPassword: {
     enabled: true,
+    // Aturan 10 karakter (`passwordSchema`) hanya ditegakkan zod di sisi klien.
+    // Tanpa baris ini, default Better Auth (8) yang berlaku di
+    // /api/auth/change-password, jadi POST langsung bisa menyetel password 8
+    // karakter dan kebijakannya bocor. Samakan di server.
+    minPasswordLength: 10,
     // No public self-signup: accounts are only created by the admin via
     // `inviteClientUser` (or by the seed script). This disables Better
     // Auth's `/sign-up/email` endpoint outright, so it can't be called even

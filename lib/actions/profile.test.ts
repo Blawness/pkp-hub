@@ -170,6 +170,29 @@ async function credentialHashFor(userId: string): Promise<string | null> {
 }
 
 describe("ganti password sendiri", () => {
+  // Aturan "minimal 10 karakter" ada di `passwordSchema` (zod) — tapi itu hanya
+  // berjalan di KLIEN. /api/auth/change-password punya aturannya sendiri, dan
+  // default Better Auth adalah 8. Tanpa `minPasswordLength: 10` di lib/auth.ts,
+  // POST langsung ke endpoint itu bisa menyetel password 8 karakter dan
+  // kebijakan kita bocor tanpa suara. Test ini menjaga keduanya tetap sama.
+  it("menolak password baru di bawah 10 karakter DI SERVER, bukan cuma di klien", async () => {
+    const me = await signIn(`me-${meId}@fixture.test`, password);
+    const hashBefore = await credentialHashFor(meId);
+
+    let code: string | undefined;
+    try {
+      await auth.api.changePassword({
+        headers: me,
+        body: { currentPassword: password, newPassword: "pendek8x" },
+      });
+    } catch (error) {
+      code = (error as { body?: { code?: string } })?.body?.code;
+    }
+
+    expect(code).toBe("PASSWORD_TOO_SHORT");
+    expect(await credentialHashFor(meId)).toBe(hashBefore);
+  });
+
   it("menolak password lama yang salah", async () => {
     const me = await signIn(`me-${meId}@fixture.test`, password);
     const hashBefore = await credentialHashFor(meId);
@@ -245,7 +268,17 @@ describe("ganti password sendiri", () => {
     // Sesi "laptop" diganti yang BARU oleh Better Auth — cookie penggantinya
     // ada di response. Inilah cookie yang, kalau hilang (mis. dipanggil dari
     // Server Action tanpa nextCookies), membuat user ke-kick setelah ganti
-    // password. Test ini yang menjaga kita tidak mengulanginya.
+    // password.
+    //
+    // BATAS TEST INI, supaya tidak ada yang salah percaya: yang dikunci di sini
+    // adalah SEMANTIK `revokeOtherSessions` milik Better Auth (berguna kalau
+    // upgrade library mengubahnya diam-diam) — BUKAN tempat kita memanggilnya.
+    // Test ini tetap hijau kalau `revokeOtherSessions: true` di
+    // components/profile/profile-form.tsx diubah jadi `false`, atau kalau ganti
+    // password dipindahkan kembali ke Server Action. Padahal justru di situ
+    // bahayanya. Repo ini belum punya infra test komponen (vitest environment:
+    // "node", tanpa jsdom/testing-library), jadi jalur klien itu diverifikasi
+    // manual di browser — lihat ledger Task 6.
     const laptopBaru = new Headers({
       cookie: cookieHeaderFrom(changed.get("set-cookie") ?? ""),
     });
