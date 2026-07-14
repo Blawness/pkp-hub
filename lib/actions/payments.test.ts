@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   getPaymentSummary,
   listPaymentsForProject,
+  listReceiptsForAdmin,
   recordPaymentForUser,
   voidPaymentForUser,
 } from "@/lib/actions/payments-logic";
@@ -173,6 +174,70 @@ describe("batas akses ledger", () => {
 
   it("klien TIDAK bisa melihat pembayaran proyek klien lain", async () => {
     await expect(listPaymentsForProject(otherClientUser, projectId)).rejects.toThrow();
+  });
+
+  it("surveyor TIDAK bisa membuka arsip kwitansi", async () => {
+    await expect(listReceiptsForAdmin(surveyor)).rejects.toThrow();
+  });
+
+  it("klien TIDAK bisa membuka arsip kwitansi", async () => {
+    await expect(listReceiptsForAdmin(clientUser)).rejects.toThrow();
+  });
+});
+
+describe("arsip kwitansi (admin)", () => {
+  it("admin melihat semua kwitansi lintas proyek, bukan baris batal", async () => {
+    // Proyek khusus agar tidak mengotori state proyek bersama (projectId/
+    // otherProjectId) yang dipakai describe lain di file ini.
+    const [clientX] = await db
+      .insert(clients)
+      .values([{ name: "Klien Arsip", type: "individual" }])
+      .returning();
+    const [projX] = await db
+      .insert(projects)
+      .values({
+        title: "Proyek Arsip",
+        clientId: clientX.id,
+        surveyType: "kavling",
+        status: "baru",
+        projectValue: 50_000_000,
+        paymentStatus: "belum",
+      })
+      .returning();
+
+    // 4jt (kwitansi ke-0001) dan 5jt (kwitansi ke-0002) di proyek ini.
+    const p1 = await recordPaymentForUser(
+      admin,
+      {
+        projectId: projX.id,
+        amount: 4_000_000,
+        paidAt: "2026-07-14",
+        method: "transfer",
+        note: "DP",
+      },
+      okStore,
+    );
+    const p2 = await recordPaymentForUser(
+      admin,
+      { projectId: projX.id, amount: 5_000_000, paidAt: "2026-07-15", method: "tunai" },
+      okStore,
+    );
+
+    const receipts = await listReceiptsForAdmin(admin);
+    const numbers = receipts.map((r) => r.receiptNumber);
+    expect(numbers).toContain(p1.receiptNumber);
+    expect(numbers).toContain(p2.receiptNumber);
+
+    // Kwitansi dengan file punya `receiptFileUrl`; baris batal tidak ikut masuk.
+    const p2Row = receipts.find((r) => r.receiptNumber === p2.receiptNumber);
+    expect(p2Row?.receiptFileUrl).toBeTruthy();
+    expect(receipts.every((r) => r.isVoided === false)).toBe(true);
+
+    // Batalkan salah satu → tidak lagi muncul di arsip.
+    await voidPaymentForUser(admin, { paymentId: p1.id, reason: "salah" }, okStore);
+    const afterVoid = await listReceiptsForAdmin(admin);
+    expect(afterVoid.map((r) => r.receiptNumber)).not.toContain(p1.receiptNumber);
+    expect(afterVoid.map((r) => r.receiptNumber)).toContain(p2.receiptNumber);
   });
 });
 

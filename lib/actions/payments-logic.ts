@@ -58,6 +58,62 @@ export type PaymentSummary = {
   status: PaymentStatus;
 };
 
+export type ReceiptArchiveRow = {
+  id: string;
+  receiptNumber: string;
+  amount: number;
+  paidAt: string;
+  method: string;
+  projectTitle: string | null;
+  clientName: string | null;
+  receiptFileUrl: string | null;
+  isVoided: boolean;
+};
+
+/**
+ * Admin-only. Semua kwitansi (baris pembayaran yang TIDAK dibatalkan) lintas
+ * proyek, untuk tab "Kwitansi" di Arsip Dokumen. Sengaja dipisah dari tabel
+ * `documents` — lihat catatan di atas: kwitansi memuat nilai proyek, jadi tidak
+ * boleh masuk ke Arsip yang terlihat surveyor. Surveyor memanggil ini akan
+ * ditolak oleh `requireAdmin`.
+ */
+export async function listReceiptsForAdmin(user: SessionUser): Promise<ReceiptArchiveRow[]> {
+  requireAdmin(user);
+
+  const rows = await db
+    .select({
+      id: payments.id,
+      receiptNumber: payments.receiptNumber,
+      amount: payments.amount,
+      paidAt: payments.paidAt,
+      method: payments.method,
+      projectTitle: projects.title,
+      clientName: clients.name,
+      receiptFileUrl: payments.receiptFileUrl,
+      voidedAt: payments.voidedAt,
+    })
+    .from(payments)
+    .innerJoin(projects, eq(payments.projectId, projects.id))
+    .leftJoin(clients, eq(projects.clientId, clients.id))
+    .where(isNull(payments.voidedAt))
+    .orderBy(desc(payments.paidAt));
+
+  // `receiptFileUrl` mentah yang diserahkan ke pemanggil; presigned URL-nya
+  // dibuat di lapisan halaman (sama seperti `documents-logic`) supaya layer
+  // logika tidak bergantung pada driver storage yang aktif.
+  return rows.map((r) => ({
+    id: r.id,
+    receiptNumber: r.receiptNumber,
+    amount: r.amount,
+    paidAt: r.paidAt,
+    method: r.method,
+    projectTitle: r.projectTitle,
+    clientName: r.clientName,
+    receiptFileUrl: r.receiptFileUrl,
+    isVoided: r.voidedAt !== null,
+  }));
+}
+
 function requireAdmin(user: SessionUser) {
   if (user.role !== "admin") {
     throw new Error("Only the admin can manage payments.");

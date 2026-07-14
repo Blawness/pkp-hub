@@ -3,10 +3,13 @@ import { FileSearchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { DocumentsFilters } from "@/components/documents/documents-filters";
 import { DocumentsTable } from "@/components/documents/documents-table";
+import { ReceiptsArchive } from "@/components/payments/receipts-archive";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { listClients } from "@/lib/actions/clients-logic";
 import { searchDocumentsForUser } from "@/lib/actions/documents-logic";
 import { documentCategorySchema } from "@/lib/actions/documents-schemas";
+import { listReceiptsForAdmin } from "@/lib/actions/payments-logic";
 import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -19,6 +22,10 @@ export const metadata = { title: "Arsip Dokumen" };
  * server-side via `searchDocumentsForUser`, which is scoped through
  * `listProjectsForUser` — a surveyor only ever sees documents belonging to
  * projects assigned to them, never the whole table.
+ *
+ * Tab "Kwitansi" HANYA untuk admin: daftar semua kwitansi lintas proyek. Ini
+ * sengaja dipisah dari tabel `documents` (dan dari surveyor) karena kwitansi
+ * memuat nilai proyek — lihat `listReceiptsForAdmin`.
  */
 export default async function DocumentsSearchPage({
   searchParams,
@@ -33,6 +40,7 @@ export default async function DocumentsSearchPage({
 }) {
   const filters = await searchParams;
   const user = await requireStaff();
+  const isAdmin = user.role === "admin";
 
   const parsedCategory = documentCategorySchema.safeParse(filters.category);
   const results = await searchDocumentsForUser(user, {
@@ -74,6 +82,17 @@ export default async function DocumentsSearchPage({
     })),
   );
 
+  // `listReceiptsForAdmin` mengembalikan `receiptFileUrl` mentah; presigned
+  // URL dibuat di sini (sama seperti baris dokumen) agar layer logika tetap
+  // bebas dari driver storage. Lihat catatan di `downloadUrlFor`.
+  const receiptSource = isAdmin ? await listReceiptsForAdmin(user) : [];
+  const receiptRows = await Promise.all(
+    receiptSource.map(async (r) => ({
+      ...r,
+      downloadUrl: r.receiptFileUrl ? await downloadUrlFor(r.receiptFileUrl) : null,
+    })),
+  );
+
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">
       <PageHeader
@@ -85,20 +104,35 @@ export default async function DocumentsSearchPage({
         }
       />
 
-      <DocumentsFilters clients={clientRows} />
+      <Tabs defaultValue="dokumen">
+        <TabsList>
+          <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
+          {isAdmin ? <TabsTrigger value="kwitansi">Kwitansi</TabsTrigger> : null}
+        </TabsList>
 
-      <DocumentsTable
-        rows={rows}
-        isAdmin={user.role === "admin"}
-        showProject
-        emptyMessage={
-          <EmptyState
-            icon={FileSearchIcon}
-            title="Tidak ada dokumen yang cocok"
-            description="Coba kata kunci, kategori, atau rentang tanggal lain."
+        <TabsContent value="dokumen" className="flex flex-col gap-4 pt-4">
+          <DocumentsFilters clients={clientRows} />
+
+          <DocumentsTable
+            rows={rows}
+            isAdmin={isAdmin}
+            showProject
+            emptyMessage={
+              <EmptyState
+                icon={FileSearchIcon}
+                title="Tidak ada dokumen yang cocok"
+                description="Coba kata kunci, kategori, atau rentang tanggal lain."
+              />
+            }
           />
-        }
-      />
+        </TabsContent>
+
+        {isAdmin ? (
+          <TabsContent value="kwitansi" className="pt-4">
+            <ReceiptsArchive rows={receiptRows} />
+          </TabsContent>
+        ) : null}
+      </Tabs>
     </main>
   );
 }
