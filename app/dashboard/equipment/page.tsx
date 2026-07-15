@@ -22,7 +22,7 @@ export const metadata = { title: "Inventaris Alat" };
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; condition?: string; status?: string }>;
+  searchParams: Promise<{ category?: string; status?: string }>;
 }) {
   const filters = await searchParams;
   const user = await requireStaff();
@@ -31,9 +31,17 @@ export default async function EquipmentPage({
   const items = await listEquipmentForUser(user);
   const filtered = items.filter((item) => {
     if (filters.category && item.category !== filters.category) return false;
-    if (filters.condition && item.condition !== filters.condition) return false;
-    if (filters.status === "dipakai" && !item.activeUsage) return false;
-    if (filters.status === "tersedia" && item.activeUsage) return false;
+    // Satu filter status, cermin dari kolom Status gabungan: "terpinjam" =
+    // ada sesi aktif; nilai kondisi (tersedia/perawatan/rusak/pensiun) hanya
+    // cocok untuk alat yang TIDAK sedang dipinjam — sama seperti tampilannya.
+    if (filters.status) {
+      if (filters.status === "terpinjam") {
+        if (!item.activeUsage) return false;
+      } else {
+        if (item.activeUsage) return false;
+        if (item.condition !== filters.status) return false;
+      }
+    }
     return true;
   });
 
@@ -49,7 +57,7 @@ export default async function EquipmentPage({
       : null,
   }));
 
-  const hasActiveFilter = Boolean(filters.category || filters.condition || filters.status);
+  const hasActiveFilter = Boolean(filters.category || filters.status);
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">

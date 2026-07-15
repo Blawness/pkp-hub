@@ -50,10 +50,12 @@ test.describe("Inventaris alat (Phase 14)", () => {
     await expect(page.getByRole("cell", { name: equipmentName })).toBeVisible();
     await expect(page.getByText("Sedang dipakai")).toBeVisible();
 
-    // 3. Assert alat berstatus "Dipakai" di daftar inventaris, beserta nama pemegang.
+    // 3. Assert alat berstatus "Terpinjam" di daftar inventaris, beserta nama pemegang.
+    // Kolom status di daftar adalah gabungan: sesi pinjam aktif menimpa kondisi
+    // fisik, jadi alat yang sedang dipakai tampil "Terpinjam".
     await page.goto("/dashboard/equipment");
     const equipmentRow = page.getByRole("row").filter({ hasText: equipmentName });
-    await expect(equipmentRow.getByText(/Dipakai/)).toBeVisible();
+    await expect(equipmentRow.getByText(/Terpinjam/)).toBeVisible();
 
     // 4. Kembalikan, dari halaman detail alat.
     await equipmentRow.getByRole("link", { name: equipmentName }).click();

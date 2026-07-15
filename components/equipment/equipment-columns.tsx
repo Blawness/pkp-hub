@@ -58,26 +58,29 @@ export function buildEquipmentColumns({
       cell: ({ row }) => row.original.serialNumber ?? "—",
     },
     {
-      accessorKey: "condition",
-      header: "Kondisi",
-      cell: ({ row }) => (
-        <Badge variant={conditionVariant[row.original.condition] ?? "secondary"}>
-          {equipmentConditionLabel[row.original.condition] ?? row.original.condition}
-        </Badge>
-      ),
-    },
-    {
       id: "status",
-      header: "Status pakai",
-      cell: ({ row }) =>
-        row.original.activeUsage ? (
-          <span className="text-sm">
-            Dipakai · {row.original.activeUsage.usedByName} ({row.original.activeUsage.projectTitle}
-            )
-          </span>
-        ) : (
-          <span className="text-sm text-muted-foreground">Tersedia</span>
-        ),
+      header: "Status",
+      // Satu status gabungan: sesi pinjam aktif MENIMPA kondisi fisik — alat yang
+      // sedang dipakai tampil "Terpinjam", bukan "Tersedia". Saat bebas, jatuh
+      // kembali ke kondisi fisik (Tersedia/Perawatan/Rusak/Pensiun).
+      cell: ({ row }) => {
+        const usage = row.original.activeUsage;
+        if (usage) {
+          return (
+            <div className="flex flex-col gap-0.5">
+              <Badge>Terpinjam</Badge>
+              <span className="text-xs text-muted-foreground">
+                {usage.usedByName} · {usage.projectTitle}
+              </span>
+            </div>
+          );
+        }
+        return (
+          <Badge variant={conditionVariant[row.original.condition] ?? "secondary"}>
+            {equipmentConditionLabel[row.original.condition] ?? row.original.condition}
+          </Badge>
+        );
+      },
     },
   ];
 

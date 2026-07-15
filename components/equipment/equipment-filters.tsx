@@ -28,14 +28,13 @@ export function EquipmentFilters() {
     value: "",
     label: "Semua kategori",
   });
-  const conditionOptions = optionsFromLabels(equipmentConditionLabel, {
-    value: "",
-    label: "Semua kondisi",
-  });
+  // Satu filter status, cermin dari kolom Status gabungan: "Terpinjam" (ada
+  // sesi aktif) menimpa kondisi fisik; sisanya adalah kondisi fisik alat yang
+  // sedang bebas.
   const statusOptions = [
     { value: "", label: "Semua status" },
-    { value: "tersedia", label: "Tersedia" },
-    { value: "dipakai", label: "Dipakai" },
+    { value: "terpinjam", label: "Terpinjam" },
+    ...optionsFromLabels(equipmentConditionLabel),
   ];
 
   return (
@@ -47,13 +46,7 @@ export function EquipmentFilters() {
         onValueChange={(value) => setParam("category", value)}
       />
       <SelectField
-        aria-label="Filter kondisi"
-        options={conditionOptions}
-        value={searchParams.get("condition") ?? ""}
-        onValueChange={(value) => setParam("condition", value)}
-      />
-      <SelectField
-        aria-label="Filter status pakai"
+        aria-label="Filter status"
         options={statusOptions}
         value={searchParams.get("status") ?? ""}
         onValueChange={(value) => setParam("status", value)}
