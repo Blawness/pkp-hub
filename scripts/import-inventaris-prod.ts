@@ -2,8 +2,9 @@
  * Import sekali-pakai: inventaris alat lahan PKP → tabel `equipment`.
  *
  * Sumber data mentah ("berantakan") sudah dirapikan manual ke `ITEMS` di bawah:
- *  - Dua bundel "SET" (drone & GNSS) tetap 1 baris SET — dipinjam sepaket,
- *    bukan per-aksesori; isinya dirinci di `notes`.
+ *  - SET DRONE tetap 1 baris (dipinjam sepaket; isi dirinci di `notes`).
+ *  - SET GEOMATE SG7 GNSS dipecah jadi 4 unit box (2 kecil + 2 besar), tiap
+ *    box 1 baris dengan `serialNumber` sendiri (no. seri sementara/acak).
  *  - Prinsip "1 baris = 1 jenis": qty asli TIDAK di-expand jadi N baris, tapi
  *    dicatat di `notes` ("Jumlah: 3 (TIGA)").
  *  - `kondisi: "BAIK"` → `condition: "tersedia"`.
@@ -34,6 +35,7 @@ type Row = {
   category: Category;
   purchaseDate: string; // YYYY-01-01
   notes: string;
+  serialNumber?: string;
 };
 
 const SET_DRONE = "SET DRONE DJI MATRICE 4E";
@@ -57,17 +59,16 @@ const ITEMS: Row[] = [
       "SD CARD SANDISK (3). Dipinjam sepaket.",
   },
 
-  // --- Item 2: SET GEOMATE SG7 GNSS (1 baris SET, dipinjam sepaket) ---
-  {
-    name: SET_GNSS,
-    category: "gps_rtk",
+  // --- Item 2: SET GEOMATE SG7 GNSS — dipecah jadi 4 unit box (2 kecil, 2 besar) ---
+  // Tiap box = 1 unit fisik dengan no. seri sendiri. No. seri SEMENTARA (acak).
+  ...["BOX KECIL 1", "BOX KECIL 2", "BOX BESAR 1", "BOX BESAR 2"].map((box, i) => ({
+    name: `${SET_GNSS} - ${box}`,
+    category: "gps_rtk" as const,
     purchaseDate: "2025-01-01",
+    serialNumber: ["SG7-K-3KA91F", "SG7-K-7QD24B", "SG7-B-1MZ58C", "SG7-B-9XP63E"][i],
     notes:
-      "Isi 1 set: RECEIVER GEOMATE SG7 GNSS (2), TRIBRACH ADAPTOR (2), EXTENSION POLE (2), " +
-      "ADAPTOR TRIBRACH (2), H.I TAPE ROLL METER (3), SET ADAPTOR CABLE A-TO-C + STEKER (2), " +
-      "RTK HEIGHT MEASURING PLATE (4), CABLE CHARGER CONTROLLER (4), BRACKET/POLE CLAMP (2), " +
-      "GEOMATE FC2 HANDHELD CONTROLLER (2), ANTENA UHF KQT450GT (2). Dipinjam sepaket.",
-  },
+      "Unit box dari SET GEOMATE SG7 GNSS. No. seri sementara (acak) — perbarui dengan yang asli.",
+  })),
 
   // --- Item 3-14: top-level ---
   { name: "MEJA LIPAT", category: "lainnya", purchaseDate: "2025-01-01", notes: note("2 (DUA)") },
@@ -149,6 +150,7 @@ async function main() {
     name: i.name,
     category: i.category,
     condition: "tersedia" as const,
+    serialNumber: i.serialNumber ?? null,
     purchaseDate: i.purchaseDate,
     notes: i.notes,
   }));
