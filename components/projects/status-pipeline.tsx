@@ -60,7 +60,7 @@ export function StatusPipeline({
   const [confirm, setConfirm] = useState<{ toStatus: ProjectStatus; label: string } | null>(null);
 
   const isCancelled = currentStatus === "dibatalkan";
-  const currentIdx = PIPELINE.indexOf(currentStatus);
+  const currentIdx = PIPELINE.indexOf(currentStatus as (typeof PIPELINE)[number]);
 
   const forwardStatus =
     currentIdx !== -1 && currentIdx + 1 < PIPELINE.length ? PIPELINE[currentIdx + 1] : null;
@@ -133,16 +133,18 @@ export function StatusPipeline({
 
         {hasMenu ? (
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                aria-label="Aksi status lain"
-                disabled={isExecuting}
-              >
-                <MoreHorizontalIcon className="size-4" />
-              </Button>
-            </DropdownMenuTrigger>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  aria-label="Aksi status lain"
+                  disabled={isExecuting}
+                >
+                  <MoreHorizontalIcon className="size-4" />
+                </Button>
+              }
+            />
             <DropdownMenuContent align="start">
               {backwardStatus ? (
                 <DropdownMenuItem onSelect={() => run(backwardStatus)}>

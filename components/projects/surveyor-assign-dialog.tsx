@@ -23,12 +23,14 @@ export function SurveyorAssignDialog({
 }) {
   return (
     <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs">
-          <PencilIcon className="size-3" />
-          Ubah
-        </Button>
-      </DialogTrigger>
+      <DialogTrigger
+        render={
+          <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs">
+            <PencilIcon className="size-3" />
+            Ubah
+          </Button>
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Assign surveyor</DialogTitle>
