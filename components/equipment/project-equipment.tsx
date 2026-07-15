@@ -99,7 +99,13 @@ export function ProjectEquipment({
                     <TableCell>{row.duration}</TableCell>
                     <TableCell>{row.note ?? "—"}</TableCell>
                     <TableCell>
-                      {row.canReturn ? <ReturnButton usageId={row.id} /> : null}
+                      {row.canReturn ? (
+                        <ReturnButton
+                          usageId={row.id}
+                          equipmentName={row.equipmentName}
+                          durationLabel={row.duration}
+                        />
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

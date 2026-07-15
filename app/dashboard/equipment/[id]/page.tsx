@@ -163,7 +163,7 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
           <CardTitle>Riwayat pakai</CardTitle>
         </CardHeader>
         <CardContent>
-          <UsageHistory rows={usageRows} />
+          <UsageHistory rows={usageRows} equipmentName={item.name} />
         </CardContent>
       </Card>
     </main>

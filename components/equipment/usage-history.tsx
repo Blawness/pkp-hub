@@ -28,7 +28,13 @@ export type UsageHistoryRow = {
  * `listUsageForEquipment`). Server Component murni — durasinya sudah dihitung
  * di server sebelum sampai ke sini (lihat `UsageHistoryRow.duration`).
  */
-export function UsageHistory({ rows }: { rows: UsageHistoryRow[] }) {
+export function UsageHistory({
+  rows,
+  equipmentName,
+}: {
+  rows: UsageHistoryRow[];
+  equipmentName?: string;
+}) {
   if (rows.length === 0) {
     return <p className="text-sm text-muted-foreground">Belum ada riwayat pakai.</p>;
   }
@@ -63,7 +69,15 @@ export function UsageHistory({ rows }: { rows: UsageHistoryRow[] }) {
                 </TableCell>
                 <TableCell>{row.duration}</TableCell>
                 <TableCell>{row.note ?? "—"}</TableCell>
-                <TableCell>{row.canReturn ? <ReturnButton usageId={row.id} /> : null}</TableCell>
+                <TableCell>
+                  {row.canReturn ? (
+                    <ReturnButton
+                      usageId={row.id}
+                      equipmentName={equipmentName}
+                      durationLabel={row.duration}
+                    />
+                  ) : null}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
