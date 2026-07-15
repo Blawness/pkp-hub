@@ -15,21 +15,22 @@ import { DataTable } from "@/components/ui/data-table";
 export function EquipmentTable({
   rows,
   isAdmin,
-  toolbar,
+  projectOptions,
+  surveyors,
   emptyMessage = "Belum ada alat.",
 }: {
   rows: EquipmentTableRow[];
   isAdmin: boolean;
-  toolbar?: ReactNode;
+  projectOptions: { id: string; title: string }[];
+  surveyors: { id: string; name: string }[];
   emptyMessage?: ReactNode;
 }) {
   return (
     <DataTable
-      columns={buildEquipmentColumns({ isAdmin })}
+      columns={buildEquipmentColumns({ isAdmin, projectOptions, surveyors })}
       data={rows}
       searchable
       searchPlaceholder="Cari alat…"
-      toolbar={toolbar}
       emptyMessage={emptyMessage}
     />
   );

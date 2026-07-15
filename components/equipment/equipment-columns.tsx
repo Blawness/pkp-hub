@@ -3,7 +3,10 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { ImageIcon } from "lucide-react";
 import Link from "next/link";
+import { BorrowDialog } from "@/components/equipment/borrow-dialog";
+import { ReturnButton } from "@/components/equipment/return-button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatIDR } from "@/lib/format";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
 
@@ -17,7 +20,14 @@ export type EquipmentTableRow = {
   image: string | null;
   /** `undefined` untuk surveyor — kolomnya sendiri disembunyikan lewat `isAdmin`, tapi ini menjaga bentuknya juga tidak terpasang. */
   purchasePrice?: number | null;
-  activeUsage: { usedByName: string; projectTitle: string } | null;
+  activeUsage: {
+    usedByName: string;
+    projectTitle: string;
+    usageId: string;
+    canReturn: boolean;
+    durationLabel: string;
+  } | null;
+  canBorrow: boolean;
 };
 
 const conditionVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -34,8 +44,12 @@ const conditionVariant: Record<string, "default" | "secondary" | "destructive" |
  */
 export function buildEquipmentColumns({
   isAdmin,
+  projectOptions,
+  surveyors,
 }: {
   isAdmin: boolean;
+  projectOptions: { id: string; title: string }[];
+  surveyors: { id: string; name: string }[];
 }): ColumnDef<EquipmentTableRow, unknown>[] {
   const columns: ColumnDef<EquipmentTableRow, unknown>[] = [
     {
@@ -108,6 +122,40 @@ export function buildEquipmentColumns({
       cell: ({ row }) => formatIDR(row.original.purchasePrice),
     });
   }
+
+  columns.push({
+    id: "actions",
+    header: "Aksi",
+    cell: ({ row }) => {
+      const item = row.original;
+      if (item.activeUsage) {
+        if (!item.activeUsage.canReturn) return <span className="text-muted-foreground">—</span>;
+        return (
+          <ReturnButton
+            usageId={item.activeUsage.usageId}
+            equipmentName={item.name}
+            durationLabel={item.activeUsage.durationLabel}
+          />
+        );
+      }
+      if (item.canBorrow) {
+        return (
+          <BorrowDialog
+            fixedEquipment={{ id: item.id, name: item.name }}
+            projectOptions={projectOptions}
+            isAdmin={isAdmin}
+            surveyors={surveyors}
+            trigger={
+              <Button size="sm" variant="outline">
+                Pinjam
+              </Button>
+            }
+          />
+        );
+      }
+      return <span className="text-muted-foreground">—</span>;
+    },
+  });
 
   return columns;
 }

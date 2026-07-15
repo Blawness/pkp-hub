@@ -1,3 +1,4 @@
+import { and, eq, isNull } from "drizzle-orm";
 import { WrenchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { EquipmentFilters } from "@/components/equipment/equipment-filters";
@@ -6,7 +7,10 @@ import { EquipmentTable } from "@/components/equipment/equipment-table";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentForUser } from "@/lib/actions/equipment-logic";
-import { requireStaff } from "@/lib/auth-guards";
+import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { downloadUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Inventaris Alat" };
@@ -31,6 +35,16 @@ export default async function EquipmentPage({
   const isAdmin = user.role === "admin";
 
   const items = await listEquipmentForUser(user);
+
+  const userProjects = await listProjectsForUser(user);
+  const projectOptions = userProjects.map((p) => ({ id: p.id, title: p.title }));
+
+  const surveyors = isAdmin
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.role, "surveyor"), isNull(users.archivedAt)))
+    : [];
 
   const summary = {
     total: items.length,
@@ -58,6 +72,7 @@ export default async function EquipmentPage({
 
   // URL R2 mentah tidak bisa dibuka tanpa tanda tangan — resolve dulu per baris.
   // Driver lokal mengembalikan URL yang sama (`/api/storage/...`).
+  const now = new Date();
   const rows = await Promise.all(
     filtered.map(async (item) => ({
       id: item.id,
@@ -68,8 +83,19 @@ export default async function EquipmentPage({
       image: item.image ? await downloadUrlFor(item.image) : null,
       purchasePrice: "purchasePrice" in item ? item.purchasePrice : undefined,
       activeUsage: item.activeUsage
-        ? { usedByName: item.activeUsage.usedByName, projectTitle: item.activeUsage.projectTitle }
+        ? {
+            usedByName: item.activeUsage.usedByName,
+            projectTitle: item.activeUsage.projectTitle,
+            usageId: item.activeUsage.usageId,
+            // Surveyor hanya boleh menutup sesi miliknya sendiri (cermin server).
+            canReturn: isAdmin || item.activeUsage.usedById === user.id,
+            durationLabel: formatDuration(
+              usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
+            ),
+          }
         : null,
+      // Bisa dipinjam: tersedia & tidak sedang dipakai (arsip sudah tersaring di query list).
+      canBorrow: item.condition === "tersedia" && !item.activeUsage,
     })),
   );
 
@@ -103,6 +129,8 @@ export default async function EquipmentPage({
       <EquipmentTable
         rows={rows}
         isAdmin={isAdmin}
+        projectOptions={projectOptions}
+        surveyors={surveyors}
         emptyMessage={
           <EmptyState
             icon={WrenchIcon}
