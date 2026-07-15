@@ -2,12 +2,16 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { ImageIcon } from "lucide-react";
 import { ArchiveEquipmentButton } from "@/components/equipment/archive-equipment-button";
 import { BorrowDialog } from "@/components/equipment/borrow-dialog";
+import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
 import { ReturnButton } from "@/components/equipment/return-button";
 import { UsageHistory, type UsageHistoryRow } from "@/components/equipment/usage-history";
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getEquipmentForUser, listUsageForEquipment } from "@/lib/actions/equipment-logic";
+import type {
+  EquipmentCategoryInput,
+  EquipmentConditionInput,
+} from "@/lib/actions/equipment-schemas";
 import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
@@ -106,9 +110,20 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
           </Badge>
           {isAdmin && !item.archivedAt ? (
             <>
-              <ButtonLink variant="outline" href={`/dashboard/equipment/${item.id}/edit`}>
-                Edit
-              </ButtonLink>
+              <EquipmentFormDialog
+                editing={{
+                  equipmentId: item.id,
+                  name: item.name,
+                  category: item.category as EquipmentCategoryInput,
+                  serialNumber: item.serialNumber,
+                  condition: item.condition as EquipmentConditionInput,
+                  image: item.image,
+                  imageDisplayUrl,
+                  purchaseDate: "purchaseDate" in item ? item.purchaseDate : null,
+                  purchasePrice: "purchasePrice" in item ? item.purchasePrice : null,
+                  notes: item.notes,
+                }}
+              />
               <ArchiveEquipmentButton equipmentId={item.id} equipmentName={item.name} />
             </>
           ) : null}

@@ -18,19 +18,21 @@ test.describe("Inventaris alat (Phase 14)", () => {
   test.use({ storageState: "e2e/.auth/admin.json" });
 
   test("tambah alat, pinjam di proyek, kembalikan, durasi tampil", async ({ page }) => {
-    // 1. Tambah alat baru lewat halaman inventaris.
+    // 1. Tambah alat baru lewat DIALOG di halaman inventaris (tidak lagi
+    //    halaman `/new`). Field diisi di dalam dialog; setelah simpan dialog
+    //    tertutup dan alat muncul di daftar (tanpa pindah halaman).
     await page.goto("/dashboard/equipment");
-    await page.getByRole("link", { name: "Tambah alat" }).click();
-
-    await page.locator("#name").fill(equipmentName);
-    await page.locator("#serialNumber").fill(`SN-${suffix}`);
     await page.getByRole("button", { name: "Tambah alat" }).click();
 
-    // Redirect ke halaman detail alat yang baru dibuat.
-    await expect(page.getByRole("heading", { name: equipmentName })).toBeVisible();
-    await expect(page.getByText("Tersedia — tidak sedang dipakai.")).toBeVisible();
+    const addDialog = page.getByRole("dialog", { name: "Alat baru" });
+    await addDialog.locator("#name").fill(equipmentName);
+    await addDialog.locator("#serialNumber").fill(`SN-${suffix}`);
+    await addDialog.getByRole("button", { name: "Tambah alat" }).click();
 
-    // 2. Buka proyek, tab Alat, pinjam alat yang baru dibuat.
+    await expect(page.getByRole("link", { name: equipmentName })).toBeVisible();
+
+    // 2. Buka proyek, tab Alat, pinjam alat yang baru dibuat. Pemilih alat
+    //    adalah Combobox (dialog cari-sendiri), bukan <select> native.
     await page.goto("/dashboard/projects");
     await page
       .getByRole("link", { name: /Pengukuran batas tanah Cimahi/ })
@@ -40,8 +42,10 @@ test.describe("Inventaris alat (Phase 14)", () => {
     await page.getByRole("tab", { name: "Alat" }).click();
     await page.getByRole("button", { name: "Pinjam alat" }).click();
 
-    await page.getByRole("combobox", { name: "Alat" }).click();
-    await page.getByRole("option", { name: equipmentName }).click();
+    await page.getByRole("button", { name: "Pilih alat…" }).click();
+    const alatPicker = page.getByRole("dialog", { name: "Pilih alat" });
+    await alatPicker.getByPlaceholder("Cari alat…").fill(equipmentName);
+    await alatPicker.getByRole("button", { name: equipmentName }).click();
     await page.getByRole("button", { name: "Pinjam", exact: true }).click();
 
     // Dialog tertutup, baris muncul di tabel riwayat tab Alat dengan nama
@@ -57,10 +61,14 @@ test.describe("Inventaris alat (Phase 14)", () => {
     const equipmentRow = page.getByRole("row").filter({ hasText: equipmentName });
     await expect(equipmentRow.getByText(/Terpinjam/)).toBeVisible();
 
-    // 4. Kembalikan, dari halaman detail alat.
+    // 4. Kembalikan, dari halaman detail alat. Tombol "Kembalikan" kini
+    //    membuka dialog konfirmasi lebih dulu (ada di kartu Status pakai DAN
+    //    di baris riwayat aktif — ambil yang pertama), lalu dikonfirmasi.
     await equipmentRow.getByRole("link", { name: equipmentName }).click();
     await expect(page.getByText(/Sedang dipakai oleh/)).toBeVisible();
-    await page.getByRole("button", { name: "Kembalikan" }).click();
+    await page.getByRole("button", { name: "Kembalikan" }).first().click();
+    const returnConfirm = page.getByRole("dialog", { name: "Kembalikan alat?" });
+    await returnConfirm.getByRole("button", { name: "Kembalikan" }).click();
 
     // 5. Assert durasi muncul di riwayat, dan alat sudah tidak lagi "Dipakai".
     // Kolom tabel riwayat di halaman detail alat adalah Proyek/Dipakai
