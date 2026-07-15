@@ -85,7 +85,8 @@ export function StatusPipeline({
     return true;
   }
 
-  const noActions = !canForward && !hasMenu;
+  const isDone = currentStatus === "selesai";
+  const noActions = !canForward && !hasMenu && !isDone;
 
   return (
     <div className="flex flex-col gap-3">
@@ -131,6 +132,12 @@ export function StatusPipeline({
           </Button>
         ) : null}
 
+        {isDone ? (
+          <span className="inline-flex items-center gap-1 text-sm font-medium text-foreground">
+            <CheckIcon className="size-4" /> Selesai
+          </span>
+        ) : null}
+
         {hasMenu ? (
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -172,9 +179,7 @@ export function StatusPipeline({
 
         {noActions ? (
           <p className="text-sm text-muted-foreground">
-            {currentStatus === "selesai"
-              ? "Proyek selesai."
-              : "Tidak ada transisi status yang tersedia untuk peran Anda saat ini."}
+            Tidak ada transisi status yang tersedia untuk peran Anda saat ini.
           </p>
         ) : null}
 

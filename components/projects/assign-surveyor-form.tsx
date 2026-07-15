@@ -12,10 +12,12 @@ export function AssignSurveyorForm({
   projectId,
   currentSurveyorId,
   surveyors,
+  onSuccess,
 }: {
   projectId: string;
   currentSurveyorId: string | null;
   surveyors: { id: string; name: string }[];
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [surveyorId, setSurveyorId] = useState(currentSurveyorId ?? "");
@@ -48,6 +50,7 @@ export function AssignSurveyorForm({
               return;
             }
             router.refresh();
+            onSuccess?.();
           }}
         >
           {isExecuting ? "Menyimpan..." : "Tugaskan"}

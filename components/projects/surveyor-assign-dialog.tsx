@@ -1,6 +1,7 @@
 "use client";
 
 import { PencilIcon } from "lucide-react";
+import { useState } from "react";
 import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +22,9 @@ export function SurveyorAssignDialog({
   currentSurveyorId: string | null;
   surveyors: { id: string; name: string }[];
 }) {
+  const [open, setOpen] = useState(false);
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         render={
           <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs">
@@ -39,6 +41,7 @@ export function SurveyorAssignDialog({
           projectId={projectId}
           currentSurveyorId={currentSurveyorId}
           surveyors={surveyors}
+          onSuccess={() => setOpen(false)}
         />
       </DialogContent>
     </Dialog>
