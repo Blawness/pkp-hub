@@ -20,6 +20,10 @@ export const metadata: Metadata = {
   description: "Dashboard manajemen survey & pengukuran — Presisi Konsulindo Prima",
   // Internal tool only — never index in search engines.
   robots: { index: false, follow: false },
+  icons: {
+    icon: [{ url: "/favicon.ico" }, { url: "/favicon.webp", type: "image/webp" }],
+    apple: "/favicon.webp",
+  },
 };
 
 export default function RootLayout({

@@ -71,7 +71,7 @@ export function DashboardSidebar({
         {collapsed ? null : (
           <>
             <Image
-              src="/logo.png"
+              src="/logo-pkp.webp"
               alt=""
               aria-hidden
               width={32}

@@ -75,7 +75,7 @@ export function BrandPanel() {
         <Reveal>
           <div className="flex items-center gap-3">
             <Image
-              src="/logo.png"
+              src="/logo-pkp.webp"
               alt=""
               aria-hidden
               width={40}
