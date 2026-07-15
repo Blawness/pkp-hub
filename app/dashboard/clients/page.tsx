@@ -1,7 +1,8 @@
 import { UsersIcon } from "lucide-react";
+import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { clientsColumns } from "@/components/clients/clients-columns";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
@@ -22,7 +23,7 @@ export default async function ClientsPage({
       <PageHeader
         title="Klien"
         description="Kelola data klien perorangan dan perusahaan."
-        action={<ButtonLink href="/dashboard/clients/new">Klien baru</ButtonLink>}
+        action={<ClientFormDialog />}
       />
 
       <div className="flex items-center gap-2">
@@ -53,11 +54,7 @@ export default async function ClientsPage({
             icon={UsersIcon}
             title={showArchived ? "Belum ada klien" : "Belum ada klien aktif"}
             description="Tambahkan klien pertama untuk mulai mengelola proyek survey."
-            action={
-              <ButtonLink size="sm" href="/dashboard/clients/new">
-                Klien baru
-              </ButtonLink>
-            }
+            action={<ClientFormDialog trigger={<Button size="sm">Klien baru</Button>} />}
           />
         }
       />

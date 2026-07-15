@@ -2,6 +2,7 @@ import { FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
+import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { InviteClientButton } from "@/components/clients/invite-client-button";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
@@ -52,9 +53,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             hasUser={Boolean(client.userId)}
             archived={Boolean(client.archivedAt)}
           />
-          <ButtonLink variant="outline" href={`/dashboard/clients/${client.id}/edit`}>
-            Edit
-          </ButtonLink>
+          <ClientFormDialog
+            client={{
+              id: client.id,
+              name: client.name,
+              type: client.type,
+              phone: client.phone,
+              email: client.email,
+              address: client.address,
+              notes: client.notes,
+            }}
+          />
           {!client.archivedAt ? <ArchiveClientButton clientId={client.id} /> : null}
         </div>
       </div>
