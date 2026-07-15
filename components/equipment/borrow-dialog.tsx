@@ -2,9 +2,10 @@
 
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
-import { useState } from "react";
+import { type ReactElement, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import {
   Dialog,
   DialogContent,
@@ -16,12 +17,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SelectField, type SelectOption } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { borrowEquipment } from "@/lib/actions/equipment";
 
 type FormValues = {
   equipmentId: string;
+  projectId: string;
   startedAt: string;
   usedById: string;
   note: string;
@@ -35,23 +36,28 @@ function nowLocalDatetime(): string {
 }
 
 /**
- * Dialog pinjam alat, dipasang di tab "Alat" detail proyek.
+ * Dialog pinjam alat, dua mode:
+ * - `fixedProject` diisi (dari detail proyek) → user memilih ALAT.
+ * - `fixedEquipment` diisi (dari daftar/detail alat) → user memilih PROYEK.
  *
- * ATURAN KERAS: pilihan "dipakai oleh" HANYA dirender untuk admin
- * (`isAdmin`). Surveyor tidak punya field itu di form ini sama sekali — dan
- * itu bukan penegakan, `borrowEquipmentForUser` di server MEMAKSA
- * `usedById` jadi id surveyor sendiri terlepas dari apa pun yang dikirim.
- * Form yang tidak merendernya cuma mencegah kebingungan UI, bukan lubang
- * keamanan yang butuh ditambal di sini.
+ * ATURAN KERAS: pilihan "dipakai oleh" HANYA dirender untuk admin. Surveyor
+ * tidak punya field itu — dan itu bukan penegakan; `borrowEquipmentForUser`
+ * di server MEMAKSA `usedById` jadi id surveyor sendiri.
  */
 export function BorrowDialog({
-  projectId,
-  borrowable,
+  trigger,
+  fixedProject,
+  fixedEquipment,
+  projectOptions,
+  equipmentOptions,
   isAdmin,
   surveyors,
 }: {
-  projectId: string;
-  borrowable: { id: string; name: string }[];
+  trigger?: ReactElement;
+  fixedProject?: { id: string };
+  fixedEquipment?: { id: string; name: string };
+  projectOptions?: { id: string; title: string }[];
+  equipmentOptions?: { id: string; name: string }[];
   isAdmin: boolean;
   surveyors: { id: string; name: string }[];
 }) {
@@ -59,8 +65,16 @@ export function BorrowDialog({
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Sisi yang bisa dipilih kosong = tidak ada yang bisa dipinjam → matikan trigger default.
+  const noEquipmentToPick = !fixedEquipment && (equipmentOptions?.length ?? 0) === 0;
+  const noProjectToPick = !fixedProject && (projectOptions?.length ?? 0) === 0;
+  const disabled = noEquipmentToPick || noProjectToPick;
+
   const defaultValues: FormValues = {
-    equipmentId: borrowable[0]?.id ?? "",
+    // Alat: default ke opsi pertama (mempertahankan perilaku lama tab proyek).
+    equipmentId: fixedEquipment?.id ?? equipmentOptions?.[0]?.id ?? "",
+    // Proyek: WAJIB dipilih sadar — jangan default ke proyek acak.
+    projectId: fixedProject?.id ?? "",
     startedAt: nowLocalDatetime(),
     usedById: "",
     note: "",
@@ -69,18 +83,20 @@ export function BorrowDialog({
   const { control, register, handleSubmit, reset } = useForm<FormValues>({ defaultValues });
   const { executeAsync, isExecuting } = useAction(borrowEquipment);
 
-  const equipmentOptions: SelectOption[] = borrowable.map((e) => ({ value: e.id, label: e.name }));
-
   const onSubmit = async (values: FormValues) => {
     setFormError(null);
     if (!values.equipmentId) {
       setFormError("Pilih alat yang akan dipinjam.");
       return;
     }
+    if (!values.projectId) {
+      setFormError("Pilih proyek tujuan pemakaian.");
+      return;
+    }
 
     const result = await executeAsync({
       equipmentId: values.equipmentId,
-      projectId,
+      projectId: values.projectId,
       startedAt: new Date(values.startedAt),
       usedById: isAdmin && values.usedById ? values.usedById : undefined,
       note: values.note.trim() || undefined,
@@ -100,42 +116,67 @@ export function BorrowDialog({
     router.refresh();
   };
 
+  const defaultTrigger = (
+    <Button disabled={disabled} className="w-fit">
+      Pinjam alat
+    </Button>
+  );
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger
-        render={
-          <Button disabled={borrowable.length === 0} className="w-fit">
-            Pinjam alat
-          </Button>
-        }
-      />
+      <DialogTrigger render={trigger ?? defaultTrigger} />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pinjam alat</DialogTitle>
           <DialogDescription>
-            Sesi pakai menempel ke proyek ini. Hanya alat yang berstatus tersedia dan tidak sedang
-            dipakai yang muncul di daftar.
+            {fixedEquipment
+              ? `Catat sesi pakai untuk ${fixedEquipment.name}. Pilih proyek tujuannya.`
+              : "Sesi pakai menempel ke proyek ini. Hanya alat yang tersedia dan tidak sedang dipakai yang muncul."}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="borrow-equipment">Alat</Label>
-            <Controller
-              control={control}
-              name="equipmentId"
-              render={({ field }) => (
-                <SelectField
-                  id="borrow-equipment"
-                  className="w-full"
-                  options={equipmentOptions}
-                  value={field.value}
-                  onValueChange={field.onChange}
-                  onBlur={field.onBlur}
-                />
-              )}
-            />
-          </div>
+          {fixedEquipment ? null : (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="borrow-equipment">Alat</Label>
+              <Controller
+                control={control}
+                name="equipmentId"
+                render={({ field }) => (
+                  <Combobox
+                    id="borrow-equipment"
+                    title="Pilih alat"
+                    placeholder="Pilih alat…"
+                    searchPlaceholder="Cari alat…"
+                    options={(equipmentOptions ?? []).map((e) => ({ value: e.id, label: e.name }))}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+          )}
+
+          {fixedProject ? null : (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="borrow-project">Proyek</Label>
+              <Controller
+                control={control}
+                name="projectId"
+                render={({ field }) => (
+                  <Combobox
+                    id="borrow-project"
+                    title="Pilih proyek"
+                    placeholder="Pilih proyek…"
+                    searchPlaceholder="Cari proyek…"
+                    options={(projectOptions ?? []).map((p) => ({ value: p.id, label: p.title }))}
+                    value={field.value}
+                    onValueChange={field.onChange}
+                  />
+                )}
+              />
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="borrow-started">Waktu mulai</Label>
@@ -149,16 +190,17 @@ export function BorrowDialog({
                 control={control}
                 name="usedById"
                 render={({ field }) => (
-                  <SelectField
+                  <Combobox
                     id="borrow-used-by"
-                    className="w-full"
+                    title="Dipakai oleh"
+                    placeholder="Saya sendiri"
+                    searchPlaceholder="Cari surveyor…"
                     options={[
                       { value: "", label: "Saya sendiri" },
                       ...surveyors.map((s) => ({ value: s.id, label: s.name })),
                     ]}
                     value={field.value}
                     onValueChange={field.onChange}
-                    onBlur={field.onBlur}
                   />
                 )}
               />

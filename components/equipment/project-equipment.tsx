@@ -52,8 +52,8 @@ export function ProjectEquipment({
     <div className="flex flex-col gap-4">
       {canRecord ? (
         <BorrowDialog
-          projectId={projectId}
-          borrowable={borrowable}
+          fixedProject={{ id: projectId }}
+          equipmentOptions={borrowable}
           isAdmin={isAdmin}
           surveyors={surveyors}
         />
