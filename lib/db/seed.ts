@@ -6,8 +6,11 @@ import {
   accounts,
   clients,
   documents,
+  equipment,
+  equipmentUsage,
   mapLayers,
   payments,
+  projectPhases,
   projectStatusLogs,
   projects,
   sessions,
@@ -23,11 +26,16 @@ const SEED_PASSWORD = "password123";
  * stored in the `account` table it owns.
  */
 async function seed() {
-  // FK-safe teardown so the seed is re-runnable.
+  // FK-safe teardown so the seed is re-runnable. `equipmentUsage` sebelum
+  // `equipment` (FK), dan keduanya sebelum `projects`/`users` — sesi pakai
+  // menunjuk ke keduanya.
+  await db.delete(equipmentUsage);
+  await db.delete(equipment);
   await db.delete(payments);
   await db.delete(documents);
   await db.delete(mapLayers);
   await db.delete(projectStatusLogs);
+  await db.delete(projectPhases);
   await db.delete(projects);
   await db.delete(clients);
   await db.delete(sessions);
@@ -225,11 +233,125 @@ async function seed() {
     },
   ]);
 
+  // Timeline fase demo (spec 2026-07-14) — di proyek "topografi" (PT Cahaya
+  // Properti, TIDAK punya akun portal), sengaja BUKAN proyek "batas" milik
+  // andi@klien.test: `e2e/project-phases.spec.ts` menambah fasenya sendiri ke
+  // proyek "batas" lewat UI dan butuh proyek itu tanpa fase yang sudah ada.
+  // Satu fase `selesai`, satu `berjalan` dengan target SUDAH LEWAT (demo
+  // penanda "Telat"), satu `belum` dengan target di masa depan.
+  await db.insert(projectPhases).values([
+    {
+      projectId: topografi.id,
+      name: "Survei lapangan",
+      sortOrder: 0,
+      status: "selesai",
+      weight: 2,
+      assignedSurveyorId: surveyor2Id,
+      targetDate: "2026-05-01",
+      completedAt: new Date("2026-05-02T09:00:00Z"),
+    },
+    {
+      projectId: topografi.id,
+      name: "Pengolahan data & gambar",
+      sortOrder: 1,
+      status: "berjalan",
+      weight: 2,
+      assignedSurveyorId: surveyor2Id,
+      targetDate: "2026-06-15", // sudah lewat dari hari ini (2026-07-15) -> "Telat"
+      description: "Menunggu revisi poligon dari surveyor.",
+    },
+    {
+      projectId: topografi.id,
+      name: "Serah terima laporan",
+      sortOrder: 2,
+      status: "belum",
+      weight: 1,
+      targetDate: "2026-08-01",
+    },
+  ]);
+
+  // Inventaris alat (spec 2026-07-14). Satu `perawatan`, satu `rusak`, sisanya
+  // `tersedia` — semuanya dengan harga beli terisi supaya kolom admin-only
+  // langsung terlihat di demo.
+  const [totalStation1, totalStation2, gpsRtk, drone, waterpass] = await db
+    .insert(equipment)
+    .values([
+      {
+        name: "Total Station Topcon GM-52",
+        category: "total_station",
+        serialNumber: "TS-GM52-001",
+        condition: "tersedia",
+        purchaseDate: "2024-03-10",
+        purchasePrice: 85_000_000,
+      },
+      {
+        name: "Total Station Sokkia CX-105",
+        category: "total_station",
+        serialNumber: "TS-CX105-002",
+        condition: "perawatan",
+        notes: "Layar retak, dikirim servis ke pusat Sokkia.",
+        purchaseDate: "2022-11-05",
+        purchasePrice: 65_000_000,
+      },
+      {
+        name: "GPS RTK Trimble R12",
+        category: "gps_rtk",
+        serialNumber: "RTK-R12-001",
+        condition: "tersedia",
+        purchaseDate: "2025-01-20",
+        purchasePrice: 120_000_000,
+      },
+      {
+        name: "Drone DJI Phantom 4 RTK",
+        category: "drone",
+        serialNumber: "DRN-P4RTK-001",
+        condition: "rusak",
+        notes: "Baling-baling patah, menunggu spare part.",
+        purchaseDate: "2023-07-15",
+        purchasePrice: 95_000_000,
+      },
+      {
+        name: "Waterpass Sokkia B40A",
+        category: "waterpass",
+        serialNumber: "WP-B40A-001",
+        condition: "tersedia",
+        purchaseDate: "2021-09-01",
+        purchasePrice: 12_000_000,
+      },
+    ])
+    .returning();
+
+  // Dua sesi pakai demo: satu MASIH BERJALAN (supaya status "Dipakai" kelihatan
+  // langsung di demo tanpa perlu meminjam manual), satu sudah ditutup (supaya
+  // durasi tertutup juga kelihatan di riwayat).
+  await db.insert(equipmentUsage).values([
+    {
+      equipmentId: totalStation1.id,
+      projectId: topografi.id,
+      usedById: surveyor2Id,
+      startedAt: new Date("2026-07-15T02:00:00Z"),
+      endedAt: null,
+      note: "Pengukuran ulang poligon tahap 2.",
+      recordedById: surveyor2Id,
+    },
+    {
+      equipmentId: waterpass.id,
+      projectId: kavling.id,
+      usedById: surveyor1Id,
+      startedAt: new Date("2026-07-10T01:00:00Z"),
+      endedAt: new Date("2026-07-10T05:30:00Z"),
+      note: "Cek elevasi blok C.",
+      recordedById: surveyor1Id,
+    },
+  ]);
+
   console.log("seed OK:", {
     users: 4,
     clients: 3,
     projects: inserted.length,
     statusLogs: 11,
+    phases: 3,
+    equipment: [totalStation1, totalStation2, gpsRtk, drone, waterpass].length,
   });
   process.exit(0);
 }

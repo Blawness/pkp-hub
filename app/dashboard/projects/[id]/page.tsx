@@ -1,12 +1,17 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { FileIcon } from "lucide-react";
 import Link from "next/link";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
+import {
+  ProjectEquipment,
+  type ProjectEquipmentUsageRow,
+} from "@/components/equipment/project-equipment";
 import { PetaTab } from "@/components/map/peta-tab";
 import { PaymentsPanel } from "@/components/payments/payments-panel";
 import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
 import { PaymentForm } from "@/components/projects/payment-form";
+import { PhaseTimeline } from "@/components/projects/phase-timeline";
 import { StatusChanger } from "@/components/projects/status-changer";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Badge } from "@/components/ui/badge";
@@ -16,8 +21,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
+import { listEquipmentForUser, listUsageForProject } from "@/lib/actions/equipment-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
+import { getProjectProgress, listPhasesForProject } from "@/lib/actions/phases-logic";
 import {
   getAllowedNextStatuses,
   getProjectDetailForUser,
@@ -27,7 +34,9 @@ import {
 import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { todayString } from "@/lib/phases/derive";
 import { downloadUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -91,6 +100,55 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .select({ id: users.id, name: users.name })
     .from(users)
     .where(eq(users.role, "surveyor"));
+
+  const phases = await listPhasesForProject(user, project.id);
+  const progress = await getProjectProgress(user, project.id);
+  // Daftar surveyor untuk dropdown penanggung jawab fase — hanya admin yang
+  // butuh. Query inline, pola yang sama dengan `app/dashboard/projects/new/page.tsx:18`.
+  // BEDANYA: kita saring `archivedAt` — menugaskan fase ke surveyor yang sudah
+  // diarsipkan berarti menugaskannya ke orang yang tidak bisa login.
+  const phaseSurveyors = isAdmin
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.role, "surveyor"), isNull(users.archivedAt)))
+    : [];
+
+  // Tab "Alat": riwayat pakai alat di proyek ini + daftar alat yang bisa
+  // dipinjam. `listUsageForProject` sudah lewat `assertProjectAccess` (di
+  // dalam `equipment-logic.ts`), jadi surveyor cuma melihat riwayat proyeknya
+  // sendiri — konsisten dengan pola di seluruh halaman ini.
+  const projectEquipmentUsages = await listUsageForProject(user, project.id);
+  const allEquipment = await listEquipmentForUser(user);
+  const equipmentNameById = new Map(allEquipment.map((e) => [e.id, e.name]));
+
+  const equipmentUsageUserIds = [...new Set(projectEquipmentUsages.map((u) => u.usedById))];
+  const equipmentUsageUsers = equipmentUsageUserIds.length
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(inArray(users.id, equipmentUsageUserIds))
+    : [];
+  const equipmentUsageUserNameById = new Map(equipmentUsageUsers.map((u) => [u.id, u.name]));
+
+  const equipmentNow = new Date();
+  const equipmentUsageRows: ProjectEquipmentUsageRow[] = projectEquipmentUsages.map((usage) => ({
+    id: usage.id,
+    equipmentId: usage.equipmentId,
+    equipmentName: equipmentNameById.get(usage.equipmentId) ?? "—",
+    usedByName: equipmentUsageUserNameById.get(usage.usedById) ?? "—",
+    startedAt: usage.startedAt,
+    endedAt: usage.endedAt,
+    duration: formatDuration(usageDurationMs(usage, equipmentNow)),
+    note: usage.note,
+    canReturn: usage.endedAt === null && (isAdmin || usage.usedById === user.id),
+  }));
+
+  // Boleh dipinjam: tersedia, tidak terarsip, dan tidak sedang dipakai —
+  // dihitung di server dari `listEquipmentForUser`, sama seperti spec Task 6.
+  const borrowableEquipment = allEquipment
+    .filter((e) => e.condition === "tersedia" && !e.archivedAt && !e.activeUsage)
+    .map((e) => ({ id: e.id, name: e.name }));
 
   const uploaderIds = [...new Set(projectDocuments.map((d) => d.uploadedById))];
   const uploaderUsers = uploaderIds.length
@@ -158,8 +216,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       <Tabs defaultValue="overview">
         <TabsList className="max-w-full overflow-x-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="fase">Fase</TabsTrigger>
           <TabsTrigger value="peta">Peta</TabsTrigger>
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
+          <TabsTrigger value="alat">Alat</TabsTrigger>
           {"projectValue" in project ? <TabsTrigger value="keuangan">Keuangan</TabsTrigger> : null}
         </TabsList>
 
@@ -234,6 +294,18 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           </Card>
         </TabsContent>
 
+        <TabsContent value="fase" className="pt-4">
+          <PhaseTimeline
+            projectId={project.id}
+            phases={phases}
+            progress={progress}
+            today={todayString(new Date())}
+            canEditPlan={isAdmin}
+            canReportWork={user.role === "admin" || user.role === "surveyor"}
+            surveyors={phaseSurveyors}
+          />
+        </TabsContent>
+
         <TabsContent value="peta" className="pt-4">
           <PetaTab
             projectId={project.id}
@@ -260,6 +332,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                 description="Unggah laporan, berita acara, atau foto lapangan untuk proyek ini."
               />
             }
+          />
+        </TabsContent>
+
+        {/* Tab ini tidak pernah dirender untuk klien — halaman ini hanya
+            dashboard staf (klien ada di `/portal`), jadi tidak ada perubahan
+            apa pun di portal untuk fitur ini. */}
+        <TabsContent value="alat" className="pt-4">
+          <ProjectEquipment
+            projectId={project.id}
+            usages={equipmentUsageRows}
+            borrowable={borrowableEquipment}
+            canRecord={user.role !== "client"}
+            isAdmin={isAdmin}
+            surveyors={phaseSurveyors}
           />
         </TabsContent>
 

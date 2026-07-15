@@ -29,6 +29,20 @@
       "when": 1784010078694,
       "tag": "0003_faithful_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784059649134,
+      "tag": "0004_overrated_jack_murdock",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784061847964,
+      "tag": "0005_parallel_cloak",
+      "breakpoints": true
     }
   ]
 }

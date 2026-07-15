@@ -4,7 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SessionUser } from "@/lib/auth-guards";
 import { assertProjectAccess, listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import {
+  clients,
+  documents,
+  mapLayers,
+  projectPhases,
+  projectStatusLogs,
+  projects,
+  users,
+} from "@/lib/db/schema";
 
 /**
  * Runs against the real (Neon) dev database: wipes the app tables, inserts a
@@ -28,8 +36,11 @@ let projA2: string; // client A, assigned to surveyor B
 let projB1: string; // client B, assigned to surveyor A
 let projB2: string; // client B, unassigned
 
+let clientAId: string; // used by the "access via phase" fixtures below
+
 beforeAll(async () => {
   // FK-safe teardown (mirrors lib/db/seed.ts ordering).
+  await db.delete(projectPhases);
   await db.delete(documents);
   await db.delete(mapLayers);
   await db.delete(projectStatusLogs);
@@ -139,6 +150,8 @@ beforeAll(async () => {
   projA2 = inserted[1].id;
   projB1 = inserted[2].id;
   projB2 = inserted[3].id;
+
+  clientAId = clientA.id;
 });
 
 afterAll(() => {
@@ -202,5 +215,73 @@ describe("listProjectsForUser", () => {
 
     const rowsB = await listProjectsForUser(clientUserB);
     expect(rowsB.map((p) => p.id).sort()).toEqual([projB1, projB2].sort());
+  });
+});
+
+describe("akses lewat fase (spec 2026-07-14)", () => {
+  it("surveyor yang di-assign HANYA ke sebuah fase bisa membuka proyeknya, DAN proyek itu muncul di daftarnya", async () => {
+    // Proyek ini TIDAK di-assign ke siapa pun di kolom assignedSurveyorId.
+    const [project] = await db
+      .insert(projects)
+      .values({
+        title: "Proyek lewat fase",
+        clientId: clientAId,
+        surveyType: "kavling",
+        assignedSurveyorId: null,
+      })
+      .returning();
+
+    await db.insert(projectPhases).values({
+      projectId: project.id,
+      name: "Olah data",
+      sortOrder: 0,
+      assignedSurveyorId: surveyorB.id,
+    });
+
+    // Dua-duanya dalam SATU test: kalau guard lolos tapi daftar tidak memuatnya,
+    // proyeknya "ada" tapi tak bisa ditemukan — fiturnya patah tanpa ketahuan.
+    await expect(assertProjectAccess(project.id, surveyorB)).resolves.toMatchObject({
+      id: project.id,
+    });
+
+    const listed = await listProjectsForUser(surveyorB);
+    expect(listed.map((p) => p.id)).toContain(project.id);
+  });
+
+  it("surveyor yang tidak di-assign ke proyek MAUPUN fase tetap ditolak", async () => {
+    const [project] = await db
+      .insert(projects)
+      .values({
+        title: "Bukan punya siapa-siapa",
+        clientId: clientAId,
+        surveyType: "kavling",
+        assignedSurveyorId: null,
+      })
+      .returning();
+
+    await expect(assertProjectAccess(project.id, surveyorB)).rejects.toThrow();
+
+    const listed = await listProjectsForUser(surveyorB);
+    expect(listed.map((p) => p.id)).not.toContain(project.id);
+  });
+
+  it("daftar proyek surveyor tidak memuat baris kembar kalau ia di-assign ke proyek DAN dua fasenya", async () => {
+    const [project] = await db
+      .insert(projects)
+      .values({
+        title: "Assigned dua kali",
+        clientId: clientAId,
+        surveyType: "kavling",
+        assignedSurveyorId: surveyorB.id,
+      })
+      .returning();
+
+    await db.insert(projectPhases).values([
+      { projectId: project.id, name: "F1", sortOrder: 0, assignedSurveyorId: surveyorB.id },
+      { projectId: project.id, name: "F2", sortOrder: 1, assignedSurveyorId: surveyorB.id },
+    ]);
+
+    const listed = await listProjectsForUser(surveyorB);
+    expect(listed.filter((p) => p.id === project.id)).toHaveLength(1);
   });
 });

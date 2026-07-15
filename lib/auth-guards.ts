@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, eq, exists, or, sql } from "drizzle-orm";
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { clients, projects } from "@/lib/db/schema";
+import { clients, projectPhases, projects } from "@/lib/db/schema";
 
 /**
  * THE SECURITY BOUNDARY (Phase 2 brief §4).
@@ -117,6 +117,17 @@ export async function assertProjectAccess(projectId: string, user: SessionUser) 
 
   if (user.role === "surveyor") {
     if (project.assignedSurveyorId === user.id) return project;
+    // Di-assign ke salah satu FASE proyek ini juga memberi akses (spec
+    // 2026-07-14). Tanpa ini, menugaskan surveyor ke sebuah fase tidak
+    // memberinya apa pun dan fiturnya cuma hiasan.
+    const [phase] = await db
+      .select({ id: projectPhases.id })
+      .from(projectPhases)
+      .where(
+        and(eq(projectPhases.projectId, project.id), eq(projectPhases.assignedSurveyorId, user.id)),
+      )
+      .limit(1);
+    if (phase) return project;
     notFound();
   }
 
@@ -140,7 +151,30 @@ export async function listProjectsForUser(user: SessionUser) {
   }
 
   if (user.role === "surveyor") {
-    return db.select().from(projects).where(eq(projects.assignedSurveyorId, user.id));
+    // Aturan HARUS sama persis dengan `assertProjectAccess` di atas. Kalau
+    // hanya guard yang diperluas, proyeknya bisa dibuka lewat URL langsung tapi
+    // tidak muncul di daftar — dalam praktik, tidak bisa ditemukan.
+    // `exists` (bukan join) supaya proyek dengan dua fase milik orang yang sama
+    // tidak muncul dua kali.
+    return db
+      .select()
+      .from(projects)
+      .where(
+        or(
+          eq(projects.assignedSurveyorId, user.id),
+          exists(
+            db
+              .select({ one: sql`1` })
+              .from(projectPhases)
+              .where(
+                and(
+                  eq(projectPhases.projectId, projects.id),
+                  eq(projectPhases.assignedSurveyorId, user.id),
+                ),
+              ),
+          ),
+        ),
+      );
   }
 
   if (user.role === "client") {

@@ -1,5 +1,9 @@
+import { asc, eq } from "drizzle-orm";
 import type { SessionUser } from "@/lib/auth-guards";
-import { listProjectsForUser } from "@/lib/auth-guards";
+import { assertProjectAccess, listProjectsForUser } from "@/lib/auth-guards";
+import { db } from "@/lib/db";
+import { projectPhases } from "@/lib/db/schema";
+import { calculateProgress, type PhaseStatus } from "@/lib/phases/derive";
 
 /**
  * Server-only business logic for the client portal's project list (PRD §3
@@ -46,4 +50,57 @@ export async function listPortalProjects(user: SessionUser): Promise<PortalProje
       orderDate: p.orderDate,
     }))
     .sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+}
+
+export type PortalPhase = {
+  id: string;
+  name: string;
+  status: PhaseStatus;
+  sortOrder: number;
+  targetDate: string | null;
+  completedAt: Date | null;
+};
+
+/**
+ * Fase seperti yang dilihat KLIEN (spec 2026-07-14). `description` (catatan
+ * internal), `weight`, dan `assignedSurveyorId` dipangkas DI SINI, di level
+ * query — bukan di render. Portal klien saat ini tidak menampilkan nama
+ * surveyor di mana pun, dan fitur ini bukan tempat untuk diam-diam mengubah
+ * itu.
+ */
+export async function listPortalPhases(
+  user: SessionUser,
+  projectId: string,
+): Promise<PortalPhase[]> {
+  await assertProjectAccess(projectId, user);
+
+  return db
+    .select({
+      id: projectPhases.id,
+      name: projectPhases.name,
+      status: projectPhases.status,
+      sortOrder: projectPhases.sortOrder,
+      targetDate: projectPhases.targetDate,
+      completedAt: projectPhases.completedAt,
+    })
+    .from(projectPhases)
+    .where(eq(projectPhases.projectId, projectId))
+    .orderBy(asc(projectPhases.sortOrder));
+}
+
+/**
+ * Persen progres portal — dihitung dari fase LENGKAP di server (`calculateProgress`
+ * butuh `weight`), lalu hanya angkanya yang keluar dari fungsi ini. `weight`
+ * sendiri tidak pernah sampai ke pemanggil.
+ */
+export async function getPortalProgress(
+  user: SessionUser,
+  projectId: string,
+): Promise<number | null> {
+  await assertProjectAccess(projectId, user);
+  const rows = await db
+    .select({ status: projectPhases.status, weight: projectPhases.weight })
+    .from(projectPhases)
+    .where(eq(projectPhases.projectId, projectId));
+  return calculateProgress(rows);
 }

@@ -5,6 +5,7 @@ import {
   LayoutDashboardIcon,
   SettingsIcon,
   UsersIcon,
+  WrenchIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/auth-guards";
 
@@ -42,6 +43,7 @@ export function buildLinks(role: Role): NavLink[] {
     { segment: null, href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
     { segment: "projects", href: "/dashboard/projects", label: "Proyek", icon: FolderKanbanIcon },
     { segment: "documents", href: "/dashboard/documents", label: "Dokumen", icon: FileTextIcon },
+    { segment: "equipment", href: "/dashboard/equipment", label: "Inventaris", icon: WrenchIcon },
   ];
 
   if (role === "admin") {

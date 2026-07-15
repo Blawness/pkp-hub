@@ -163,6 +163,105 @@ Breakdown eksekusi untuk Claude Code. Kerjakan per fase, urut — tiap fase puny
       dihitung di level halaman. Dipisah dari tabel `documents` agar surveyor tak melihat
       nilai proyek. Commit `4dd0403`, push ke `master`.
 
+## Phase 13 — Timeline fase proyek  *(kode selesai)*
+> Spec: `docs/superpowers/specs/2026-07-14-timeline-fase-proyek-design.md`.
+> Plan: `docs/superpowers/plans/2026-07-14-timeline-fase-proyek.md`.
+> Melengkapi `projects.status` (pipeline kasar) dengan fase kerja yang lebih
+> granular — nama, urutan, bobot, penanggung jawab, target — sehingga persen
+> progres bisa ditunjukkan ke klien tanpa membocorkan detail internal.
+- [x] Tabel `project_phase` + enum `project_phase_status` (`belum` | `berjalan`
+      | `selesai`). Fungsi murni progres/telat/urutan di `lib/phases/derive.ts`
+      (tanpa DB, tanpa fixture).
+- [x] **Progres adalah kolom TURUNAN**, sama seperti `paymentStatus` di Phase 12:
+      `calculateProgress` = Σ bobot fase `selesai` ÷ Σ bobot semua fase × 100,
+      dibulatkan. Fase `berjalan` dihitung NOL (bukan setengah — "setengah
+      selesai" adalah klaim, bukan fakta). Tanpa fase, atau total bobot 0 →
+      **`null`**, bukan `0`. UI (dashboard & portal) merender `null` sebagai
+      empty state / bagian yang tidak ditampilkan, TIDAK PERNAH sebagai "0%".
+- [x] **Fase memberi surveyor akses ke proyeknya.** `assertProjectAccess` dan
+      `listProjectsForUser` diperluas: surveyor yang di-assign ke SALAH SATU
+      fase sebuah proyek mendapat akses proyek itu, meski `project.assignedSurveyorId`
+      tidak mengarah ke dia. Tanpa ini, menugaskan surveyor ke sebuah fase
+      cuma hiasan.
+- [x] Pembagian hak load-bearing: admin memegang RENCANA (buat/hapus/susun
+      urutan/bobot/target/penanggung jawab); admin ATAU surveyor ber-akses
+      melapor PEKERJAAN (status + catatan). Kalau surveyor bisa menyusun ulang
+      atau mengubah bobot, persen progres berhenti berarti apa pun — orang
+      yang dinilai olehnya juga yang menyusunnya.
+- [x] `completedAt` diisi/dikosongkan OTOMATIS oleh transisi status
+      (`completedAtFor`), tidak pernah diketik manusia — mundur dari `selesai`
+      mengosongkannya lagi.
+- [x] Tab "Fase" di `/dashboard/projects/[id]`: `PhaseTimeline` (server-safe,
+      dipakai ulang di portal) + `PhaseCard`/`PhaseFormDialog`/`PhaseReorderButtons`
+      (client). Tombol kelola sama sekali tidak dirender untuk non-admin —
+      kenyamanan UI, penolakan sungguhannya ada di `phases-logic.ts`.
+- [x] **Klien TIDAK PERNAH melihat catatan internal, bobot, atau penanggung
+      jawab fase.** `listPortalPhases` memangkas `description` / `weight` /
+      `assignedSurveyorId` **di level SELECT query** (bukan di render) — dikunci
+      test yang menegaskan `not.toHaveProperty` pada bentuk hasil query, bukan
+      pada HTML. Progres portal (`getPortalProgress`) dihitung dari fase lengkap
+      di server; hanya angkanya yang keluar ke pemanggil.
+- [x] Portal klien: timeline read-only di `/portal/projects/[id]`. Kalau proyek
+      belum punya fase, bagian timeline tidak dirender sama sekali — timeline
+      kosong terlihat seperti proyek yang tidak dikerjakan.
+- [x] Seed demo: 3 fase (`selesai`/`berjalan`/`belum`) di proyek "Topografi
+      lahan perumahan tahap 2", satu dengan target yang sudah lewat supaya
+      penanda "Telat" kelihatan.
+- [x] E2E `e2e/project-phases.spec.ts`: admin menambah fase + menandai selesai
+      → klien melihat progres & nama fase, catatan internal tidak ada di HTML.
+
+---
+
+## Phase 14 — Inventaris alat  *(kode selesai)*
+> Spec: `docs/superpowers/specs/2026-07-14-inventaris-alat-design.md`.
+> Plan: `docs/superpowers/plans/2026-07-14-inventaris-alat.md`.
+> CRUD alat ukur (total station, GPS RTK, drone, dst.) dengan
+> pinjam/kembalikan yang menghasilkan status pakai realtime dan durasi
+> terhitung, tiap sesi menunjuk satu proyek.
+- [x] Tabel `equipment` (SATU BARIS = SATU UNIT FISIK — dua total station
+      sejenis adalah dua baris, bukan satu baris dengan stok 2) + `equipment_usage`
+      (sesi pakai). Fungsi murni durasi/kelayakan pinjam/validasi waktu di
+      `lib/equipment/derive.ts` (tanpa DB, tanpa fixture).
+- [x] **Durasi & status pakai TIDAK PERNAH disimpan sebagai kolom** — keduanya
+      turunan. `endedAt IS NULL` = sedang dipakai; durasi = `endedAt − startedAt`
+      (atau `now − startedAt` untuk sesi berjalan). Menyimpannya berarti
+      mengoreksi jam mulai meninggalkan durasi lama yang sudah jadi bohong —
+      pelajaran `paymentStatus` (Phase 12) dan `progress` (Phase 13).
+- [x] **Sesi ganda dicegah oleh partial unique index di database**
+      (`equipment_active_usage_uniq` on `equipment_id` WHERE `ended_at IS NULL`),
+      bukan hanya pengecekan di kode. Dikunci test yang sengaja MELEWATI logic
+      layer dan menulis langsung ke tabel — kalau index-nya dicabut dari
+      skema, test itu berhenti jeblok.
+- [x] **Harga beli & tanggal beli admin-only, dipangkas di level query**
+      (pola `projectValue` Phase 6/7): surveyor menerima baris alat yang secara
+      BENTUK tidak punya `purchasePrice`/`purchaseDate` sama sekali, bukan versi
+      yang disembunyikan di UI. Dikunci test yang menegaskan `not.toHaveProperty`
+      pada hasil query, dan `JSON.stringify` tidak memuat angka harganya.
+- [x] `usedById` (yang MEMEGANG alat) dipisah dari `recordedById` (yang
+      MENGINPUT sesi) — admin sering mencatat dari kantor untuk surveyor di
+      lapangan. Untuk surveyor, `usedById` DIPAKSA jadi id dirinya sendiri di
+      server (`borrowEquipmentForUser`), terlepas dari apa pun yang dikirim
+      request — form yang tidak merender pilihan itu untuk surveyor bukan
+      penegakan, hanya kenyamanan UI.
+- [x] Alat TIDAK PERNAH dihapus permanen, hanya diarsipkan (`archivedAt`) —
+      `equipment_usage` menunjuk ke `equipment` lewat FK `onDelete: "restrict"`,
+      dan riwayat siapa-pernah-memegang-apa tidak boleh ikut hilang.
+- [x] `/dashboard/equipment` (daftar, filter kategori/kondisi/status pakai),
+      detail + riwayat pakai, form tambah/edit (admin-only). Tab "Alat" di
+      `/dashboard/projects/[id]` dengan dialog pinjam. Menu "Inventaris" di
+      nav staf (admin + surveyor) — halaman & logic tetap gerbang sungguhannya,
+      bukan menu yang disembunyikan.
+- [x] **Klien tidak punya permukaan apa pun ke modul ini**: tidak ada rute di
+      bawah `/portal`, tidak ada query inventaris dipanggil dari sana, menu
+      "Inventaris" tidak muncul untuk klien. Halaman dashboard equipment
+      memanggil `requireStaff()`.
+- [x] Seed demo: 5 alat (`tersedia` × 3, `perawatan` × 1, `rusak` × 1, semua
+      dengan harga beli terisi), 2 sesi pakai (satu masih berjalan supaya
+      status "Dipakai" kelihatan langsung, satu sudah ditutup).
+- [x] E2E `e2e/equipment.spec.ts`: admin menambah alat → pinjam di tab Alat
+      proyek → status "Dipakai" + nama pemegang tampil → kembalikan → durasi
+      tampil di riwayat. Idempoten (nama alat diberi akhiran `Date.now()`).
+
 ---
 
 ## Open Decisions (dari PRD §10)

@@ -2,11 +2,19 @@ import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
-import { listPortalProjects } from "@/lib/actions/portal-logic";
+import { listPortalPhases, listPortalProjects } from "@/lib/actions/portal-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import {
+  clients,
+  documents,
+  mapLayers,
+  projectPhases,
+  projectStatusLogs,
+  projects,
+  users,
+} from "@/lib/db/schema";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -21,10 +29,12 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
 
 let clientUserA: SessionUser;
 let clientUserB: SessionUser;
+let surveyor: SessionUser;
 let projectA: string;
 let projectB: string;
 
 beforeAll(async () => {
+  await db.delete(projectPhases);
   await db.delete(documents);
   await db.delete(mapLayers);
   await db.delete(projectStatusLogs);
@@ -35,6 +45,7 @@ beforeAll(async () => {
   const adminId = randomUUID();
   const clientUserAId = randomUUID();
   const clientUserBId = randomUUID();
+  const surveyorId = randomUUID();
 
   await db.insert(users).values([
     {
@@ -55,6 +66,12 @@ beforeAll(async () => {
       email: "test-client-b-portal@fixture.test",
       role: "client",
     },
+    {
+      id: surveyorId,
+      name: "Portal Test Surveyor",
+      email: "test-surveyor-portal@fixture.test",
+      role: "surveyor",
+    },
   ]);
 
   clientUserA = {
@@ -68,6 +85,12 @@ beforeAll(async () => {
     name: "Portal Test Client B",
     email: "test-client-b-portal@fixture.test",
     role: "client",
+  };
+  surveyor = {
+    id: surveyorId,
+    name: "Portal Test Surveyor",
+    email: "test-surveyor-portal@fixture.test",
+    role: "surveyor",
   };
 
   const [clientARow, clientBRow] = await db
@@ -153,5 +176,32 @@ describe("listSharedDocumentsForProject: shared-only filter", () => {
 
   it("client B cannot list client A's project documents at all", async () => {
     await expect(listSharedDocumentsForProject(clientUserB, projectA)).rejects.toThrow();
+  });
+});
+
+describe("listPortalPhases: pemangkasan field internal", () => {
+  it("baris fase yang sampai ke klien TIDAK memuat catatan internal, bobot, maupun penanggung jawab", async () => {
+    await db.insert(projectPhases).values({
+      projectId: projectA,
+      name: "Olah data",
+      sortOrder: 0,
+      weight: 5,
+      description: "RAHASIA INTERNAL",
+      assignedSurveyorId: surveyor.id,
+    });
+
+    const rows = await listPortalPhases(clientUserA, projectA);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe("Olah data");
+    // Dikunci pada BENTUK hasil query, bukan pada render — UI bukan batas keamanan.
+    expect(rows[0]).not.toHaveProperty("description");
+    expect(rows[0]).not.toHaveProperty("weight");
+    expect(rows[0]).not.toHaveProperty("assignedSurveyorId");
+    expect(JSON.stringify(rows)).not.toContain("RAHASIA INTERNAL");
+  });
+
+  it("klien tidak bisa membaca fase proyek klien lain", async () => {
+    await expect(listPortalPhases(clientUserB, projectA)).rejects.toThrow();
   });
 });
