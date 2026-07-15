@@ -1,6 +1,5 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { FileIcon } from "lucide-react";
-import Link from "next/link";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import {
@@ -9,13 +8,9 @@ import {
 } from "@/components/equipment/project-equipment";
 import { PetaTab } from "@/components/map/peta-tab";
 import { PaymentsPanel } from "@/components/payments/payments-panel";
-import { AssignSurveyorForm } from "@/components/projects/assign-surveyor-form";
 import { PaymentForm } from "@/components/projects/payment-form";
 import { PhaseTimeline } from "@/components/projects/phase-timeline";
-import { StatusChanger } from "@/components/projects/status-changer";
-import { StatusHistory } from "@/components/projects/status-history";
-import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { ProjectSummary } from "@/components/projects/project-summary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,7 +30,6 @@ import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
-import { statusLabel, surveyTypeLabel } from "@/lib/labels";
 import { todayString } from "@/lib/phases/derive";
 import { downloadUrlFor } from "@/lib/storage";
 
@@ -62,10 +56,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // never contains those keys unless `user.role === "admin"`.
   const project = await getProjectDetailForUser(user, id);
 
-  const client = await getClientById(project.clientId);
-  const statusLogs = await getStatusLogsForProject(project.id);
-  const projectDocuments = await listDocumentsForProject(user, project.id);
-  const mapLayerRows = await listMapLayersForProject(user, project.id);
+  // Empat pembacaan ini hanya bergantung pada `project`/`user` dan tidak saling
+  // membutuhkan — dijalankan paralel supaya waktu buka halaman detail (yang
+  // berat: 6 tab) tidak menumpuk empat round-trip DB berurutan.
+  const [client, statusLogs, projectDocuments, mapLayerRows] = await Promise.all([
+    getClientById(project.clientId),
+    getStatusLogsForProject(project.id),
+    listDocumentsForProject(user, project.id),
+    listMapLayersForProject(user, project.id),
+  ]);
 
   // Ledger pembayaran HANYA untuk admin. Memanggilnya untuk surveyor akan
   // ditolak server-side — tapi jangan bergantung pada itu: jangan panggil sama
@@ -103,6 +102,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   const phases = await listPhasesForProject(user, project.id);
   const progress = await getProjectProgress(user, project.id);
+  const phasesDone = phases.filter((p) => p.status === "selesai").length;
+  const phasesTotal = phases.length;
   // Daftar surveyor untuk dropdown penanggung jawab fase — hanya admin yang
   // butuh. Query inline, pola yang sama dengan `app/dashboard/projects/new/page.tsx:18`.
   // BEDANYA: kita saring `archivedAt` — menugaskan fase ke surveyor yang sudah
@@ -188,111 +189,44 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
 
   return (
     <main className="flex flex-col gap-6 p-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-medium">{project.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {client ? (
-              <Link href={`/dashboard/clients/${client.id}`} className="hover:underline">
-                {client.name}
-              </Link>
-            ) : (
-              "Klien tidak ditemukan"
-            )}
-            {" · "}
-            {surveyTypeLabel[project.surveyType] ?? project.surveyType}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary">{statusLabel[project.status] ?? project.status}</Badge>
-          {user.role === "admin" ? (
-            <ButtonLink variant="outline" href={`/dashboard/projects/${project.id}/edit`}>
-              Edit
-            </ButtonLink>
-          ) : null}
-        </div>
-      </div>
+      <ProjectSummary
+        projectId={project.id}
+        title={project.title}
+        surveyType={project.surveyType}
+        clientId={client?.id ?? null}
+        clientName={client?.name ?? null}
+        surveyorName={assignedSurveyorName}
+        assignedSurveyorId={project.assignedSurveyorId}
+        surveyors={surveyorRows}
+        isAdmin={isAdmin}
+        canEdit={user.role === "admin"}
+        status={project.status}
+        allowedNextStatuses={allowedNextStatuses}
+        logs={statusLogs.map((log) => ({
+          id: log.id,
+          fromStatus: log.fromStatus,
+          toStatus: log.toStatus,
+          changedByName: nameById.get(log.changedById) ?? "—",
+          createdAt: log.createdAt,
+        }))}
+        progressPercent={progress}
+        phasesDone={phasesDone}
+        phasesTotal={phasesTotal}
+        remaining={paymentSummary ? paymentSummary.remaining : null}
+        paymentStatus={paymentSummary ? paymentSummary.status : null}
+        locationLabel={project.locationLabel ?? null}
+        orderDate={project.orderDate}
+        description={project.description ?? null}
+      />
 
-      <Tabs defaultValue="overview">
-        <TabsList className="max-w-full overflow-x-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
+      <Tabs defaultValue="fase">
+        <TabsList className="max-w-full overflow-x-auto overflow-y-hidden">
           <TabsTrigger value="fase">Fase</TabsTrigger>
           <TabsTrigger value="peta">Peta</TabsTrigger>
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
           <TabsTrigger value="alat">Alat</TabsTrigger>
           {"projectValue" in project ? <TabsTrigger value="keuangan">Keuangan</TabsTrigger> : null}
         </TabsList>
-
-        <TabsContent value="overview" className="flex flex-col gap-6 pt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Detail proyek</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-2 sm:grid-cols-2">
-              <div>
-                <p className="text-xs text-muted-foreground">Lokasi</p>
-                <p className="text-sm">{project.locationLabel ?? "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Tanggal order</p>
-                <p className="text-sm">{project.orderDate.toLocaleDateString("id-ID")}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Surveyor</p>
-                <p className="text-sm">{assignedSurveyorName}</p>
-              </div>
-              {project.description ? (
-                <div className="sm:col-span-2">
-                  <p className="text-xs text-muted-foreground">Deskripsi</p>
-                  <p className="text-sm">{project.description}</p>
-                </div>
-              ) : null}
-            </CardContent>
-          </Card>
-
-          {user.role === "admin" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Assign surveyor</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <AssignSurveyorForm
-                  projectId={project.id}
-                  currentSurveyorId={project.assignedSurveyorId}
-                  surveyors={surveyorRows}
-                />
-              </CardContent>
-            </Card>
-          ) : null}
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Status</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {canChangeStatus ? (
-                <StatusChanger
-                  projectId={project.id}
-                  currentStatus={project.status}
-                  allowedNextStatuses={allowedNextStatuses}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Hanya admin atau surveyor yang ditugaskan yang bisa mengubah status.
-                </p>
-              )}
-              <StatusHistory
-                logs={statusLogs.map((log) => ({
-                  id: log.id,
-                  fromStatus: log.fromStatus,
-                  toStatus: log.toStatus,
-                  changedByName: nameById.get(log.changedById) ?? "—",
-                  createdAt: log.createdAt,
-                }))}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="fase" className="pt-4">
           <PhaseTimeline
