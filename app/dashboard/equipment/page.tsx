@@ -1,6 +1,7 @@
 import { WrenchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { EquipmentFilters } from "@/components/equipment/equipment-filters";
+import { EquipmentSummary } from "@/components/equipment/equipment-summary";
 import { EquipmentTable } from "@/components/equipment/equipment-table";
 import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -30,6 +31,15 @@ export default async function EquipmentPage({
   const isAdmin = user.role === "admin";
 
   const items = await listEquipmentForUser(user);
+
+  const summary = {
+    total: items.length,
+    terpinjam: items.filter((i) => i.activeUsage).length,
+    tersedia: items.filter((i) => !i.activeUsage && i.condition === "tersedia").length,
+    perawatan: items.filter((i) => !i.activeUsage && i.condition === "perawatan").length,
+    rusak: items.filter((i) => !i.activeUsage && i.condition === "rusak").length,
+  };
+
   const filtered = items.filter((item) => {
     if (filters.category && item.category !== filters.category) return false;
     // Satu filter status, cermin dari kolom Status gabungan: "terpinjam" =
@@ -79,10 +89,20 @@ export default async function EquipmentPage({
         }
       />
 
+      <EquipmentSummary
+        total={summary.total}
+        tersedia={summary.tersedia}
+        terpinjam={summary.terpinjam}
+        perawatan={summary.perawatan}
+        rusak={summary.rusak}
+        activeStatus={filters.status ?? ""}
+      />
+
+      <EquipmentFilters />
+
       <EquipmentTable
         rows={rows}
         isAdmin={isAdmin}
-        toolbar={<EquipmentFilters />}
         emptyMessage={
           <EmptyState
             icon={WrenchIcon}
