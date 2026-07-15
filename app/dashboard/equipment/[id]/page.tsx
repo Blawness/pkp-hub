@@ -1,12 +1,14 @@
-import { inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { ImageIcon } from "lucide-react";
 import { ArchiveEquipmentButton } from "@/components/equipment/archive-equipment-button";
+import { BorrowDialog } from "@/components/equipment/borrow-dialog";
+import { ReturnButton } from "@/components/equipment/return-button";
 import { UsageHistory, type UsageHistoryRow } from "@/components/equipment/usage-history";
 import { Badge } from "@/components/ui/badge";
 import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getEquipmentForUser, listUsageForEquipment } from "@/lib/actions/equipment-logic";
-import { requireStaff } from "@/lib/auth-guards";
+import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
@@ -38,6 +40,17 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
   const item = await getEquipmentForUser(user, id);
   const usages = await listUsageForEquipment(user, id);
   const imageDisplayUrl = item.image ? await downloadUrlFor(item.image) : null;
+
+  const userProjects = await listProjectsForUser(user);
+  const projectOptions = userProjects.map((p) => ({ id: p.id, title: p.title }));
+  const surveyors = isAdmin
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.role, "surveyor"), isNull(users.archivedAt)))
+    : [];
+  const canReturnActive =
+    item.activeUsage !== null && (isAdmin || item.activeUsage.usedById === user.id);
 
   const projectIds = [...new Set(usages.map((u) => u.projectId))];
   const userIds = [...new Set(usages.map((u) => u.usedById))];
@@ -113,18 +126,39 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
         <CardHeader>
           <CardTitle>Status pakai</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col gap-3">
           {item.activeUsage ? (
-            <p className="text-sm">
-              Sedang dipakai oleh <span className="font-medium">{item.activeUsage.usedByName}</span>{" "}
-              untuk proyek <span className="font-medium">{item.activeUsage.projectTitle}</span> ·
-              berjalan{" "}
-              {formatDuration(
-                usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
-              )}
-            </p>
+            <>
+              <p className="text-sm">
+                Sedang dipakai oleh{" "}
+                <span className="font-medium">{item.activeUsage.usedByName}</span> untuk proyek{" "}
+                <span className="font-medium">{item.activeUsage.projectTitle}</span> · berjalan{" "}
+                {formatDuration(
+                  usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
+                )}
+              </p>
+              {canReturnActive ? (
+                <ReturnButton
+                  usageId={item.activeUsage.usageId}
+                  equipmentName={item.name}
+                  durationLabel={formatDuration(
+                    usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
+                  )}
+                />
+              ) : null}
+            </>
           ) : (
-            <p className="text-sm text-muted-foreground">Tersedia — tidak sedang dipakai.</p>
+            <>
+              <p className="text-sm text-muted-foreground">Tersedia — tidak sedang dipakai.</p>
+              {item.condition === "tersedia" && !item.archivedAt ? (
+                <BorrowDialog
+                  fixedEquipment={{ id: item.id, name: item.name }}
+                  projectOptions={projectOptions}
+                  isAdmin={isAdmin}
+                  surveyors={surveyors}
+                />
+              ) : null}
+            </>
           )}
         </CardContent>
       </Card>
