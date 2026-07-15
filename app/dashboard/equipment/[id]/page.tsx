@@ -84,6 +84,12 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
     canReturn: usage.endedAt === null && (isAdmin || usage.usedById === user.id),
   }));
 
+  // Dihitung sekali di sini (bukan dua kali di JSX) supaya teks inline dan
+  // `ReturnButton` selalu menampilkan durasi yang identik.
+  const activeDuration = item.activeUsage
+    ? formatDuration(usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now))
+    : null;
+
   return (
     <main className="flex flex-col gap-6 p-8">
       <div className="flex items-start justify-between gap-4">
@@ -133,17 +139,13 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
                 Sedang dipakai oleh{" "}
                 <span className="font-medium">{item.activeUsage.usedByName}</span> untuk proyek{" "}
                 <span className="font-medium">{item.activeUsage.projectTitle}</span> · berjalan{" "}
-                {formatDuration(
-                  usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
-                )}
+                {activeDuration}
               </p>
               {canReturnActive ? (
                 <ReturnButton
                   usageId={item.activeUsage.usageId}
                   equipmentName={item.name}
-                  durationLabel={formatDuration(
-                    usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
-                  )}
+                  durationLabel={activeDuration ?? undefined}
                 />
               ) : null}
             </>

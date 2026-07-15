@@ -24,7 +24,7 @@ export function ReturnButton({
   const router = useRouter();
   const { executeAsync } = useAction(returnEquipment);
 
-  async function handleReturn(): Promise<{ error?: string } | void> {
+  async function handleReturn(): Promise<{ error?: string } | undefined> {
     const result = await executeAsync({ usageId });
     if (result?.serverError) return { error: result.serverError };
     router.refresh();

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
-import { type ReactElement, useState } from "react";
+import { cloneElement, type ReactElement, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -124,7 +124,15 @@ export function BorrowDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger ?? defaultTrigger} />
+      <DialogTrigger
+        render={
+          trigger
+            ? disabled
+              ? cloneElement(trigger, { disabled: true } as Partial<typeof trigger.props>)
+              : trigger
+            : defaultTrigger
+        }
+      />
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Pinjam alat</DialogTitle>

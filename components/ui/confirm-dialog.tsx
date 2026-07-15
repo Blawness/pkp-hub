@@ -39,6 +39,7 @@ export function ConfirmDialog({
   const [error, setError] = useState<string | null>(null);
 
   async function handleConfirm() {
+    if (pending) return;
     setPending(true);
     setError(null);
     const result = await onConfirm();
