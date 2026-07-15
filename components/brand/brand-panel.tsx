@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useMotionValue, useSpring, useTransform } from "motion/react";
+import Image from "next/image";
 import type { PointerEvent } from "react";
 import { GRID_BACKGROUND_IMAGE, GRID_BACKGROUND_SIZE } from "@/components/brand/grid-texture";
 import { Reveal, Stagger } from "@/components/motion/reveal";
@@ -72,7 +73,18 @@ export function BrandPanel() {
 
       <Stagger className="relative">
         <Reveal>
-          <p className="font-heading text-xl font-semibold tracking-tight">PKP Hub</p>
+          <div className="flex items-center gap-3">
+            <Image
+              src="/logo.png"
+              alt=""
+              aria-hidden
+              width={40}
+              height={40}
+              priority
+              className="size-10 shrink-0"
+            />
+            <p className="font-heading text-xl font-semibold tracking-tight">PKP Hub</p>
+          </div>
           <p className="mt-1 text-sm text-white/60">Presisi Konsulindo Prima</p>
         </Reveal>
       </Stagger>

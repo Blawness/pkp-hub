@@ -1,5 +1,8 @@
 import { eq } from "drizzle-orm";
+import { UsersIcon } from "lucide-react";
 import { ProjectForm } from "@/components/projects/project-form";
+import { ButtonLink } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
 import { requireAdmin } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
@@ -26,7 +29,20 @@ export default async function NewProjectPage() {
           Buat proyek survey baru untuk seorang klien.
         </p>
       </div>
-      <ProjectForm clients={clientRows} surveyors={surveyorRows} />
+      {clientRows.length === 0 ? (
+        <EmptyState
+          icon={UsersIcon}
+          title="Belum ada klien"
+          description="Proyek harus dimiliki oleh seorang klien. Buat klien terlebih dahulu sebelum membuat proyek."
+          action={
+            <ButtonLink size="sm" href="/dashboard/clients/new">
+              Buat klien
+            </ButtonLink>
+          }
+        />
+      ) : (
+        <ProjectForm clients={clientRows} surveyors={surveyorRows} />
+      )}
     </main>
   );
 }

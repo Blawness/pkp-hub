@@ -16,6 +16,7 @@ import {
   type EquipmentCondition,
   validateUsageWindow,
 } from "@/lib/equipment/derive";
+import { storage } from "@/lib/storage";
 
 /**
  * Inventaris alat (spec 2026-07-14). Logika + guard dipisah dari pembungkus
@@ -37,6 +38,7 @@ export type EquipmentRow = {
   category: string;
   serialNumber: string | null;
   condition: EquipmentCondition;
+  image: string | null;
   purchaseDate: string | null;
   purchasePrice: number | null;
   notes: string | null;
@@ -108,6 +110,7 @@ const adminColumns = {
   category: equipment.category,
   serialNumber: equipment.serialNumber,
   condition: equipment.condition,
+  image: equipment.image,
   purchaseDate: equipment.purchaseDate,
   purchasePrice: equipment.purchasePrice,
   notes: equipment.notes,
@@ -122,6 +125,7 @@ const safeColumns = {
   category: equipment.category,
   serialNumber: equipment.serialNumber,
   condition: equipment.condition,
+  image: equipment.image,
   notes: equipment.notes,
   archivedAt: equipment.archivedAt,
   createdAt: equipment.createdAt,
@@ -263,6 +267,7 @@ export async function createEquipmentForUser(
       category: input.category,
       serialNumber: input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
       condition: input.condition,
+      image: input.image && input.image.length > 0 ? input.image : null,
       purchaseDate: input.purchaseDate ?? null,
       purchasePrice: input.purchasePrice ?? null,
       notes: input.notes && input.notes.length > 0 ? input.notes : null,
@@ -271,11 +276,32 @@ export async function createEquipmentForUser(
   return row;
 }
 
+/**
+ * Hapus objek gambar lama saat diganti/dihapus — best-effort. Kegagalan
+ * menghapus (objek sudah tak ada, URL dari driver lain, dll.) tidak boleh
+ * menggagalkan operasi utama; sisa orphan lebih ringan daripada update gagal.
+ */
+async function deleteImageObject(fileUrl: string): Promise<void> {
+  try {
+    await storage.delete(storage.keyFromUrl(fileUrl));
+  } catch {
+    // abaikan
+  }
+}
+
 export async function updateEquipmentForUser(
   user: SessionUser,
   input: UpdateEquipmentInput,
 ): Promise<EquipmentRow> {
   requireAdmin(user);
+
+  const [existing] = await db
+    .select({ image: equipment.image })
+    .from(equipment)
+    .where(eq(equipment.id, input.equipmentId));
+  if (!existing) throw new Error("Alat tidak ditemukan.");
+
+  const nextImage = input.image && input.image.length > 0 ? input.image : null;
 
   const [row] = await db
     .update(equipment)
@@ -284,6 +310,7 @@ export async function updateEquipmentForUser(
       category: input.category,
       serialNumber: input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
       condition: input.condition,
+      image: nextImage,
       purchaseDate: input.purchaseDate ?? null,
       purchasePrice: input.purchasePrice ?? null,
       notes: input.notes && input.notes.length > 0 ? input.notes : null,
@@ -292,6 +319,11 @@ export async function updateEquipmentForUser(
     .where(eq(equipment.id, input.equipmentId))
     .returning(adminColumns);
   if (!row) throw new Error("Alat tidak ditemukan.");
+
+  // Gambar lama jadi orphan kalau diganti/dihapus — bersihkan best-effort.
+  if (existing.image && existing.image !== nextImage) {
+    await deleteImageObject(existing.image);
+  }
   return row;
 }
 

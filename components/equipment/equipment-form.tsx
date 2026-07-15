@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
+import { EquipmentImageField } from "@/components/equipment/equipment-image-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,6 +33,9 @@ type EquipmentEditTarget = {
   category: EquipmentCategoryInput;
   serialNumber: string | null;
   condition: EquipmentConditionInput;
+  image: string | null;
+  /** URL yang sudah di-resolve untuk pratinjau gambar lama (server: `downloadUrlFor`). */
+  imageDisplayUrl: string | null;
   purchaseDate: string | null;
   purchasePrice: number | null;
   notes: string | null;
@@ -47,6 +51,7 @@ type EquipmentEditTarget = {
 export function EquipmentForm({ editing }: { editing?: EquipmentEditTarget }) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
+  const [image, setImage] = useState<string | null>(editing?.image ?? null);
   const isEditing = !!editing;
 
   const defaultValues: FormValues = {
@@ -82,6 +87,7 @@ export function EquipmentForm({ editing }: { editing?: EquipmentEditTarget }) {
       category: values.category,
       serialNumber: values.serialNumber.trim() || undefined,
       condition: values.condition,
+      image,
       purchaseDate: values.purchaseDate || null,
       purchasePrice,
       notes: values.notes.trim() || undefined,
@@ -111,6 +117,15 @@ export function EquipmentForm({ editing }: { editing?: EquipmentEditTarget }) {
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="name">Nama alat</Label>
         <Input id="name" {...register("name")} />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label>Gambar (opsional)</Label>
+        <EquipmentImageField
+          value={image}
+          displayUrl={editing?.imageDisplayUrl ?? null}
+          onChange={setImage}
+        />
       </div>
 
       <div className="flex flex-col gap-1.5">

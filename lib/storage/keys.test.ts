@@ -16,10 +16,16 @@ describe("parseStorageKey", () => {
     });
   });
 
+  it("mengenali kunci gambar alat — tanpa projectId", () => {
+    expect(parseStorageKey("equipment/9f8b2c1d.webp")).toEqual({ kind: "equipment" });
+  });
+
   it("menolak prefix yang tidak dikenal — termasuk yang mencoba menyamar", () => {
     expect(parseStorageKey("secrets/abc/x.pdf")).toBeNull();
     expect(parseStorageKey("documents")).toBeNull();
     expect(parseStorageKey("receipts/")).toBeNull();
+    expect(parseStorageKey("equipment")).toBeNull();
+    expect(parseStorageKey("equipment/")).toBeNull();
     expect(parseStorageKey("")).toBeNull();
   });
 });

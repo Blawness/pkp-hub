@@ -1,6 +1,7 @@
 "use client";
 
 import { PanelLeftIcon } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
 import { GridTexture } from "@/components/brand/grid-texture";
 import { buildLinks, SIDEBAR_COOKIE } from "@/components/dashboard/nav-config";
@@ -69,7 +70,15 @@ export function DashboardSidebar({
       >
         {collapsed ? null : (
           <>
-            <span aria-hidden className="ml-1 size-2 shrink-0 rotate-45 rounded-[2px] bg-primary" />
+            <Image
+              src="/logo.png"
+              alt=""
+              aria-hidden
+              width={32}
+              height={32}
+              priority
+              className="ml-1 size-7 shrink-0"
+            />
             <span className="font-heading flex-1 truncate text-sm font-semibold tracking-tight">
               PKP Hub
             </span>

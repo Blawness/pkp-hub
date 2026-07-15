@@ -86,7 +86,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  execSync("pnpm db:seed", { stdio: "inherit" });
+  execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
 describe("getProjectDetailForUser", () => {

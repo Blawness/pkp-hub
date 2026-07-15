@@ -157,7 +157,7 @@ beforeAll(async () => {
 afterAll(() => {
   // Restore the canonical dev seed so the demo data used for manual/dev
   // testing isn't left in this test's fixture state.
-  execSync("pnpm db:seed", { stdio: "inherit" });
+  execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
 describe("assertProjectAccess", () => {

@@ -3,8 +3,8 @@ import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaView } from "@/components/map/peta-view";
 import { PortalPayments } from "@/components/payments/portal-payments";
 import { PhaseTimeline } from "@/components/projects/phase-timeline";
+import { StatusBadge } from "@/components/projects/status-badge";
 import { StatusHistory } from "@/components/projects/status-history";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
@@ -14,7 +14,7 @@ import { getPortalProgress, listPortalPhases } from "@/lib/actions/portal-logic"
 import { getStatusLogsForProject } from "@/lib/actions/projects-logic";
 import { assertProjectAccess, requireClient } from "@/lib/auth-guards";
 import { formatArea } from "@/lib/geo/area";
-import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { surveyTypeLabel } from "@/lib/labels";
 import { todayString } from "@/lib/phases/derive";
 import { downloadUrlFor } from "@/lib/storage";
 
@@ -90,7 +90,7 @@ export default async function PortalProjectDetailPage({
             {project.locationLabel ? ` · ${project.locationLabel}` : ""}
           </p>
         </div>
-        <Badge variant="secondary">{statusLabel[project.status] ?? project.status}</Badge>
+        <StatusBadge status={project.status} />
       </div>
 
       <Card>

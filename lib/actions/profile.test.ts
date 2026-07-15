@@ -62,7 +62,7 @@ afterAll(async () => {
     await db.delete(accounts).where(eq(accounts.userId, id));
     await db.delete(users).where(eq(users.id, id));
   }
-  execSync("pnpm db:seed", { stdio: "inherit" });
+  execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
 describe("updateOwnNameSchema", () => {

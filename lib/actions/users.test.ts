@@ -69,7 +69,7 @@ async function seedFixture() {
 beforeAll(seedFixture);
 
 afterAll(() => {
-  execSync("pnpm db:seed", { stdio: "inherit" });
+  execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
 describe("createStaffUser", () => {

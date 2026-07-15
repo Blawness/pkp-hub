@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "./index";
 import {
   accounts,
@@ -24,23 +24,49 @@ const SEED_PASSWORD = "password123";
  * Dev seed. Every seeded user gets a working `password123` credential,
  * hashed with Better Auth's own `hashPassword` (never hand-rolled) and
  * stored in the `account` table it owns.
+ *
+ * NON-DESTRUKTIF secara default: kalau data seed sudah ada (dideteksi lewat
+ * user sentinel `admin@pkp.test`), seed berhenti tanpa menyentuh apa pun —
+ * jadi menjalankannya ulang TIDAK menghapus data dev yang kamu masukkan
+ * manual. Untuk wipe + seed ulang dari nol, set `SEED_RESET=1` (lihat script
+ * `db:seed:reset`). Test memakai flag itu supaya tiap run mulai dari data
+ * demo yang bersih.
  */
 async function seed() {
-  // FK-safe teardown so the seed is re-runnable. `equipmentUsage` sebelum
-  // `equipment` (FK), dan keduanya sebelum `projects`/`users` — sesi pakai
-  // menunjuk ke keduanya.
-  await db.delete(equipmentUsage);
-  await db.delete(equipment);
-  await db.delete(payments);
-  await db.delete(documents);
-  await db.delete(mapLayers);
-  await db.delete(projectStatusLogs);
-  await db.delete(projectPhases);
-  await db.delete(projects);
-  await db.delete(clients);
-  await db.delete(sessions);
-  await db.delete(accounts);
-  await db.delete(users);
+  const force = ["1", "true"].includes(process.env.SEED_RESET ?? "");
+
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, "admin@pkp.test"))
+    .limit(1);
+
+  if (existing && !force) {
+    console.log(
+      "seed SKIP: data seed sudah ada (admin@pkp.test). " +
+        "Data tidak disentuh. Pakai `SEED_RESET=1 pnpm db:seed` " +
+        "(atau `pnpm db:seed:reset`) untuk wipe & seed ulang.",
+    );
+    process.exit(0);
+  }
+
+  if (force) {
+    // FK-safe teardown so the seed is re-runnable. `equipmentUsage` sebelum
+    // `equipment` (FK), dan keduanya sebelum `projects`/`users` — sesi pakai
+    // menunjuk ke keduanya.
+    await db.delete(equipmentUsage);
+    await db.delete(equipment);
+    await db.delete(payments);
+    await db.delete(documents);
+    await db.delete(mapLayers);
+    await db.delete(projectStatusLogs);
+    await db.delete(projectPhases);
+    await db.delete(projects);
+    await db.delete(clients);
+    await db.delete(sessions);
+    await db.delete(accounts);
+    await db.delete(users);
+  }
 
   const adminId = randomUUID();
   const surveyor1Id = randomUUID();

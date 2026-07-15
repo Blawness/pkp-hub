@@ -42,8 +42,9 @@ cp .env.example .env.local
 #                            a local-disk storage driver and logs invite
 #                            links to the console instead of emailing them
 
-pnpm db:migrate   # apply migrations to DATABASE_URL
-pnpm db:seed      # seed demo owner/surveyor/client accounts + sample data
+pnpm db:migrate     # apply migrations to DATABASE_URL
+pnpm db:seed        # seed demo data — NON-destructive: skips if already seeded
+pnpm db:seed:reset  # wipe all tables and re-seed from scratch
 
 pnpm dev          # http://localhost:3000
 ```

@@ -92,7 +92,7 @@ beforeAll(async () => {
 });
 
 afterAll(() => {
-  execSync("pnpm db:seed", { stdio: "inherit" });
+  execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
 describe("batas akses", () => {
@@ -218,6 +218,60 @@ describe("batas akses", () => {
 
   it("klien tidak bisa melihat daftar alat", async () => {
     await expect(listEquipmentForUser(clientUser)).rejects.toThrow();
+  });
+});
+
+describe("gambar alat", () => {
+  it("menyimpan URL gambar saat create", async () => {
+    const item = await createEquipmentForUser(admin, {
+      name: "TS-Gambar",
+      category: "total_station",
+      condition: "tersedia",
+      image: "/api/storage/equipment/aaa.webp",
+    });
+    expect(item.image).toBe("/api/storage/equipment/aaa.webp");
+  });
+
+  it("mengganti gambar saat update (dan tidak melempar walau objek lama tak ada)", async () => {
+    const item = await createEquipmentForUser(admin, {
+      name: "TS-GantiGambar",
+      category: "total_station",
+      condition: "tersedia",
+      image: "/api/storage/equipment/lama.webp",
+    });
+
+    const updated = await updateEquipmentForUser(admin, {
+      equipmentId: item.id,
+      name: "TS-GantiGambar",
+      category: "total_station",
+      condition: "tersedia",
+      image: "/api/storage/equipment/baru.webp",
+    });
+    expect(updated.image).toBe("/api/storage/equipment/baru.webp");
+
+    const [row] = await db
+      .select({ image: equipment.image })
+      .from(equipment)
+      .where(eq(equipment.id, item.id));
+    expect(row.image).toBe("/api/storage/equipment/baru.webp");
+  });
+
+  it("menghapus gambar saat image di-set null", async () => {
+    const item = await createEquipmentForUser(admin, {
+      name: "TS-HapusGambar",
+      category: "total_station",
+      condition: "tersedia",
+      image: "/api/storage/equipment/ada.webp",
+    });
+
+    const updated = await updateEquipmentForUser(admin, {
+      equipmentId: item.id,
+      name: "TS-HapusGambar",
+      category: "total_station",
+      condition: "tersedia",
+      image: null,
+    });
+    expect(updated.image).toBeNull();
   });
 });
 

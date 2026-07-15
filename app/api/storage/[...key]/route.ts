@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { assertProjectAccess, requireStaff, requireUser } from "@/lib/auth-guards";
+import { assertProjectAccess, requireAdmin, requireStaff, requireUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { documents, payments } from "@/lib/db/schema";
 import { storage } from "@/lib/storage";
@@ -52,11 +52,29 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
   const { key: keyParts } = await params;
   const key = keyParts.join("/");
 
-  const user = await requireUser();
   const parsed = parseStorageKey(key);
   if (!parsed) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
+
+  // Gambar alat TIDAK terikat project — modul equipment staff-only, jadi
+  // gerbangnya cukup `requireStaff` (tanpa `assertProjectAccess`).
+  if (parsed.kind === "equipment") {
+    await requireStaff();
+    try {
+      const buffer = await readLocalFile(key);
+      return new NextResponse(new Uint8Array(buffer), {
+        headers: {
+          "Content-Type": guessContentType(key),
+          "Cache-Control": "private, max-age=0, no-store",
+        },
+      });
+    } catch {
+      return NextResponse.json({ error: "Not found." }, { status: 404 });
+    }
+  }
+
+  const user = await requireUser();
 
   // Kwitansi memuat nilai proyek. Surveyor TIDAK boleh melihat keuangan —
   // dan `assertProjectAccess` di bawah MELOLOSKAN surveyor yang di-assign,
@@ -117,8 +135,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ key:
   const { key: keyParts } = await params;
   const key = keyParts.join("/");
 
-  const user = await requireStaff();
   const parsed = parseStorageKey(key);
+
+  // Gambar alat: PUT hanya admin, tanpa scoping project.
+  if (parsed?.kind === "equipment") {
+    await requireAdmin();
+    const contentType = request.headers.get("content-type") ?? "application/octet-stream";
+    const bytes = Buffer.from(await request.arrayBuffer());
+    const url = await storage.put(key, bytes, contentType);
+    return NextResponse.json({ url });
+  }
+
+  const user = await requireStaff();
   // Kwitansi TIDAK PERNAH diunggah lewat HTTP — ia ditulis server-side lewat
   // `storage.put`. Menerima PUT ke `receipts/` berarti membiarkan siapa pun
   // yang berstatus staf menimpa kwitansi dengan berkas karangannya sendiri.

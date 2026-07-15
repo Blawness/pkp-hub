@@ -6,6 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentForUser } from "@/lib/actions/equipment-logic";
 import { requireStaff } from "@/lib/auth-guards";
+import { downloadUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Inventaris Alat" };
 
@@ -45,17 +46,22 @@ export default async function EquipmentPage({
     return true;
   });
 
-  const rows = filtered.map((item) => ({
-    id: item.id,
-    name: item.name,
-    category: item.category,
-    serialNumber: item.serialNumber,
-    condition: item.condition,
-    purchasePrice: "purchasePrice" in item ? item.purchasePrice : undefined,
-    activeUsage: item.activeUsage
-      ? { usedByName: item.activeUsage.usedByName, projectTitle: item.activeUsage.projectTitle }
-      : null,
-  }));
+  // URL R2 mentah tidak bisa dibuka tanpa tanda tangan — resolve dulu per baris.
+  // Driver lokal mengembalikan URL yang sama (`/api/storage/...`).
+  const rows = await Promise.all(
+    filtered.map(async (item) => ({
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      serialNumber: item.serialNumber,
+      condition: item.condition,
+      image: item.image ? await downloadUrlFor(item.image) : null,
+      purchasePrice: "purchasePrice" in item ? item.purchasePrice : undefined,
+      activeUsage: item.activeUsage
+        ? { usedByName: item.activeUsage.usedByName, projectTitle: item.activeUsage.projectTitle }
+        : null,
+    })),
+  );
 
   const hasActiveFilter = Boolean(filters.category || filters.status);
 

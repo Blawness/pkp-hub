@@ -57,7 +57,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   // Restore the canonical dev seed so demo data is left intact for manual use.
-  execSync("pnpm db:seed", { stdio: "inherit" });
+  execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
 describe("createClientForUser", () => {

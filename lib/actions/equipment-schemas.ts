@@ -27,6 +27,8 @@ export const createEquipmentInputSchema = z.object({
   purchaseDate: dateString.nullable().optional(),
   purchasePrice: z.number().int().nonnegative().nullable().optional(),
   notes: z.string().trim().max(1000).optional(),
+  // URL objek storage hasil upload (WebP). `null` = hapus gambar.
+  image: z.string().trim().max(1000).nullable().optional(),
 });
 export type CreateEquipmentInput = z.infer<typeof createEquipmentInputSchema>;
 

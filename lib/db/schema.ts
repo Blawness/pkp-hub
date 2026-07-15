@@ -397,6 +397,9 @@ export const equipment = pgTable(
     category: equipmentCategory("category").notNull(),
     serialNumber: text("serial_number"),
     condition: equipmentCondition("condition").notNull().default("tersedia"),
+    // URL objek storage (WebP, dioptimasi di klien). `fileUrl` mentah — jangan
+    // diserahkan langsung ke browser saat driver R2; pakai `downloadUrlFor`.
+    image: text("image"),
     // ADMIN-ONLY. Dipangkas di level query untuk surveyor (equipment-logic.ts).
     purchaseDate: date("purchase_date", { mode: "string" }),
     purchasePrice: bigint("purchase_price", { mode: "number" }),

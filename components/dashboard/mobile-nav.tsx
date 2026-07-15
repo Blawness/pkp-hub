@@ -1,6 +1,7 @@
 "use client";
 
 import { MenuIcon } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
 import { buildLinks } from "@/components/dashboard/nav-config";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
@@ -37,7 +38,7 @@ export function MobileNav({ user }: { user: SessionUser }) {
       <SheetContent side="left" className="flex flex-col p-0">
         <SheetHeader className="h-16 justify-center px-4">
           <SheetTitle className="flex items-center gap-2 text-sm">
-            <span aria-hidden className="size-2 rotate-45 rounded-[2px] bg-primary" />
+            <Image src="/logo.png" alt="" aria-hidden width={28} height={28} className="size-6" />
             PKP Hub
           </SheetTitle>
         </SheetHeader>

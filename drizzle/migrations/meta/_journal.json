@@ -43,6 +43,13 @@
       "when": 1784061847964,
       "tag": "0005_parallel_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784103879351,
+      "tag": "0006_groovy_zaran",
+      "breakpoints": true
     }
   ]
 }

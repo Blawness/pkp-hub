@@ -1,4 +1,5 @@
 import { inArray } from "drizzle-orm";
+import { ImageIcon } from "lucide-react";
 import { ArchiveEquipmentButton } from "@/components/equipment/archive-equipment-button";
 import { UsageHistory, type UsageHistoryRow } from "@/components/equipment/usage-history";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +12,7 @@ import { projects, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { formatIDR } from "@/lib/format";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
+import { downloadUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,6 +37,7 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
 
   const item = await getEquipmentForUser(user, id);
   const usages = await listUsageForEquipment(user, id);
+  const imageDisplayUrl = item.image ? await downloadUrlFor(item.image) : null;
 
   const projectIds = [...new Set(usages.map((u) => u.projectId))];
   const userIds = [...new Set(usages.map((u) => u.usedById))];
@@ -91,6 +94,15 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
             </>
           ) : null}
         </div>
+      </div>
+
+      <div className="flex h-48 w-full max-w-sm items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
+        {imageDisplayUrl ? (
+          // biome-ignore lint/performance/noImgElement: gambar hasil upload, bukan aset statis yang bisa dioptimasi
+          <img src={imageDisplayUrl} alt={item.name} className="h-full w-full object-contain" />
+        ) : (
+          <ImageIcon className="h-10 w-10 text-muted-foreground" aria-hidden />
+        )}
       </div>
 
       {item.archivedAt ? (

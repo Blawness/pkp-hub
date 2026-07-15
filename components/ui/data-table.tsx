@@ -119,7 +119,7 @@ export function DataTable<TData extends { id: string }, TValue>({
       {searchable || toolbar ? (
         <div className="flex flex-wrap items-center gap-2">
           {searchable ? (
-            <div className="relative min-w-52 flex-1 sm:max-w-xs">
+            <div key="search" className="relative min-w-52 flex-1 sm:max-w-xs">
               <SearchIcon
                 aria-hidden
                 className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -133,7 +133,11 @@ export function DataTable<TData extends { id: string }, TValue>({
               />
             </div>
           ) : null}
-          {toolbar}
+          {/* `toolbar` bisa berupa elemen apa pun dari pemanggil (mis. filter di
+              Server Component). Saat search DAN toolbar sama-sama tampil, keduanya
+              jadi anak-anak dalam satu list — bungkus dengan Fragment ber-key
+              (tanpa menambah DOM) supaya React tidak memperingatkan "unique key". */}
+          {toolbar ? <React.Fragment key="toolbar">{toolbar}</React.Fragment> : null}
         </div>
       ) : null}
 

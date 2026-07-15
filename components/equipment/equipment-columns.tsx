@@ -1,6 +1,7 @@
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
+import { ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { formatIDR } from "@/lib/format";
@@ -12,6 +13,8 @@ export type EquipmentTableRow = {
   category: string;
   serialNumber: string | null;
   condition: string;
+  /** URL tampilan gambar (sudah di-resolve di server), atau `null`. */
+  image: string | null;
   /** `undefined` untuk surveyor — kolomnya sendiri disembunyikan lewat `isAdmin`, tapi ini menjaga bentuknya juga tidak terpasang. */
   purchasePrice?: number | null;
   activeUsage: { usedByName: string; projectTitle: string } | null;
@@ -39,12 +42,26 @@ export function buildEquipmentColumns({
       accessorKey: "name",
       header: "Nama",
       cell: ({ row }) => (
-        <Link
-          href={`/dashboard/equipment/${row.original.id}`}
-          className="font-medium hover:underline"
-        >
-          {row.original.name}
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+            {row.original.image ? (
+              // biome-ignore lint/performance/noImgElement: gambar hasil upload, bukan aset statis yang bisa dioptimasi
+              <img
+                src={row.original.image}
+                alt={row.original.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <ImageIcon className="h-4 w-4 text-muted-foreground" aria-hidden />
+            )}
+          </div>
+          <Link
+            href={`/dashboard/equipment/${row.original.id}`}
+            className="font-medium hover:underline"
+          >
+            {row.original.name}
+          </Link>
+        </div>
       ),
     },
     {
