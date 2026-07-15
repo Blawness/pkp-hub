@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { EquipmentCardList } from "@/components/equipment/equipment-card-list";
 import {
   buildEquipmentColumns,
   type EquipmentTableRow,
@@ -26,12 +27,28 @@ export function EquipmentTable({
   emptyMessage?: ReactNode;
 }) {
   return (
-    <DataTable
-      columns={buildEquipmentColumns({ isAdmin, projectOptions, surveyors })}
-      data={rows}
-      searchable
-      searchPlaceholder="Cari alat…"
-      emptyMessage={emptyMessage}
-    />
+    <>
+      <div className="hidden md:block">
+        <DataTable
+          columns={buildEquipmentColumns({ isAdmin, projectOptions, surveyors })}
+          data={rows}
+          searchable
+          searchPlaceholder="Cari alat…"
+          emptyMessage={emptyMessage}
+        />
+      </div>
+      <div className="md:hidden">
+        {rows.length === 0 ? (
+          emptyMessage
+        ) : (
+          <EquipmentCardList
+            rows={rows}
+            isAdmin={isAdmin}
+            projectOptions={projectOptions}
+            surveyors={surveyors}
+          />
+        )}
+      </div>
+    </>
   );
 }
