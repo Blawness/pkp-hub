@@ -34,20 +34,24 @@ async function main() {
   const usedCodes = new Set<string>();
 
   for (const row of rows) {
-    const [item] = await db
-      .insert(equipmentItem)
-      .values({ name: row.name, category: row.category, image: row.image })
-      .returning();
-
     let code = row.serialNumber?.trim() || "";
     if (!code || usedCodes.has(code)) {
       code = `UNIT-${row.id.slice(0, 8).toUpperCase()}`;
     }
     usedCodes.add(code);
 
-    await db.update(equipment).set({ itemId: item.id, code }).where(eq(equipment.id, row.id));
+    const itemId = await db.transaction(async (tx) => {
+      const [item] = await tx
+        .insert(equipmentItem)
+        .values({ name: row.name, category: row.category, image: row.image })
+        .returning();
 
-    console.log(`  ${row.name} -> item ${item.id}, code "${code}"`);
+      await tx.update(equipment).set({ itemId: item.id, code }).where(eq(equipment.id, row.id));
+
+      return item.id;
+    });
+
+    console.log(`  ${row.name} -> item ${itemId}, code "${code}"`);
   }
 
   console.log("Backfill selesai.");
