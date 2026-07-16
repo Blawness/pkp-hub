@@ -390,12 +390,39 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
  * dan bukan "tersedia"; tanpa kolom ini, satu-satunya cara menandainya adalah
  * menghapusnya.
  */
+/**
+ * Jenis alat (spec 2026-07-16) — "GPS RTK Trimble R8", bukan unit fisiknya.
+ * Field yang sama untuk semua unit sejenis (nama, kategori, gambar) tinggal
+ * di sini; yang beda per unit fisik (kode, kondisi, data pembelian) tinggal
+ * di `equipment`. Memisahkan keduanya memungkinkan daftar alat menunjukkan
+ * "5 total, 3 tersedia, 2 dipinjam" per jenis tanpa kehilangan identitas
+ * unit fisik mana yang sedang di tangan siapa — `equipment` tetap satu baris
+ * = satu unit fisik, invarian yang sama dengan spec 2026-07-14.
+ *
+ * TIDAK ADA `archivedAt` di sini dengan sengaja: arsip tetap per UNIT
+ * (`equipment.archivedAt`), bukan per jenis — mengarsipkan satu jenis alat
+ * sekaligus bukan cakupan fitur ini (lihat spec §Ruang lingkup).
+ */
+export const equipmentItem = pgTable("equipment_item", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  category: equipmentCategory("category").notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const equipment = pgTable(
   "equipment",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     category: equipmentCategory("category").notNull(),
+    // BARU (spec 2026-07-16, tahap 1/3): nullable sementara sampai backfill
+    // (Task 2) selesai — Task 3 mengunci NOT NULL/UNIQUE dan membuang
+    // name/category/image lama dari tabel ini.
+    itemId: uuid("item_id").references(() => equipmentItem.id, { onDelete: "restrict" }),
+    code: text("code"),
     serialNumber: text("serial_number"),
     condition: equipmentCondition("condition").notNull().default("tersedia"),
     // URL objek storage (WebP, dioptimasi di klien). `fileUrl` mentah — jangan
@@ -410,6 +437,7 @@ export const equipment = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    index("equipment_item_id_idx").on(t.itemId),
     index("equipment_condition_idx").on(t.condition),
     index("equipment_archived_at_idx").on(t.archivedAt),
   ],
@@ -461,7 +489,12 @@ export const equipmentUsage = pgTable(
   ],
 );
 
-export const equipmentRelations = relations(equipment, ({ many }) => ({
+export const equipmentItemRelations = relations(equipmentItem, ({ many }) => ({
+  units: many(equipment),
+}));
+
+export const equipmentRelations = relations(equipment, ({ one, many }) => ({
+  item: one(equipmentItem, { fields: [equipment.itemId], references: [equipmentItem.id] }),
   usages: many(equipmentUsage),
 }));
 
