@@ -2,29 +2,30 @@ import { and, eq, isNull } from "drizzle-orm";
 import { WrenchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { EquipmentFilters } from "@/components/equipment/equipment-filters";
-import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
+import {
+  EquipmentItemAccordion,
+  type EquipmentItemAccordionRow,
+} from "@/components/equipment/equipment-item-accordion";
+import { EquipmentItemFormDialog } from "@/components/equipment/equipment-item-form-dialog";
 import { EquipmentSummary } from "@/components/equipment/equipment-summary";
-import { EquipmentTable } from "@/components/equipment/equipment-table";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { listEquipmentForUser } from "@/lib/actions/equipment-logic";
+import { listEquipmentItemsForUser } from "@/lib/actions/equipment-items-logic";
 import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
+import { formatDuration, summarizeUnits, usageDurationMs } from "@/lib/equipment/derive";
 import { downloadUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Inventaris Alat" };
 
 /**
- * Daftar alat. `requireStaff()` adalah gerbangnya — klien tidak pernah
- * sampai ke sini (redirect ke `/portal`), dan modul ini tidak punya rute
- * apa pun di bawah `/portal`.
+ * Daftar alat, dikelompokkan per JENIS (spec 2026-07-16). `requireStaff()`
+ * adalah gerbangnya — klien tidak pernah sampai ke sini.
  *
- * Kolom harga beli hanya dirender untuk admin, TAPI untuk surveyor field-nya
- * sendiri memang sudah tidak ada di baris — `listEquipmentForUser` memangkasnya
- * di level query (`equipment-logic.ts`). `isAdmin` di sini hanya mengatur
- * layout tabel.
+ * Kolom harga beli hanya masuk payload admin — `listEquipmentItemsForUser`
+ * (lewat `listEquipmentForUser`) memangkasnya di level query untuk surveyor,
+ * bukan disembunyikan di render.
  */
 export default async function EquipmentPage({
   searchParams,
@@ -35,7 +36,7 @@ export default async function EquipmentPage({
   const user = await requireStaff();
   const isAdmin = user.role === "admin";
 
-  const items = await listEquipmentForUser(user);
+  const itemsWithUnits = await listEquipmentItemsForUser(user);
 
   const userProjects = await listProjectsForUser(user);
   const projectOptions = userProjects.map((p) => ({ id: p.id, title: p.title }));
@@ -47,56 +48,52 @@ export default async function EquipmentPage({
         .where(and(eq(users.role, "surveyor"), isNull(users.archivedAt)))
     : [];
 
-  const summary = {
-    total: items.length,
-    terpinjam: items.filter((i) => i.activeUsage).length,
-    tersedia: items.filter((i) => !i.activeUsage && i.condition === "tersedia").length,
-    perawatan: items.filter((i) => !i.activeUsage && i.condition === "perawatan").length,
-    rusak: items.filter((i) => !i.activeUsage && i.condition === "rusak").length,
-  };
+  // Ringkasan total dihitung SEBELUM filter diterapkan — kartunya sendiri
+  // adalah quick-filter, jadi harus tetap menunjukkan total sesungguhnya.
+  const overallSummary = summarizeUnits(itemsWithUnits.flatMap((it) => it.units));
 
-  const filtered = items.filter((item) => {
-    if (filters.category && item.category !== filters.category) return false;
-    // Satu filter status, cermin dari kolom Status gabungan: "terpinjam" =
-    // ada sesi aktif; nilai kondisi (tersedia/perawatan/rusak/pensiun) hanya
-    // cocok untuk alat yang TIDAK sedang dipinjam — sama seperti tampilannya.
-    if (filters.status) {
-      if (filters.status === "terpinjam") {
-        if (!item.activeUsage) return false;
-      } else {
-        if (item.activeUsage) return false;
-        if (item.condition !== filters.status) return false;
-      }
-    }
-    return true;
-  });
+  // Filter di level item: item tampil kalau ADA unit yang cocok filter; unit
+  // yang tidak cocok tersembunyi di dalam accordion-nya, bukan item-nya yang
+  // hilang seluruhnya.
+  const filteredItems = itemsWithUnits
+    .filter((it) => !filters.category || it.item.category === filters.category)
+    .map((it) => ({
+      ...it,
+      units: it.units.filter((u) => {
+        if (!filters.status) return true;
+        if (filters.status === "terpinjam") return Boolean(u.activeUsage);
+        return !u.activeUsage && u.condition === filters.status;
+      }),
+    }))
+    .filter((it) => !filters.status || it.units.length > 0);
 
-  // URL R2 mentah tidak bisa dibuka tanpa tanda tangan — resolve dulu per baris.
-  // Driver lokal mengembalikan URL yang sama (`/api/storage/...`).
   const now = new Date();
-  const rows = await Promise.all(
-    filtered.map(async (item) => ({
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      serialNumber: item.serialNumber,
-      condition: item.condition,
-      image: item.image ? await downloadUrlFor(item.image) : null,
-      purchasePrice: "purchasePrice" in item ? item.purchasePrice : undefined,
-      activeUsage: item.activeUsage
-        ? {
-            usedByName: item.activeUsage.usedByName,
-            projectTitle: item.activeUsage.projectTitle,
-            usageId: item.activeUsage.usageId,
-            // Surveyor hanya boleh menutup sesi miliknya sendiri (cermin server).
-            canReturn: isAdmin || item.activeUsage.usedById === user.id,
-            durationLabel: formatDuration(
-              usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now),
-            ),
-          }
-        : null,
-      // Bisa dipinjam: tersedia & tidak sedang dipakai (arsip sudah tersaring di query list).
-      canBorrow: item.condition === "tersedia" && !item.activeUsage,
+  const rows: EquipmentItemAccordionRow[] = await Promise.all(
+    filteredItems.map(async (it) => ({
+      id: it.item.id,
+      name: it.item.name,
+      category: it.item.category,
+      image: it.item.image ? await downloadUrlFor(it.item.image) : null,
+      summary: summarizeUnits(it.units),
+      units: it.units.map((unit) => ({
+        id: unit.id,
+        code: unit.code,
+        serialNumber: unit.serialNumber,
+        condition: unit.condition,
+        purchasePrice: "purchasePrice" in unit ? unit.purchasePrice : undefined,
+        activeUsage: unit.activeUsage
+          ? {
+              usedByName: unit.activeUsage.usedByName,
+              projectTitle: unit.activeUsage.projectTitle,
+              usageId: unit.activeUsage.usageId,
+              canReturn: isAdmin || unit.activeUsage.usedById === user.id,
+              durationLabel: formatDuration(
+                usageDurationMs({ startedAt: unit.activeUsage.startedAt, endedAt: null }, now),
+              ),
+            }
+          : null,
+        canBorrow: unit.condition === "tersedia" && !unit.activeUsage,
+      })),
     })),
   );
 
@@ -111,22 +108,22 @@ export default async function EquipmentPage({
             ? "Alat ukur yang bisa Anda pinjam."
             : "Seluruh alat ukur studio."
         }
-        action={isAdmin ? <EquipmentFormDialog /> : undefined}
+        action={isAdmin ? <EquipmentItemFormDialog /> : undefined}
       />
 
       <EquipmentSummary
-        total={summary.total}
-        tersedia={summary.tersedia}
-        terpinjam={summary.terpinjam}
-        perawatan={summary.perawatan}
-        rusak={summary.rusak}
+        total={overallSummary.total}
+        tersedia={overallSummary.tersedia}
+        terpinjam={overallSummary.terpinjam}
+        perawatan={overallSummary.perawatan}
+        rusak={overallSummary.rusak}
         activeStatus={filters.status ?? ""}
       />
 
       <EquipmentFilters />
 
-      <EquipmentTable
-        rows={rows}
+      <EquipmentItemAccordion
+        items={rows}
         isAdmin={isAdmin}
         projectOptions={projectOptions}
         surveyors={surveyors}
@@ -138,12 +135,12 @@ export default async function EquipmentPage({
               hasActiveFilter
                 ? "Coba ubah atau hapus filter yang aktif."
                 : isAdmin
-                  ? "Tambahkan alat pertama untuk mulai mencatat pemakaiannya."
+                  ? "Tambahkan jenis alat pertama untuk mulai mencatat unit & pemakaiannya."
                   : "Belum ada alat yang terdaftar."
             }
             action={
               isAdmin && !hasActiveFilter ? (
-                <EquipmentFormDialog trigger={<Button size="sm">Tambah alat</Button>} />
+                <EquipmentItemFormDialog trigger={<Button size="sm">Tambah jenis alat</Button>} />
               ) : undefined
             }
           />
