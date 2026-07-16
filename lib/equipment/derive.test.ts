@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   borrowRejection,
   formatDuration,
+  summarizeUnits,
   usageDurationMs,
   validateUsageWindow,
 } from "@/lib/equipment/derive";
@@ -94,5 +95,48 @@ describe("validateUsageWindow", () => {
   it("selesai sama dengan mulai -> ditolak", () => {
     const t = new Date("2026-07-14T10:00:00Z");
     expect(validateUsageWindow(t, t, now)).toMatch(/setelah/i);
+  });
+});
+
+describe("summarizeUnits", () => {
+  it("item tanpa unit -> semua nol", () => {
+    expect(summarizeUnits([])).toEqual({
+      total: 0,
+      tersedia: 0,
+      terpinjam: 0,
+      perawatan: 0,
+      rusak: 0,
+    });
+  });
+
+  it("menghitung agregat dari campuran kondisi dan sesi aktif", () => {
+    const units = [
+      { condition: "tersedia" as const, activeUsage: null },
+      { condition: "tersedia" as const, activeUsage: { usageId: "u1" } },
+      { condition: "perawatan" as const, activeUsage: null },
+      { condition: "rusak" as const, activeUsage: null },
+      { condition: "pensiun" as const, activeUsage: null },
+    ];
+    expect(summarizeUnits(units)).toEqual({
+      total: 5,
+      tersedia: 1,
+      terpinjam: 1,
+      perawatan: 1,
+      rusak: 1,
+    });
+  });
+
+  // Unit yang sedang dipinjam dihitung "terpinjam" walau condition-nya masih
+  // "tersedia" secara fisik — sesi aktif MENIMPA condition, sama seperti
+  // kolom Status gabungan di tabel alat sebelumnya.
+  it("sesi aktif menimpa condition tersedia", () => {
+    const units = [{ condition: "tersedia" as const, activeUsage: { usageId: "u1" } }];
+    expect(summarizeUnits(units)).toEqual({
+      total: 1,
+      tersedia: 0,
+      terpinjam: 1,
+      perawatan: 0,
+      rusak: 0,
+    });
   });
 });

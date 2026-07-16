@@ -65,3 +65,25 @@ export function validateUsageWindow(
   }
   return null;
 }
+
+/**
+ * Agregat tersedia/dipinjam/perawatan/rusak untuk sekumpulan unit — dipakai
+ * baik untuk ringkasan total (semua unit lintas item) maupun ringkasan per
+ * item (spec 2026-07-16). Sesi aktif MENIMPA `condition`: unit yang sedang
+ * dipinjam dihitung "terpinjam" walau `condition`-nya "tersedia".
+ */
+export function summarizeUnits(units: { condition: EquipmentCondition; activeUsage: unknown }[]): {
+  total: number;
+  tersedia: number;
+  terpinjam: number;
+  perawatan: number;
+  rusak: number;
+} {
+  return {
+    total: units.length,
+    tersedia: units.filter((u) => !u.activeUsage && u.condition === "tersedia").length,
+    terpinjam: units.filter((u) => Boolean(u.activeUsage)).length,
+    perawatan: units.filter((u) => !u.activeUsage && u.condition === "perawatan").length,
+    rusak: units.filter((u) => !u.activeUsage && u.condition === "rusak").length,
+  };
+}
