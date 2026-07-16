@@ -134,7 +134,9 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // sendiri — konsisten dengan pola di seluruh halaman ini.
   const projectEquipmentUsages = await listUsageForProject(user, project.id);
   const allEquipment = await listEquipmentForUser(user);
-  const equipmentNameById = new Map(allEquipment.map((e) => [e.id, e.name]));
+  // "${itemName} (${code})" — beberapa unit sejenis kini mungkin ada (spec
+  // 2026-07-16), jadi nama alat saja tidak lagi cukup membedakan unit mana.
+  const equipmentNameById = new Map(allEquipment.map((e) => [e.id, `${e.itemName} (${e.code})`]));
 
   const equipmentUsageUserIds = [...new Set(projectEquipmentUsages.map((u) => u.usedById))];
   const equipmentUsageUsers = equipmentUsageUserIds.length
@@ -159,10 +161,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   }));
 
   // Boleh dipinjam: tersedia, tidak terarsip, dan tidak sedang dipakai —
-  // dihitung di server dari `listEquipmentForUser`, sama seperti spec Task 6.
+  // dihitung di server dari `listEquipmentForUser`.
   const borrowableEquipment = allEquipment
     .filter((e) => e.condition === "tersedia" && !e.archivedAt && !e.activeUsage)
-    .map((e) => ({ id: e.id, name: e.name }));
+    .map((e) => ({ id: e.id, name: `${e.itemName} (${e.code})` }));
 
   const uploaderIds = [...new Set(projectDocuments.map((d) => d.uploadedById))];
   const uploaderUsers = uploaderIds.length

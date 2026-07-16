@@ -390,17 +390,41 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
  * dan bukan "tersedia"; tanpa kolom ini, satu-satunya cara menandainya adalah
  * menghapusnya.
  */
+/**
+ * Jenis alat (spec 2026-07-16) — "GPS RTK Trimble R8", bukan unit fisiknya.
+ * Field yang sama untuk semua unit sejenis (nama, kategori, gambar) tinggal
+ * di sini; yang beda per unit fisik (kode, kondisi, data pembelian) tinggal
+ * di `equipment`. Memisahkan keduanya memungkinkan daftar alat menunjukkan
+ * "5 total, 3 tersedia, 2 dipinjam" per jenis tanpa kehilangan identitas
+ * unit fisik mana yang sedang di tangan siapa — `equipment` tetap satu baris
+ * = satu unit fisik, invarian yang sama dengan spec 2026-07-14.
+ *
+ * TIDAK ADA `archivedAt` di sini dengan sengaja: arsip tetap per UNIT
+ * (`equipment.archivedAt`), bukan per jenis — mengarsipkan satu jenis alat
+ * sekaligus bukan cakupan fitur ini (lihat spec §Ruang lingkup).
+ */
+export const equipmentItem = pgTable("equipment_item", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  category: equipmentCategory("category").notNull(),
+  image: text("image"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const equipment = pgTable(
   "equipment",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    name: text("name").notNull(),
-    category: equipmentCategory("category").notNull(),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => equipmentItem.id, { onDelete: "restrict" }),
+    // Kode inventaris studio — BUKAN serialNumber (nomor seri pabrik di bawah,
+    // opsional & tidak dijamin unik). `code` dikontrol studio sendiri, wajib,
+    // unik, dipakai untuk saling merujuk di lapangan/laporan.
+    code: text("code").notNull(),
     serialNumber: text("serial_number"),
     condition: equipmentCondition("condition").notNull().default("tersedia"),
-    // URL objek storage (WebP, dioptimasi di klien). `fileUrl` mentah — jangan
-    // diserahkan langsung ke browser saat driver R2; pakai `downloadUrlFor`.
-    image: text("image"),
     // ADMIN-ONLY. Dipangkas di level query untuk surveyor (equipment-logic.ts).
     purchaseDate: date("purchase_date", { mode: "string" }),
     purchasePrice: bigint("purchase_price", { mode: "number" }),
@@ -410,8 +434,10 @@ export const equipment = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    index("equipment_item_id_idx").on(t.itemId),
     index("equipment_condition_idx").on(t.condition),
     index("equipment_archived_at_idx").on(t.archivedAt),
+    uniqueIndex("equipment_code_uniq").on(t.code),
   ],
 );
 
@@ -461,7 +487,12 @@ export const equipmentUsage = pgTable(
   ],
 );
 
-export const equipmentRelations = relations(equipment, ({ many }) => ({
+export const equipmentItemRelations = relations(equipmentItem, ({ many }) => ({
+  units: many(equipment),
+}));
+
+export const equipmentRelations = relations(equipment, ({ one, many }) => ({
+  item: one(equipmentItem, { fields: [equipment.itemId], references: [equipmentItem.id] }),
   usages: many(equipmentUsage),
 }));
 

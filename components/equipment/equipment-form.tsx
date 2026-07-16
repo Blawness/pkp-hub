@@ -4,22 +4,17 @@ import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { EquipmentImageField } from "@/components/equipment/equipment-image-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createEquipment, updateEquipment } from "@/lib/actions/equipment";
-import type {
-  EquipmentCategoryInput,
-  EquipmentConditionInput,
-} from "@/lib/actions/equipment-schemas";
-import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
+import type { EquipmentConditionInput } from "@/lib/actions/equipment-schemas";
+import { equipmentConditionLabel } from "@/lib/labels";
 
 type FormValues = {
-  name: string;
-  category: EquipmentCategoryInput;
+  code: string;
   serialNumber: string;
   condition: EquipmentConditionInput;
   purchaseDate: string;
@@ -29,44 +24,36 @@ type FormValues = {
 
 export type EquipmentEditTarget = {
   equipmentId: string;
-  name: string;
-  category: EquipmentCategoryInput;
+  code: string;
   serialNumber: string | null;
   condition: EquipmentConditionInput;
-  image: string | null;
-  /** URL yang sudah di-resolve untuk pratinjau gambar lama (server: `downloadUrlFor`). */
-  imageDisplayUrl: string | null;
   purchaseDate: string | null;
   purchasePrice: number | null;
   notes: string | null;
 };
 
 /**
- * Admin-only: tambah alat baru ATAU edit alat yang ada, tergantung apakah
- * `editing` di-pass — pola sama dengan `PhaseFormDialog`/`RecordPaymentDialog`
- * (`useAction` + `executeAsync`, error di state lokal). Dirender di dalam
- * `EquipmentFormDialog` (tidak lagi punya halaman `/new` atau `/[id]/edit`);
- * penegakan admin ada di server (`createEquipment`/`updateEquipment` memakai
- * `adminActionClient`), jadi komponen ini tidak perlu mengulang itu.
- *
- * `onSuccess` di-pass oleh dialog untuk menutup dirinya setelah simpan; tanpa
- * itu (fallback), form berpindah ke halaman detail alat seperti dulu.
+ * Admin-only: tambah unit fisik baru di bawah `itemId`, ATAU edit unit yang
+ * ada (spec 2026-07-16). Jenis alat (nama/kategori/gambar) tidak ada di sini
+ * lagi — itu `EquipmentItemForm`. `itemId` selalu wajib: untuk create dikirim
+ * ke server; untuk edit unit tidak pernah pindah item, jadi tidak dikirim
+ * ulang, hanya dipakai untuk teks tampilan oleh pemanggil.
  */
 export function EquipmentForm({
+  itemId,
   editing,
   onSuccess,
 }: {
+  itemId: string;
   editing?: EquipmentEditTarget;
   onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
-  const [image, setImage] = useState<string | null>(editing?.image ?? null);
   const isEditing = !!editing;
 
   const defaultValues: FormValues = {
-    name: editing?.name ?? "",
-    category: editing?.category ?? "instrumen_ukur",
+    code: editing?.code ?? "",
     serialNumber: editing?.serialNumber ?? "",
     condition: editing?.condition ?? "tersedia",
     purchaseDate: editing?.purchaseDate ?? "",
@@ -93,11 +80,9 @@ export function EquipmentForm({
     }
 
     const payload = {
-      name: values.name.trim(),
-      category: values.category,
+      code: values.code.trim(),
       serialNumber: values.serialNumber.trim() || undefined,
       condition: values.condition,
-      image,
       purchaseDate: values.purchaseDate || null,
       purchasePrice,
       notes: values.notes.trim() || undefined,
@@ -105,7 +90,7 @@ export function EquipmentForm({
 
     const result = isEditing
       ? await executeUpdate({ equipmentId: editing.equipmentId, ...payload })
-      : await executeCreate(payload);
+      : await executeCreate({ itemId, ...payload });
 
     if (result?.serverError) {
       setFormError(result.serverError);
@@ -116,52 +101,18 @@ export function EquipmentForm({
       return;
     }
 
-    const savedId = result?.data?.item.id ?? editing?.equipmentId;
     reset(defaultValues);
-
-    // Di dalam dialog: tutup + segarkan daftar/detail di tempat, tanpa pindah
-    // halaman. Tanpa `onSuccess` (fallback), perilaku lama: buka detail alat.
     if (onSuccess) {
       onSuccess();
-      router.refresh();
-      return;
     }
-    router.push(savedId ? `/dashboard/equipment/${savedId}` : "/dashboard/equipment");
     router.refresh();
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-lg flex-col gap-4" noValidate>
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="name">Nama alat</Label>
-        <Input id="name" {...register("name")} />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label>Gambar (opsional)</Label>
-        <EquipmentImageField
-          value={image}
-          displayUrl={editing?.imageDisplayUrl ?? null}
-          onChange={setImage}
-        />
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="category">Kategori</Label>
-        <Controller
-          control={control}
-          name="category"
-          render={({ field }) => (
-            <SelectField
-              id="category"
-              className="w-full"
-              options={optionsFromLabels(equipmentCategoryLabel)}
-              value={field.value}
-              onValueChange={field.onChange}
-              onBlur={field.onBlur}
-            />
-          )}
-        />
+        <Label htmlFor="code">Kode unit</Label>
+        <Input id="code" {...register("code")} />
       </div>
 
       <div className="flex flex-col gap-1.5">
@@ -206,7 +157,7 @@ export function EquipmentForm({
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
       <Button type="submit" disabled={isSubmitting} className="mt-2 w-fit">
-        {isSubmitting ? "Menyimpan..." : isEditing ? "Simpan perubahan" : "Tambah alat"}
+        {isSubmitting ? "Menyimpan..." : isEditing ? "Simpan perubahan" : "Tambah unit"}
       </Button>
     </form>
   );

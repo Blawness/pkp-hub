@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** Skema input inventaris alat. Dipisah dari logika (server-only) — komponen klien boleh mengimpor ini. */
+/** Skema input inventaris alat — UNIT FISIK (spec 2026-07-14, direvisi spec 2026-07-16). Jenis alat ada di `equipment-items-schemas.ts`. Dipisah dari logika (server-only) — komponen klien boleh mengimpor ini. */
 
 export const equipmentCategorySchema = z.enum([
   "instrumen_ukur",
@@ -21,21 +21,22 @@ const dateString = z
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal harus dalam format YYYY-MM-DD.");
 
 export const createEquipmentInputSchema = z.object({
-  name: z.string().trim().min(1, "Nama alat wajib diisi.").max(160),
-  category: equipmentCategorySchema,
+  itemId: z.uuid(),
+  // Kode inventaris studio, unik per unit — lihat komentar di lib/db/schema.ts.
+  code: z.string().trim().min(1, "Kode unit wajib diisi.").max(60),
   serialNumber: z.string().trim().max(120).optional(),
   condition: equipmentConditionSchema.default("tersedia"),
   purchaseDate: dateString.nullable().optional(),
   purchasePrice: z.number().int().nonnegative().nullable().optional(),
   notes: z.string().trim().max(1000).optional(),
-  // URL objek storage hasil upload (WebP). `null` = hapus gambar.
-  image: z.string().trim().max(1000).nullable().optional(),
 });
 export type CreateEquipmentInput = z.infer<typeof createEquipmentInputSchema>;
 
-export const updateEquipmentInputSchema = createEquipmentInputSchema.extend({
-  equipmentId: z.uuid(),
-});
+// `itemId` sengaja TIDAK ada di sini — unit tidak pindah item setelah dibuat
+// (lihat spec §Ruang lingkup, non-goal).
+export const updateEquipmentInputSchema = createEquipmentInputSchema
+  .omit({ itemId: true })
+  .extend({ equipmentId: z.uuid() });
 export type UpdateEquipmentInput = z.infer<typeof updateEquipmentInputSchema>;
 
 export const archiveEquipmentInputSchema = z.object({ equipmentId: z.uuid() });

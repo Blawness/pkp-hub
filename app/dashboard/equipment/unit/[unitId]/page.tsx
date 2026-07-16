@@ -1,5 +1,6 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { ImageIcon } from "lucide-react";
+import Link from "next/link";
 import { ArchiveEquipmentButton } from "@/components/equipment/archive-equipment-button";
 import { BorrowDialog } from "@/components/equipment/borrow-dialog";
 import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
@@ -8,10 +9,7 @@ import { UsageHistory, type UsageHistoryRow } from "@/components/equipment/usage
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getEquipmentForUser, listUsageForEquipment } from "@/lib/actions/equipment-logic";
-import type {
-  EquipmentCategoryInput,
-  EquipmentConditionInput,
-} from "@/lib/actions/equipment-schemas";
+import type { EquipmentConditionInput } from "@/lib/actions/equipment-schemas";
 import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
@@ -20,29 +18,34 @@ import { formatIDR } from "@/lib/format";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
 import { downloadUrlFor } from "@/lib/storage";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export async function generateMetadata({ params }: { params: Promise<{ unitId: string }> }) {
+  const { unitId } = await params;
   const user = await requireStaff();
-  const item = await getEquipmentForUser(user, id);
-  return { title: item.name };
+  const item = await getEquipmentForUser(user, unitId);
+  return { title: `${item.itemName} — ${item.code}` };
 }
 
 /**
- * Detail alat + riwayat pakai. `requireStaff()` adalah gerbang halaman ini —
- * klien tidak pernah sampai kemari.
+ * Detail SATU UNIT fisik + riwayat pakai (spec 2026-07-16, evolusi dari
+ * `[id]/page.tsx`). `requireStaff()` adalah gerbang halaman ini — klien tidak
+ * pernah sampai kemari.
  *
  * Harga & tanggal beli hanya dirender kalau `"purchasePrice" in item` — yang
  * hanya benar untuk payload admin (`getEquipmentForUser` memangkas dua field
  * itu dari bentuk objeknya sendiri untuk surveyor, bukan cuma
  * menyembunyikannya di UI).
  */
-export default async function EquipmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function EquipmentUnitDetailPage({
+  params,
+}: {
+  params: Promise<{ unitId: string }>;
+}) {
+  const { unitId } = await params;
   const user = await requireStaff();
   const isAdmin = user.role === "admin";
 
-  const item = await getEquipmentForUser(user, id);
-  const usages = await listUsageForEquipment(user, id);
+  const item = await getEquipmentForUser(user, unitId);
+  const usages = await listUsageForEquipment(user, unitId);
   const imageDisplayUrl = item.image ? await downloadUrlFor(item.image) : null;
 
   const userProjects = await listProjectsForUser(user);
@@ -88,17 +91,21 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
     canReturn: usage.endedAt === null && (isAdmin || usage.usedById === user.id),
   }));
 
-  // Dihitung sekali di sini (bukan dua kali di JSX) supaya teks inline dan
-  // `ReturnButton` selalu menampilkan durasi yang identik.
   const activeDuration = item.activeUsage
     ? formatDuration(usageDurationMs({ startedAt: item.activeUsage.startedAt, endedAt: null }, now))
     : null;
 
+  const displayName = `${item.itemName} (${item.code})`;
+
   return (
     <main className="flex flex-col gap-6 p-8">
+      <Link href="/dashboard/equipment" className="text-sm text-muted-foreground hover:underline">
+        ← Kembali ke daftar alat
+      </Link>
+
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-medium">{item.name}</h1>
+          <h1 className="text-xl font-medium">{displayName}</h1>
           <p className="text-sm text-muted-foreground">
             {equipmentCategoryLabel[item.category] ?? item.category}
             {item.serialNumber ? ` · SN ${item.serialNumber}` : ""}
@@ -111,20 +118,19 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
           {isAdmin && !item.archivedAt ? (
             <>
               <EquipmentFormDialog
+                itemId={item.itemId}
+                itemName={item.itemName}
                 editing={{
                   equipmentId: item.id,
-                  name: item.name,
-                  category: item.category as EquipmentCategoryInput,
+                  code: item.code,
                   serialNumber: item.serialNumber,
                   condition: item.condition as EquipmentConditionInput,
-                  image: item.image,
-                  imageDisplayUrl,
                   purchaseDate: "purchaseDate" in item ? item.purchaseDate : null,
                   purchasePrice: "purchasePrice" in item ? item.purchasePrice : null,
                   notes: item.notes,
                 }}
               />
-              <ArchiveEquipmentButton equipmentId={item.id} equipmentName={item.name} />
+              <ArchiveEquipmentButton equipmentId={item.id} equipmentName={displayName} />
             </>
           ) : null}
         </div>
@@ -133,7 +139,7 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
       <div className="flex h-48 w-full max-w-sm items-center justify-center overflow-hidden rounded-lg border border-border bg-muted">
         {imageDisplayUrl ? (
           // biome-ignore lint/performance/noImgElement: gambar hasil upload, bukan aset statis yang bisa dioptimasi
-          <img src={imageDisplayUrl} alt={item.name} className="h-full w-full object-contain" />
+          <img src={imageDisplayUrl} alt={item.itemName} className="h-full w-full object-contain" />
         ) : (
           <ImageIcon className="h-10 w-10 text-muted-foreground" aria-hidden />
         )}
@@ -159,7 +165,7 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
               {canReturnActive ? (
                 <ReturnButton
                   usageId={item.activeUsage.usageId}
-                  equipmentName={item.name}
+                  equipmentName={displayName}
                   durationLabel={activeDuration ?? undefined}
                 />
               ) : null}
@@ -169,7 +175,7 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
               <p className="text-sm text-muted-foreground">Tersedia — tidak sedang dipakai.</p>
               {item.condition === "tersedia" && !item.archivedAt ? (
                 <BorrowDialog
-                  fixedEquipment={{ id: item.id, name: item.name }}
+                  fixedEquipment={{ id: item.id, name: displayName }}
                   projectOptions={projectOptions}
                   isAdmin={isAdmin}
                   surveyors={surveyors}
@@ -214,7 +220,7 @@ export default async function EquipmentDetailPage({ params }: { params: Promise<
           <CardTitle>Riwayat pakai</CardTitle>
         </CardHeader>
         <CardContent>
-          <UsageHistory rows={usageRows} equipmentName={item.name} />
+          <UsageHistory rows={usageRows} equipmentName={displayName} />
         </CardContent>
       </Card>
     </main>

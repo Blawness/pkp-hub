@@ -2,7 +2,10 @@
 
 import type { ReactElement } from "react";
 import { useState } from "react";
-import { type EquipmentEditTarget, EquipmentForm } from "@/components/equipment/equipment-form";
+import {
+  type EquipmentItemEditTarget,
+  EquipmentItemForm,
+} from "@/components/equipment/equipment-item-form";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,28 +17,25 @@ import {
 } from "@/components/ui/dialog";
 
 /**
- * Tambah / edit UNIT dalam dialog (spec 2026-07-16). `itemId`/`itemName`
- * selalu wajib — unit selalu ada di bawah satu jenis alat, baik saat
- * ditambah dari accordion daftar maupun diedit dari halaman detail unit.
+ * Tambah / edit jenis alat dalam dialog (spec 2026-07-16). `editing`
+ * menentukan mode, sama seperti `EquipmentFormDialog` (unit).
  */
-export function EquipmentFormDialog({
-  itemId,
-  itemName,
+export function EquipmentItemFormDialog({
   editing,
   trigger,
 }: {
-  itemId: string;
-  itemName: string;
-  editing?: EquipmentEditTarget;
+  editing?: EquipmentItemEditTarget;
   trigger?: ReactElement;
 }) {
   const [open, setOpen] = useState(false);
   const isEditing = !!editing;
 
   const defaultTrigger = isEditing ? (
-    <Button variant="outline">Edit</Button>
+    <Button variant="outline" size="sm">
+      Edit
+    </Button>
   ) : (
-    <Button>Tambah unit</Button>
+    <Button>Tambah jenis alat</Button>
   );
 
   return (
@@ -43,14 +43,14 @@ export function EquipmentFormDialog({
       <DialogTrigger render={trigger ?? defaultTrigger} />
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit unit" : "Unit baru"}</DialogTitle>
+          <DialogTitle>{isEditing ? "Edit jenis alat" : "Jenis alat baru"}</DialogTitle>
           <DialogDescription>
             {isEditing
-              ? `${itemName} — ${editing.code}`
-              : `Tambahkan unit fisik baru untuk ${itemName}.`}
+              ? editing.name
+              : "Tambahkan jenis alat baru. Unit fisiknya ditambahkan satu-satu setelah tersimpan."}
           </DialogDescription>
         </DialogHeader>
-        <EquipmentForm itemId={itemId} editing={editing} onSuccess={() => setOpen(false)} />
+        <EquipmentItemForm editing={editing} onSuccess={() => setOpen(false)} />
       </DialogContent>
     </Dialog>
   );

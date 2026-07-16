@@ -10,18 +10,18 @@ import type {
 import type { SessionUser } from "@/lib/auth-guards";
 import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { equipment, equipmentUsage, projects, users } from "@/lib/db/schema";
+import { equipment, equipmentItem, equipmentUsage, projects, users } from "@/lib/db/schema";
 import {
   borrowRejection,
   type EquipmentCondition,
   validateUsageWindow,
 } from "@/lib/equipment/derive";
-import { storage } from "@/lib/storage";
 
 /**
- * Inventaris alat (spec 2026-07-14). Logika + guard dipisah dari pembungkus
- * "use server" (`equipment.ts`) supaya bisa diuji langsung — pola
- * `payments-logic.ts`.
+ * Inventaris alat — UNIT FISIK (spec 2026-07-14, direvisi spec 2026-07-16).
+ * Logika + guard dipisah dari pembungkus "use server" (`equipment.ts`) supaya
+ * bisa diuji langsung — pola `payments-logic.ts`. Jenis alat (`equipmentItem`)
+ * ada di `equipment-items-logic.ts`, file terpisah.
  *
  * DUA ATURAN YANG MUDAH DILANGGAR TANPA SADAR:
  *
@@ -34,11 +34,13 @@ import { storage } from "@/lib/storage";
 
 export type EquipmentRow = {
   id: string;
-  name: string;
+  itemId: string;
+  itemName: string;
   category: string;
+  image: string | null;
+  code: string;
   serialNumber: string | null;
   condition: EquipmentCondition;
-  image: string | null;
   purchaseDate: string | null;
   purchasePrice: number | null;
   notes: string | null;
@@ -106,11 +108,13 @@ async function assertProjectAccessOrReject(projectId: string, user: SessionUser)
 
 const adminColumns = {
   id: equipment.id,
-  name: equipment.name,
-  category: equipment.category,
+  itemId: equipment.itemId,
+  itemName: equipmentItem.name,
+  category: equipmentItem.category,
+  image: equipmentItem.image,
+  code: equipment.code,
   serialNumber: equipment.serialNumber,
   condition: equipment.condition,
-  image: equipment.image,
   purchaseDate: equipment.purchaseDate,
   purchasePrice: equipment.purchasePrice,
   notes: equipment.notes,
@@ -121,11 +125,13 @@ const adminColumns = {
 
 const safeColumns = {
   id: equipment.id,
-  name: equipment.name,
-  category: equipment.category,
+  itemId: equipment.itemId,
+  itemName: equipmentItem.name,
+  category: equipmentItem.category,
+  image: equipmentItem.image,
+  code: equipment.code,
   serialNumber: equipment.serialNumber,
   condition: equipment.condition,
-  image: equipment.image,
   notes: equipment.notes,
   archivedAt: equipment.archivedAt,
   createdAt: equipment.createdAt,
@@ -163,7 +169,7 @@ async function activeUsageByEquipmentId(): Promise<Map<string, ActiveUsage>> {
   return map;
 }
 
-/** Admin: seluruh kolom termasuk harga & tanggal beli. Surveyor: TANPA keduanya. */
+/** Admin: seluruh kolom termasuk harga & tanggal beli. Surveyor: TANPA keduanya. Baris terarsip tidak ikut — dikelompokkan per jenis di `equipment-items-logic.ts`. */
 export async function listEquipmentForUser(user: SessionUser): Promise<EquipmentListItem[]> {
   requireStaff(user);
 
@@ -173,6 +179,7 @@ export async function listEquipmentForUser(user: SessionUser): Promise<Equipment
     const rows = await db
       .select(adminColumns)
       .from(equipment)
+      .innerJoin(equipmentItem, eq(equipment.itemId, equipmentItem.id))
       .where(isNull(equipment.archivedAt))
       .orderBy(desc(equipment.createdAt));
     return rows.map((row) => ({ ...row, activeUsage: activeMap.get(row.id) ?? null }));
@@ -181,6 +188,7 @@ export async function listEquipmentForUser(user: SessionUser): Promise<Equipment
   const rows = await db
     .select(safeColumns)
     .from(equipment)
+    .innerJoin(equipmentItem, eq(equipment.itemId, equipmentItem.id))
     .where(isNull(equipment.archivedAt))
     .orderBy(desc(equipment.createdAt));
   return rows.map((row) => ({ ...row, activeUsage: activeMap.get(row.id) ?? null }));
@@ -193,7 +201,11 @@ export async function getEquipmentForUser(
   requireStaff(user);
 
   const columns = user.role === "admin" ? adminColumns : safeColumns;
-  const [row] = await db.select(columns).from(equipment).where(eq(equipment.id, equipmentId));
+  const [row] = await db
+    .select(columns)
+    .from(equipment)
+    .innerJoin(equipmentItem, eq(equipment.itemId, equipmentItem.id))
+    .where(eq(equipment.id, equipmentId));
   if (!row) throw new Error("Alat tidak ditemukan.");
 
   const [activeRow] = await db
@@ -254,38 +266,52 @@ export async function listUsageForProject(
     .orderBy(desc(equipmentUsage.startedAt));
 }
 
+/** Deteksi error dari unique index `equipment_code_uniq` (Postgres code 23505) dan terjemahkan jadi pesan yang enak dibaca. */
+function isCodeUniqueViolation(error: unknown): boolean {
+  const direct = (error as { code?: unknown } | null)?.code;
+  if (direct === "23505") return true;
+  const cause = (error as { cause?: unknown } | null)?.cause;
+  const causeCode = (cause as { code?: unknown } | null)?.code;
+  return causeCode === "23505";
+}
+
 export async function createEquipmentForUser(
   user: SessionUser,
   input: CreateEquipmentInput,
 ): Promise<EquipmentRow> {
   requireAdmin(user);
 
-  const [row] = await db
-    .insert(equipment)
-    .values({
-      name: input.name,
-      category: input.category,
-      serialNumber: input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
-      condition: input.condition,
-      image: input.image && input.image.length > 0 ? input.image : null,
-      purchaseDate: input.purchaseDate ?? null,
-      purchasePrice: input.purchasePrice ?? null,
-      notes: input.notes && input.notes.length > 0 ? input.notes : null,
+  const [item] = await db
+    .select({
+      id: equipmentItem.id,
+      name: equipmentItem.name,
+      category: equipmentItem.category,
+      image: equipmentItem.image,
     })
-    .returning(adminColumns);
-  return row;
-}
+    .from(equipmentItem)
+    .where(eq(equipmentItem.id, input.itemId));
+  if (!item) throw new Error("Jenis alat tidak ditemukan.");
 
-/**
- * Hapus objek gambar lama saat diganti/dihapus — best-effort. Kegagalan
- * menghapus (objek sudah tak ada, URL dari driver lain, dll.) tidak boleh
- * menggagalkan operasi utama; sisa orphan lebih ringan daripada update gagal.
- */
-async function deleteImageObject(fileUrl: string): Promise<void> {
   try {
-    await storage.delete(storage.keyFromUrl(fileUrl));
-  } catch {
-    // abaikan
+    const [row] = await db
+      .insert(equipment)
+      .values({
+        itemId: input.itemId,
+        code: input.code,
+        serialNumber:
+          input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
+        condition: input.condition,
+        purchaseDate: input.purchaseDate ?? null,
+        purchasePrice: input.purchasePrice ?? null,
+        notes: input.notes && input.notes.length > 0 ? input.notes : null,
+      })
+      .returning();
+    return { ...row, itemName: item.name, category: item.category, image: item.image };
+  } catch (error) {
+    if (isCodeUniqueViolation(error)) {
+      throw new Error("Kode unit sudah dipakai — pakai kode lain.");
+    }
+    throw error;
   }
 }
 
@@ -296,35 +322,43 @@ export async function updateEquipmentForUser(
   requireAdmin(user);
 
   const [existing] = await db
-    .select({ image: equipment.image })
+    .select({ itemId: equipment.itemId })
     .from(equipment)
     .where(eq(equipment.id, input.equipmentId));
   if (!existing) throw new Error("Alat tidak ditemukan.");
 
-  const nextImage = input.image && input.image.length > 0 ? input.image : null;
-
-  const [row] = await db
-    .update(equipment)
-    .set({
-      name: input.name,
-      category: input.category,
-      serialNumber: input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
-      condition: input.condition,
-      image: nextImage,
-      purchaseDate: input.purchaseDate ?? null,
-      purchasePrice: input.purchasePrice ?? null,
-      notes: input.notes && input.notes.length > 0 ? input.notes : null,
-      updatedAt: new Date(),
+  const [item] = await db
+    .select({
+      name: equipmentItem.name,
+      category: equipmentItem.category,
+      image: equipmentItem.image,
     })
-    .where(eq(equipment.id, input.equipmentId))
-    .returning(adminColumns);
-  if (!row) throw new Error("Alat tidak ditemukan.");
+    .from(equipmentItem)
+    .where(eq(equipmentItem.id, existing.itemId));
 
-  // Gambar lama jadi orphan kalau diganti/dihapus — bersihkan best-effort.
-  if (existing.image && existing.image !== nextImage) {
-    await deleteImageObject(existing.image);
+  try {
+    const [row] = await db
+      .update(equipment)
+      .set({
+        code: input.code,
+        serialNumber:
+          input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
+        condition: input.condition,
+        purchaseDate: input.purchaseDate ?? null,
+        purchasePrice: input.purchasePrice ?? null,
+        notes: input.notes && input.notes.length > 0 ? input.notes : null,
+        updatedAt: new Date(),
+      })
+      .where(eq(equipment.id, input.equipmentId))
+      .returning();
+    if (!row) throw new Error("Alat tidak ditemukan.");
+    return { ...row, itemName: item.name, category: item.category, image: item.image };
+  } catch (error) {
+    if (isCodeUniqueViolation(error)) {
+      throw new Error("Kode unit sudah dipakai — pakai kode lain.");
+    }
+    throw error;
   }
-  return row;
 }
 
 export async function archiveEquipmentForUser(
@@ -337,9 +371,19 @@ export async function archiveEquipmentForUser(
     .update(equipment)
     .set({ archivedAt: new Date(), updatedAt: new Date() })
     .where(eq(equipment.id, input.equipmentId))
-    .returning(adminColumns);
+    .returning();
   if (!row) throw new Error("Alat tidak ditemukan.");
-  return row;
+
+  const [item] = await db
+    .select({
+      name: equipmentItem.name,
+      category: equipmentItem.category,
+      image: equipmentItem.image,
+    })
+    .from(equipmentItem)
+    .where(eq(equipmentItem.id, row.itemId));
+
+  return { ...row, itemName: item.name, category: item.category, image: item.image };
 }
 
 /**
@@ -349,9 +393,6 @@ export async function archiveEquipmentForUser(
  * penerjemah.
  */
 function isActiveUsageUniqueViolation(error: unknown): boolean {
-  // Drizzle wraps the real pg error in `DrizzleQueryError.cause` — the code
-  // (and the constraint name in the message) live there, not on the
-  // top-level error.
   const direct = (error as { code?: unknown } | null)?.code;
   if (direct === "23505") return true;
   const cause = (error as { cause?: unknown } | null)?.cause;

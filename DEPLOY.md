@@ -171,6 +171,126 @@ Do **not** run `pnpm db:seed` against production — the seed script creates
 demo owner/surveyor/client accounts with known credentials, meant for local
 dev only. Create the first real owner account directly (see §6).
 
+### 5a. One-time special case: migrations `0010` → `0011` (equipment quantity/unit split)
+
+This applies **only** to this deploy, because of two migrations currently sitting
+in `drizzle/migrations/`:
+
+- `0010_sudden_quicksilver.sql` creates the new `equipment_item` table and adds
+  **nullable** `equipment.item_id` / `equipment.code` columns.
+- `0011_confused_bucky.sql` makes `equipment.item_id` / `equipment.code`
+  `NOT NULL`, adds a unique index on `code`, and drops the now-migrated
+  `equipment.name` / `category` / `image` columns.
+
+Between those two, every pre-existing `equipment` row has to be backfilled with
+an `item_id` and `code` — that backfill is a data migration, not SQL, so it
+cannot live inside `0010` or `0011` itself. The script that does it
+(`scripts/backfill-equipment-items.ts`) was run once against the dev database
+and then deleted from the repo (it referenced `equipment` columns that `0011`
+removes, so it would never compile again) — it's still retrievable from git
+history at commit `8c793ad`.
+
+The normal §5 procedure (`drizzle-kit migrate` straight through) applies **all**
+pending migrations back to back with no pause. If production already has
+`equipment` rows (it does — earlier one-off scripts populated it), running
+`0010` and `0011` back to back will apply `0010` fine, then fail partway
+through `0011`'s `ALTER TABLE "equipment" ALTER COLUMN "item_id" SET NOT NULL`
+because the backfill never ran in between, leaving prod in a half-migrated
+state. Do **not** run the normal §5 command for this deploy. Instead:
+
+**1. Apply `0010` only.** `drizzle-kit` has no "migrate to version N" flag, so
+the practical way to stop it at `0010` is to temporarily remove `0011` from
+both the migrations folder and its journal, then put both back afterwards.
+
+```bash
+# From the repo root. Move the 0011 SQL file somewhere outside
+# drizzle/migrations/ entirely, so drizzle-kit can't see it regardless of
+# the journal edit below:
+mv drizzle/migrations/0011_confused_bucky.sql /tmp/0011_confused_bucky.sql.bak
+```
+
+Then edit `drizzle/migrations/meta/_journal.json` and remove the last entry
+(the one with `"tag": "0011_confused_bucky"`) from the `entries` array — it is
+currently:
+
+```json
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784185258362,
+      "tag": "0011_confused_bucky",
+      "breakpoints": true
+    }
+```
+
+Delete that object (and the trailing comma on the entry before it, `idx: 10`,
+so the JSON stays valid) and save. Now run the normal migrate command from §5
+against production — with only `0010`'s file and journal entry present, it
+applies `0010` and stops there:
+
+```bash
+DATABASE_URL="<paste the Neon production connection string>" \
+  node node_modules/drizzle-kit/bin.cjs migrate
+```
+
+**2. Run the backfill.** Retrieve the deleted script from git history and run
+it with the production database. The script imports `lib/db`, which imports
+`env.ts` — that validates the **full** required env schema at import time
+(`DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`,
+`NEXT_PUBLIC_APP_URL`), not just `DATABASE_URL`, so all four have to be in the
+shell even though the script itself only touches `equipment`/`equipment_item`.
+Reuse the real values you already set in Vercel for Production (§3) — the
+auth-related ones don't functionally matter to this script, they just have to
+pass validation:
+
+```bash
+git show 8c793ad:scripts/backfill-equipment-items.ts > /tmp/backfill-equipment-items.ts
+
+DATABASE_URL="<prod connection string>" \
+BETTER_AUTH_SECRET="<prod value from Vercel>" \
+BETTER_AUTH_URL="<prod value from Vercel>" \
+NEXT_PUBLIC_APP_URL="<prod value from Vercel>" \
+  pnpm exec tsx /tmp/backfill-equipment-items.ts
+```
+
+It logs one line per unit it backfills and is idempotent (it only touches rows
+where `item_id IS NULL`), so it's safe to re-run if it's interrupted.
+
+**3. Verify every row was backfilled before touching `0011`.** Via
+`node node_modules/drizzle-kit/bin.cjs studio` (same `DATABASE_URL`) or Neon's
+SQL editor, confirm this returns `0`:
+
+```sql
+SELECT count(*) FROM equipment WHERE item_id IS NULL OR code IS NULL;
+```
+
+Do not proceed to step 4 until this is `0` — `0011`'s `SET NOT NULL` will fail
+on any row it isn't.
+
+**4. Restore `0011` and apply it.** Move the SQL file back and re-add the
+journal entry deleted in step 1 (the exact object shown above, appended back
+as the last element of `entries`), then run the same migrate command again:
+
+```bash
+mv /tmp/0011_confused_bucky.sql.bak drizzle/migrations/0011_confused_bucky.sql
+```
+
+```bash
+DATABASE_URL="<paste the Neon production connection string>" \
+  node node_modules/drizzle-kit/bin.cjs migrate
+```
+
+Verify with the same `count(*)` query pattern as §5 — check the `equipment`
+table now has `item_id`/`code` as `NOT NULL` columns and no more
+`name`/`category`/`image` columns (Neon SQL editor or drizzle studio's schema
+view), and that `git status` shows `drizzle/migrations/` back to its original
+state (0011's file present, journal entry restored, nothing left in `/tmp`).
+
+This whole split-apply procedure is specific to `0010`→`0011` on this one
+deploy. Once it's done, delete this note's relevance from your mental model —
+every migration after `0011` goes back to the normal single-shot `pnpm
+db:migrate:prod` / §5 procedure above, no interleaving required.
+
 ## 6. First deploy
 
 1. Trigger the deploy (push to the branch Vercel is tracking, or click Deploy
