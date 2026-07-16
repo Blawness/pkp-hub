@@ -109,14 +109,14 @@ describe("batas akses", () => {
   it("surveyor tidak bisa mengubah kondisi alat", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     await expect(
       updateEquipmentForUser(surveyor, {
         equipmentId: item.id,
         name: "TS-1",
-        category: "total_station",
+        category: "instrumen_ukur",
         condition: "rusak",
       }),
     ).rejects.toThrow(/admin/i);
@@ -125,7 +125,7 @@ describe("batas akses", () => {
   it("surveyor tidak bisa mengarsipkan alat", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     await expect(archiveEquipmentForUser(surveyor, { equipmentId: item.id })).rejects.toThrow(
@@ -145,7 +145,7 @@ describe("batas akses", () => {
   it("baris alat yang sampai ke surveyor TIDAK memuat harga & tanggal beli", async () => {
     await createEquipmentForUser(admin, {
       name: "TS-Harga",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
       purchasePrice: 250_000_000,
       purchaseDate: "2025-01-10",
@@ -166,7 +166,7 @@ describe("batas akses", () => {
   it("surveyor tidak bisa mencatat pemakaian untuk proyek yang bukan miliknya", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     await expect(
@@ -183,7 +183,7 @@ describe("batas akses", () => {
   it("surveyor yang mengisi usedById orang lain tetap tercatat atas namanya sendiri", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
 
@@ -201,7 +201,7 @@ describe("batas akses", () => {
   it("admin BOLEH mencatat atas nama surveyor", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
 
@@ -225,7 +225,7 @@ describe("gambar alat", () => {
   it("menyimpan URL gambar saat create", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-Gambar",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
       image: "/api/storage/equipment/aaa.webp",
     });
@@ -235,7 +235,7 @@ describe("gambar alat", () => {
   it("mengganti gambar saat update (dan tidak melempar walau objek lama tak ada)", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-GantiGambar",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
       image: "/api/storage/equipment/lama.webp",
     });
@@ -243,7 +243,7 @@ describe("gambar alat", () => {
     const updated = await updateEquipmentForUser(admin, {
       equipmentId: item.id,
       name: "TS-GantiGambar",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
       image: "/api/storage/equipment/baru.webp",
     });
@@ -259,7 +259,7 @@ describe("gambar alat", () => {
   it("menghapus gambar saat image di-set null", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-HapusGambar",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
       image: "/api/storage/equipment/ada.webp",
     });
@@ -267,7 +267,7 @@ describe("gambar alat", () => {
     const updated = await updateEquipmentForUser(admin, {
       equipmentId: item.id,
       name: "TS-HapusGambar",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
       image: null,
     });
@@ -279,7 +279,7 @@ describe("aturan pinjam", () => {
   it("alat rusak tidak bisa dipinjam", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS rusak",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "rusak",
     });
     await expect(
@@ -290,7 +290,7 @@ describe("aturan pinjam", () => {
   it("alat terarsip tidak bisa dipinjam", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS arsip",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     await archiveEquipmentForUser(admin, { equipmentId: item.id });
@@ -302,7 +302,7 @@ describe("aturan pinjam", () => {
   it("waktu mulai di masa depan ditolak", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     const besok = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -314,7 +314,7 @@ describe("aturan pinjam", () => {
   it("meminjam alat yang sudah dipinjam ditolak, dengan menyebut pemegangnya", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     await borrowEquipmentForUser(admin, {
@@ -332,7 +332,7 @@ describe("aturan pinjam", () => {
   it("mengembalikan lalu meminjam lagi BOLEH — kuncinya sesi aktif, bukan seumur hidup", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     const first = await borrowEquipmentForUser(admin, {
@@ -353,7 +353,7 @@ describe("aturan pinjam", () => {
   it("status pakai adalah TURUNAN: alat dengan sesi terbuka tampil sedang dipakai, setelah dikembalikan tidak lagi", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     const usage = await borrowEquipmentForUser(admin, {
@@ -384,7 +384,7 @@ describe("kunci sesi ganda di level database", () => {
   it("dua sesi terbuka untuk alat yang sama ditolak constraint, walau logic layer dilewati", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-1",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
 
@@ -424,7 +424,7 @@ describe("koreksi sesi (admin-only)", () => {
   it("surveyor tidak bisa mengoreksi sesi", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-Koreksi",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     const usage = await borrowEquipmentForUser(admin, {
@@ -446,7 +446,7 @@ describe("koreksi sesi (admin-only)", () => {
   it("klien tidak bisa mengoreksi sesi", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-Koreksi",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     const usage = await borrowEquipmentForUser(admin, {
@@ -468,7 +468,7 @@ describe("koreksi sesi (admin-only)", () => {
   it("admin bisa mengoreksi startedAt/endedAt sesi yang sudah ditutup, dan nilainya berubah di DB", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-Koreksi",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     const originalStart = new Date(Date.now() - 3 * 60 * 60 * 1000);
@@ -499,7 +499,7 @@ describe("koreksi sesi (admin-only)", () => {
   it("koreksi dengan endedAt <= startedAt ditolak", async () => {
     const item = await createEquipmentForUser(admin, {
       name: "TS-Koreksi",
-      category: "total_station",
+      category: "instrumen_ukur",
       condition: "tersedia",
     });
     const usage = await borrowEquipmentForUser(admin, {

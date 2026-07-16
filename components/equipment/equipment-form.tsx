@@ -66,7 +66,7 @@ export function EquipmentForm({
 
   const defaultValues: FormValues = {
     name: editing?.name ?? "",
-    category: editing?.category ?? "total_station",
+    category: editing?.category ?? "instrumen_ukur",
     serialNumber: editing?.serialNumber ?? "",
     condition: editing?.condition ?? "tersedia",
     purchaseDate: editing?.purchaseDate ?? "",

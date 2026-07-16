@@ -50,6 +50,27 @@
       "when": 1784103879351,
       "tag": "0006_groovy_zaran",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784174571169,
+      "tag": "0007_slim_impossible_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784175126995,
+      "tag": "0008_simple_lyja",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784176281958,
+      "tag": "0009_parched_blacklash",
+      "breakpoints": true
     }
   ]
 }

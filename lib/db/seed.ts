@@ -304,7 +304,7 @@ async function seed() {
     .values([
       {
         name: "Total Station Topcon GM-52",
-        category: "total_station",
+        category: "instrumen_ukur",
         serialNumber: "TS-GM52-001",
         condition: "tersedia",
         purchaseDate: "2024-03-10",
@@ -312,7 +312,7 @@ async function seed() {
       },
       {
         name: "Total Station Sokkia CX-105",
-        category: "total_station",
+        category: "instrumen_ukur",
         serialNumber: "TS-CX105-002",
         condition: "perawatan",
         notes: "Layar retak, dikirim servis ke pusat Sokkia.",
@@ -338,7 +338,7 @@ async function seed() {
       },
       {
         name: "Waterpass Sokkia B40A",
-        category: "waterpass",
+        category: "instrumen_ukur",
         serialNumber: "WP-B40A-001",
         condition: "tersedia",
         purchaseDate: "2021-09-01",

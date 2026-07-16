@@ -1,0 +1,1 @@
+ALTER TYPE "public"."equipment_category" ADD VALUE 'laptop' BEFORE 'inventaris_kantor';

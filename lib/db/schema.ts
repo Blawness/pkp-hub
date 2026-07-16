@@ -49,11 +49,12 @@ export const documentCategory = pgEnum("document_category", [
 export const mapLayerSource = pgEnum("map_layer_source", ["manual", "import_csv", "import_dxf"]);
 export const projectPhaseStatus = pgEnum("project_phase_status", ["belum", "berjalan", "selesai"]);
 export const equipmentCategory = pgEnum("equipment_category", [
-  "total_station",
+  "instrumen_ukur",
   "gps_rtk",
   "drone",
-  "waterpass",
-  "theodolite",
+  "aksesoris_survey",
+  "laptop",
+  "inventaris_kantor",
   "lainnya",
 ]);
 export const equipmentCondition = pgEnum("equipment_condition", [
