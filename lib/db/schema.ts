@@ -416,18 +416,15 @@ export const equipment = pgTable(
   "equipment",
   {
     id: uuid("id").primaryKey().defaultRandom(),
-    name: text("name").notNull(),
-    category: equipmentCategory("category").notNull(),
-    // BARU (spec 2026-07-16, tahap 1/3): nullable sementara sampai backfill
-    // (Task 2) selesai — Task 3 mengunci NOT NULL/UNIQUE dan membuang
-    // name/category/image lama dari tabel ini.
-    itemId: uuid("item_id").references(() => equipmentItem.id, { onDelete: "restrict" }),
-    code: text("code"),
+    itemId: uuid("item_id")
+      .notNull()
+      .references(() => equipmentItem.id, { onDelete: "restrict" }),
+    // Kode inventaris studio — BUKAN serialNumber (nomor seri pabrik di bawah,
+    // opsional & tidak dijamin unik). `code` dikontrol studio sendiri, wajib,
+    // unik, dipakai untuk saling merujuk di lapangan/laporan.
+    code: text("code").notNull(),
     serialNumber: text("serial_number"),
     condition: equipmentCondition("condition").notNull().default("tersedia"),
-    // URL objek storage (WebP, dioptimasi di klien). `fileUrl` mentah — jangan
-    // diserahkan langsung ke browser saat driver R2; pakai `downloadUrlFor`.
-    image: text("image"),
     // ADMIN-ONLY. Dipangkas di level query untuk surveyor (equipment-logic.ts).
     purchaseDate: date("purchase_date", { mode: "string" }),
     purchasePrice: bigint("purchase_price", { mode: "number" }),
@@ -440,6 +437,7 @@ export const equipment = pgTable(
     index("equipment_item_id_idx").on(t.itemId),
     index("equipment_condition_idx").on(t.condition),
     index("equipment_archived_at_idx").on(t.archivedAt),
+    uniqueIndex("equipment_code_uniq").on(t.code),
   ],
 );
 
