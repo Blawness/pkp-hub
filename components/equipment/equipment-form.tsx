@@ -27,7 +27,7 @@ type FormValues = {
   notes: string;
 };
 
-type EquipmentEditTarget = {
+export type EquipmentEditTarget = {
   equipmentId: string;
   name: string;
   category: EquipmentCategoryInput;
@@ -44,11 +44,21 @@ type EquipmentEditTarget = {
 /**
  * Admin-only: tambah alat baru ATAU edit alat yang ada, tergantung apakah
  * `editing` di-pass — pola sama dengan `PhaseFormDialog`/`RecordPaymentDialog`
- * (`useAction` + `executeAsync`, error di state lokal). Halaman ini sendiri
- * (`new/page.tsx`, `[id]/edit/page.tsx`) sudah memanggil `requireAdmin()` di
- * server; komponen ini tidak perlu mengulang itu.
+ * (`useAction` + `executeAsync`, error di state lokal). Dirender di dalam
+ * `EquipmentFormDialog` (tidak lagi punya halaman `/new` atau `/[id]/edit`);
+ * penegakan admin ada di server (`createEquipment`/`updateEquipment` memakai
+ * `adminActionClient`), jadi komponen ini tidak perlu mengulang itu.
+ *
+ * `onSuccess` di-pass oleh dialog untuk menutup dirinya setelah simpan; tanpa
+ * itu (fallback), form berpindah ke halaman detail alat seperti dulu.
  */
-export function EquipmentForm({ editing }: { editing?: EquipmentEditTarget }) {
+export function EquipmentForm({
+  editing,
+  onSuccess,
+}: {
+  editing?: EquipmentEditTarget;
+  onSuccess?: () => void;
+}) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
   const [image, setImage] = useState<string | null>(editing?.image ?? null);
@@ -56,7 +66,7 @@ export function EquipmentForm({ editing }: { editing?: EquipmentEditTarget }) {
 
   const defaultValues: FormValues = {
     name: editing?.name ?? "",
-    category: editing?.category ?? "total_station",
+    category: editing?.category ?? "instrumen_ukur",
     serialNumber: editing?.serialNumber ?? "",
     condition: editing?.condition ?? "tersedia",
     purchaseDate: editing?.purchaseDate ?? "",
@@ -108,6 +118,14 @@ export function EquipmentForm({ editing }: { editing?: EquipmentEditTarget }) {
 
     const savedId = result?.data?.item.id ?? editing?.equipmentId;
     reset(defaultValues);
+
+    // Di dalam dialog: tutup + segarkan daftar/detail di tempat, tanpa pindah
+    // halaman. Tanpa `onSuccess` (fallback), perilaku lama: buka detail alat.
+    if (onSuccess) {
+      onSuccess();
+      router.refresh();
+      return;
+    }
     router.push(savedId ? `/dashboard/equipment/${savedId}` : "/dashboard/equipment");
     router.refresh();
   };

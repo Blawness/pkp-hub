@@ -1,5 +1,6 @@
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { FileIcon } from "lucide-react";
+import type { z } from "zod";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import {
@@ -26,12 +27,15 @@ import {
   getStatusLogsForProject,
   type ProjectStatus,
 } from "@/lib/actions/projects-logic";
+import type { projectInputSchema } from "@/lib/actions/projects-schemas";
 import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { clients, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { todayString } from "@/lib/phases/derive";
 import { downloadUrlFor } from "@/lib/storage";
+
+type ProjectFormValues = z.infer<typeof projectInputSchema>;
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -100,14 +104,23 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .from(users)
     .where(eq(users.role, "surveyor"));
 
+  // Klien untuk dropdown edit proyek: kecualikan klien terarsip, KECUALI
+  // klien proyek ini sendiri kalau kebetulan terarsip — meniru guard di
+  // halaman `/[id]/edit` yang dihapus, supaya klien saat ini tidak hilang
+  // diam-diam dari opsi dropdown.
+  const clientRows = await db
+    .select({ id: clients.id, name: clients.name })
+    .from(clients)
+    .where(or(isNull(clients.archivedAt), eq(clients.id, project.clientId)));
+
   const phases = await listPhasesForProject(user, project.id);
   const progress = await getProjectProgress(user, project.id);
   const phasesDone = phases.filter((p) => p.status === "selesai").length;
   const phasesTotal = phases.length;
   // Daftar surveyor untuk dropdown penanggung jawab fase — hanya admin yang
-  // butuh. Query inline, pola yang sama dengan `app/dashboard/projects/new/page.tsx:18`.
-  // BEDANYA: kita saring `archivedAt` — menugaskan fase ke surveyor yang sudah
-  // diarsipkan berarti menugaskannya ke orang yang tidak bisa login.
+  // butuh. Query inline, sama seperti `surveyorRows` di atas. BEDANYA: kita
+  // saring `archivedAt` — menugaskan fase ke surveyor yang sudah diarsipkan
+  // berarti menugaskannya ke orang yang tidak bisa login.
   const phaseSurveyors = isAdmin
     ? await db
         .select({ id: users.id, name: users.name })
@@ -198,6 +211,21 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         surveyorName={assignedSurveyorName}
         assignedSurveyorId={project.assignedSurveyorId}
         surveyors={surveyorRows}
+        clients={clientRows}
+        editProject={{
+          id: project.id,
+          title: project.title,
+          clientId: project.clientId,
+          // `getProjectDetailForUser` widens `surveyType` to `string` in its
+          // field-by-field projection (see `ProjectDetailBase` in
+          // projects-logic.ts) — safe to narrow back here since the value
+          // always comes straight from the DB enum column.
+          surveyType: project.surveyType as ProjectFormValues["surveyType"],
+          locationLabel: project.locationLabel ?? null,
+          assignedSurveyorId: project.assignedSurveyorId,
+          orderDate: project.orderDate,
+          description: project.description ?? null,
+        }}
         isAdmin={isAdmin}
         canEdit={user.role === "admin"}
         status={project.status}

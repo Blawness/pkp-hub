@@ -1,14 +1,19 @@
+import { eq } from "drizzle-orm";
 import { FolderKanbanIcon } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
+import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { InviteClientButton } from "@/components/clients/invite-client-button";
+import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listProjectsForUser, requireAdmin } from "@/lib/auth-guards";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
 import { clientTypeLabel, statusLabel } from "@/lib/labels";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -35,6 +40,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
   const allProjects = await listProjectsForUser(user);
   const clientProjects = allProjects.filter((p) => p.clientId === client.id);
 
+  const surveyorRows = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(eq(users.role, "surveyor"));
+
   return (
     <main className="flex flex-col gap-6 p-8">
       <div className="flex items-center justify-between">
@@ -52,9 +62,17 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
             hasUser={Boolean(client.userId)}
             archived={Boolean(client.archivedAt)}
           />
-          <ButtonLink variant="outline" href={`/dashboard/clients/${client.id}/edit`}>
-            Edit
-          </ButtonLink>
+          <ClientFormDialog
+            client={{
+              id: client.id,
+              name: client.name,
+              type: client.type,
+              phone: client.phone,
+              email: client.email,
+              address: client.address,
+              notes: client.notes,
+            }}
+          />
           {!client.archivedAt ? <ArchiveClientButton clientId={client.id} /> : null}
         </div>
       </div>
@@ -96,9 +114,11 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               title="Belum ada proyek"
               description="Klien ini belum punya proyek survey."
               action={
-                <ButtonLink size="sm" href="/dashboard/projects/new">
-                  Buat proyek
-                </ButtonLink>
+                <ProjectFormDialog
+                  clients={[{ id: client.id, name: client.name }]}
+                  surveyors={surveyorRows}
+                  trigger={<Button size="sm">Buat proyek</Button>}
+                />
               }
             />
           ) : (

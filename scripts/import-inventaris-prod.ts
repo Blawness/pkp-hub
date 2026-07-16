@@ -28,7 +28,14 @@ import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { equipment } from "@/lib/db/schema";
 
-type Category = "total_station" | "gps_rtk" | "drone" | "waterpass" | "theodolite" | "lainnya";
+type Category =
+  | "instrumen_ukur"
+  | "gps_rtk"
+  | "drone"
+  | "aksesoris_survey"
+  | "laptop"
+  | "inventaris_kantor"
+  | "lainnya";
 
 type Row = {
   name: string;

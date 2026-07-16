@@ -56,11 +56,12 @@ export const phaseStatusLabel: Record<string, string> = {
 };
 
 export const equipmentCategoryLabel: Record<string, string> = {
-  total_station: "Total Station",
+  instrumen_ukur: "Instrumen Ukur",
   gps_rtk: "GPS RTK",
   drone: "Drone",
-  waterpass: "Waterpass",
-  theodolite: "Theodolite",
+  aksesoris_survey: "Aksesoris Survey",
+  laptop: "Laptop",
+  inventaris_kantor: "Inventaris Kantor",
   lainnya: "Lainnya",
 };
 

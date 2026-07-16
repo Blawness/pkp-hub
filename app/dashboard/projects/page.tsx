@@ -3,10 +3,12 @@ import { FolderKanbanIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ActiveFilters } from "@/components/projects/active-filters";
 import { ProjectFilters } from "@/components/projects/project-filters";
+import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { projectsColumns } from "@/components/projects/projects-columns";
-import { ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
+import { listClients } from "@/lib/actions/clients-logic";
 import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
@@ -39,10 +41,12 @@ export default async function ProjectsPage({
     return true;
   });
 
-  const [clientRows, surveyorRows] = await Promise.all([
+  const [clientRows, surveyorRows, activeClientRows] = await Promise.all([
     db.select({ id: clients.id, name: clients.name }).from(clients),
     db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, "surveyor")),
+    listClients(),
   ]);
+  const activeClients = activeClientRows.map((c) => ({ id: c.id, name: c.name }));
   const clientMap = new Map(clientRows.map((c) => [c.id, c.name]));
   const surveyorMap = new Map(surveyorRows.map((s) => [s.id, s.name]));
 
@@ -65,7 +69,7 @@ export default async function ProjectsPage({
         }
         action={
           user.role === "admin" ? (
-            <ButtonLink href="/dashboard/projects/new">Proyek baru</ButtonLink>
+            <ProjectFormDialog clients={activeClients} surveyors={surveyorRows} />
           ) : undefined
         }
       />
@@ -99,9 +103,11 @@ export default async function ProjectsPage({
             }
             action={
               user.role === "admin" ? (
-                <ButtonLink size="sm" href="/dashboard/projects/new">
-                  Proyek baru
-                </ButtonLink>
+                <ProjectFormDialog
+                  clients={activeClients}
+                  surveyors={surveyorRows}
+                  trigger={<Button size="sm">Proyek baru</Button>}
+                />
               ) : undefined
             }
           />

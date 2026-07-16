@@ -21,6 +21,7 @@ export function ProjectForm({
   clients,
   surveyors,
   project,
+  onSuccess,
 }: {
   clients: { id: string; name: string }[];
   surveyors: { id: string; name: string }[];
@@ -34,6 +35,7 @@ export function ProjectForm({
     orderDate: Date;
     description: string | null;
   };
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
@@ -79,6 +81,12 @@ export function ProjectForm({
     }
     if (result?.validationErrors) {
       setFormError("Periksa kembali data yang dimasukkan.");
+      return;
+    }
+
+    if (onSuccess) {
+      onSuccess();
+      router.refresh();
       return;
     }
 

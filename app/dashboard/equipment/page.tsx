@@ -2,9 +2,10 @@ import { and, eq, isNull } from "drizzle-orm";
 import { WrenchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { EquipmentFilters } from "@/components/equipment/equipment-filters";
+import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
 import { EquipmentSummary } from "@/components/equipment/equipment-summary";
 import { EquipmentTable } from "@/components/equipment/equipment-table";
-import { ButtonLink } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentForUser } from "@/lib/actions/equipment-logic";
 import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
@@ -110,9 +111,7 @@ export default async function EquipmentPage({
             ? "Alat ukur yang bisa Anda pinjam."
             : "Seluruh alat ukur studio."
         }
-        action={
-          isAdmin ? <ButtonLink href="/dashboard/equipment/new">Tambah alat</ButtonLink> : undefined
-        }
+        action={isAdmin ? <EquipmentFormDialog /> : undefined}
       />
 
       <EquipmentSummary
@@ -144,9 +143,7 @@ export default async function EquipmentPage({
             }
             action={
               isAdmin && !hasActiveFilter ? (
-                <ButtonLink size="sm" href="/dashboard/equipment/new">
-                  Tambah alat
-                </ButtonLink>
+                <EquipmentFormDialog trigger={<Button size="sm">Tambah alat</Button>} />
               ) : undefined
             }
           />

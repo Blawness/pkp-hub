@@ -1,11 +1,15 @@
 import Link from "next/link";
+import type { z } from "zod";
+import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import type { StatusLogRow } from "@/components/projects/status-history";
 import { StatusPipeline } from "@/components/projects/status-pipeline";
 import { SurveyorAssignDialog } from "@/components/projects/surveyor-assign-dialog";
 import { Badge } from "@/components/ui/badge";
-import { ButtonLink } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import type { projectInputSchema } from "@/lib/actions/projects-schemas";
 import { paymentStatusLabel, surveyTypeLabel } from "@/lib/labels";
+
+type ProjectFormValues = z.infer<typeof projectInputSchema>;
 
 const rupiah = new Intl.NumberFormat("id-ID", {
   style: "currency",
@@ -29,6 +33,8 @@ export function ProjectSummary({
   surveyorName,
   assignedSurveyorId,
   surveyors,
+  clients,
+  editProject,
   isAdmin,
   canEdit,
   status,
@@ -51,6 +57,17 @@ export function ProjectSummary({
   surveyorName: string;
   assignedSurveyorId: string | null;
   surveyors: { id: string; name: string }[];
+  clients: { id: string; name: string }[];
+  editProject: {
+    id: string;
+    title: string;
+    clientId: string;
+    surveyType: ProjectFormValues["surveyType"];
+    locationLabel: string | null;
+    assignedSurveyorId: string | null;
+    orderDate: Date;
+    description: string | null;
+  };
   isAdmin: boolean;
   canEdit: boolean;
   status: string;
@@ -89,9 +106,7 @@ export function ProjectSummary({
             </p>
           </div>
           {canEdit ? (
-            <ButtonLink variant="outline" size="sm" href={`/dashboard/projects/${projectId}/edit`}>
-              Edit
-            </ButtonLink>
+            <ProjectFormDialog clients={clients} surveyors={surveyors} project={editProject} />
           ) : null}
         </div>
 

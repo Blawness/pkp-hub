@@ -3,11 +3,12 @@ import { z } from "zod";
 /** Skema input inventaris alat. Dipisah dari logika (server-only) — komponen klien boleh mengimpor ini. */
 
 export const equipmentCategorySchema = z.enum([
-  "total_station",
+  "instrumen_ukur",
   "gps_rtk",
   "drone",
-  "waterpass",
-  "theodolite",
+  "aksesoris_survey",
+  "laptop",
+  "inventaris_kantor",
   "lainnya",
 ]);
 export type EquipmentCategoryInput = z.infer<typeof equipmentCategorySchema>;

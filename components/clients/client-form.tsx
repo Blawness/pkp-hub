@@ -19,6 +19,7 @@ type ClientFormValues = z.infer<typeof clientInputSchema>;
 
 export function ClientForm({
   client,
+  onSuccess,
 }: {
   client?: {
     id: string;
@@ -29,6 +30,7 @@ export function ClientForm({
     address: string | null;
     notes: string | null;
   };
+  onSuccess?: () => void;
 }) {
   const router = useRouter();
   const [formError, setFormError] = useState<string | null>(null);
@@ -70,6 +72,12 @@ export function ClientForm({
     }
 
     const savedId = result?.data?.client.id ?? client?.id;
+
+    if (onSuccess) {
+      onSuccess();
+      router.refresh();
+      return;
+    }
     router.push(savedId ? `/dashboard/clients/${savedId}` : "/dashboard/clients");
     router.refresh();
   };

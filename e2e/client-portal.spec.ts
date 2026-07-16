@@ -38,11 +38,17 @@ test.describe("Akses portal klien", () => {
     test("admin mengundang klien → akun portal langsung tercipta (tertaut)", async ({ page }) => {
       const email = `klien-undang-${Date.now()}@pkp.test`;
 
-      // Buat klien lewat halaman Klien (belum punya akun portal).
-      await page.goto("/dashboard/clients/new");
-      await page.locator("#name").fill("Klien Undang E2E");
+      // Buat klien lewat dialog di halaman Klien (belum punya akun portal).
+      const clientName = "Klien Undang E2E";
+      await page.goto("/dashboard/clients");
+      await page.getByRole("button", { name: "Klien baru" }).click();
+      await page.locator("#name").fill(clientName);
       await page.locator("#email").fill(email);
       await page.getByRole("button", { name: "Buat klien" }).click();
+
+      // Dialog tertutup; buka detail klien yang baru dibuat dari daftar.
+      await expect(page.getByRole("dialog")).toBeHidden();
+      await page.getByRole("link", { name: clientName }).click();
 
       // Berada di halaman detail; tombol undangan tersedia.
       await expect(page.getByRole("button", { name: "Undang ke portal" })).toBeVisible();
