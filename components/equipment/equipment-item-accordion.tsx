@@ -129,7 +129,9 @@ export function EquipmentItemAccordion({
                         <span>{it.summary.total} total</span>
                         <span>· {it.summary.tersedia} tersedia</span>
                         <span>· {it.summary.terpinjam} dipinjam</span>
-                        {it.summary.perawatan > 0 ? <span>· {it.summary.perawatan} perawatan</span> : null}
+                        {it.summary.perawatan > 0 ? (
+                          <span>· {it.summary.perawatan} perawatan</span>
+                        ) : null}
                         {it.summary.rusak > 0 ? <span>· {it.summary.rusak} rusak</span> : null}
                       </div>
                     </div>
