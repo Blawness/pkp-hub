@@ -85,7 +85,7 @@ export function ProjectEquipment({
                   <TableRow key={row.id}>
                     <TableCell>
                       <Link
-                        href={`/dashboard/equipment/${row.equipmentId}`}
+                        href={`/dashboard/equipment/unit/${row.equipmentId}`}
                         className="font-medium hover:underline"
                       >
                         {row.equipmentName}
