@@ -82,7 +82,10 @@ export default async function EquipmentPage({
       serialNumber: item.serialNumber,
       condition: item.condition,
       image: item.image ? await downloadUrlFor(item.image) : null,
+      imagePath: "image" in item ? item.image : null,
       purchasePrice: "purchasePrice" in item ? item.purchasePrice : undefined,
+      purchaseDate: "purchaseDate" in item ? item.purchaseDate : undefined,
+      notes: "notes" in item ? item.notes : undefined,
       activeUsage: item.activeUsage
         ? {
             usedByName: item.activeUsage.usedByName,

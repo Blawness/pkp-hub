@@ -4,7 +4,9 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { ImageIcon } from "lucide-react";
 import Link from "next/link";
 import { BorrowDialog } from "@/components/equipment/borrow-dialog";
+import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
 import { ReturnButton } from "@/components/equipment/return-button";
+import type { EquipmentEditTarget } from "@/components/equipment/equipment-form";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatIDR } from "@/lib/format";
@@ -20,6 +22,11 @@ export type EquipmentTableRow = {
   image: string | null;
   /** `undefined` untuk surveyor — kolomnya sendiri disembunyikan lewat `isAdmin`, tapi ini menjaga bentuknya juga tidak terpasang. */
   purchasePrice?: number | null;
+  /** Field tambahan yang dibutuhkan `EquipmentEditTarget` (edit). Hanya terisi untuk admin. */
+  purchaseDate?: string | null;
+  notes?: string | null;
+  /** `image` sudah di-resolve jadi URL tampilan di server; ini simpan path asli untuk edit. */
+  imagePath?: string | null;
   activeUsage: {
     usedByName: string;
     projectTitle: string;
@@ -128,32 +135,56 @@ export function buildEquipmentColumns({
     header: "Aksi",
     cell: ({ row }) => {
       const item = row.original;
-      if (item.activeUsage) {
-        if (!item.activeUsage.canReturn) return <span className="text-muted-foreground">—</span>;
-        return (
-          <ReturnButton
-            usageId={item.activeUsage.usageId}
-            equipmentName={item.name}
-            durationLabel={item.activeUsage.durationLabel}
-          />
-        );
-      }
-      if (item.canBorrow) {
-        return (
-          <BorrowDialog
-            fixedEquipment={{ id: item.id, name: item.name }}
-            projectOptions={projectOptions}
-            isAdmin={isAdmin}
-            surveyors={surveyors}
-            trigger={
-              <Button size="sm" variant="outline">
-                Pinjam
-              </Button>
-            }
-          />
-        );
-      }
-      return <span className="text-muted-foreground">—</span>;
+      const editTarget: EquipmentEditTarget | undefined = isAdmin
+        ? {
+            equipmentId: item.id,
+            name: item.name,
+            category: item.category as EquipmentEditTarget["category"],
+            serialNumber: item.serialNumber,
+            condition: item.condition as EquipmentEditTarget["condition"],
+            image: item.imagePath ?? null,
+            imageDisplayUrl: item.image,
+            purchaseDate: item.purchaseDate ?? null,
+            purchasePrice: item.purchasePrice ?? null,
+            notes: item.notes ?? null,
+          }
+        : undefined;
+
+      return (
+        <div className="flex items-center gap-1.5">
+          {isAdmin && editTarget ? (
+            <EquipmentFormDialog
+              editing={editTarget}
+              trigger={
+                <Button size="sm" variant="outline">
+                  Edit
+                </Button>
+              }
+            />
+          ) : null}
+          {item.activeUsage ? (
+            !item.activeUsage.canReturn ? null : (
+              <ReturnButton
+                usageId={item.activeUsage.usageId}
+                equipmentName={item.name}
+                durationLabel={item.activeUsage.durationLabel}
+              />
+            )
+          ) : item.canBorrow ? (
+            <BorrowDialog
+              fixedEquipment={{ id: item.id, name: item.name }}
+              projectOptions={projectOptions}
+              isAdmin={isAdmin}
+              surveyors={surveyors}
+              trigger={
+                <Button size="sm" variant="outline">
+                  Pinjam
+                </Button>
+              }
+            />
+          ) : null}
+        </div>
+      );
     },
   });
 
