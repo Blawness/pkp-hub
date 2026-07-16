@@ -136,9 +136,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const allEquipment = await listEquipmentForUser(user);
   // "${itemName} (${code})" — beberapa unit sejenis kini mungkin ada (spec
   // 2026-07-16), jadi nama alat saja tidak lagi cukup membedakan unit mana.
-  const equipmentNameById = new Map(
-    allEquipment.map((e) => [e.id, `${e.itemName} (${e.code})`]),
-  );
+  const equipmentNameById = new Map(allEquipment.map((e) => [e.id, `${e.itemName} (${e.code})`]));
 
   const equipmentUsageUserIds = [...new Set(projectEquipmentUsages.map((u) => u.usedById))];
   const equipmentUsageUsers = equipmentUsageUserIds.length

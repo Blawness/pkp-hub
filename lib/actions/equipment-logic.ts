@@ -298,7 +298,8 @@ export async function createEquipmentForUser(
       .values({
         itemId: input.itemId,
         code: input.code,
-        serialNumber: input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
+        serialNumber:
+          input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
         condition: input.condition,
         purchaseDate: input.purchaseDate ?? null,
         purchasePrice: input.purchasePrice ?? null,
@@ -327,7 +328,11 @@ export async function updateEquipmentForUser(
   if (!existing) throw new Error("Alat tidak ditemukan.");
 
   const [item] = await db
-    .select({ name: equipmentItem.name, category: equipmentItem.category, image: equipmentItem.image })
+    .select({
+      name: equipmentItem.name,
+      category: equipmentItem.category,
+      image: equipmentItem.image,
+    })
     .from(equipmentItem)
     .where(eq(equipmentItem.id, existing.itemId));
 
@@ -336,7 +341,8 @@ export async function updateEquipmentForUser(
       .update(equipment)
       .set({
         code: input.code,
-        serialNumber: input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
+        serialNumber:
+          input.serialNumber && input.serialNumber.length > 0 ? input.serialNumber : null,
         condition: input.condition,
         purchaseDate: input.purchaseDate ?? null,
         purchasePrice: input.purchasePrice ?? null,
@@ -369,7 +375,11 @@ export async function archiveEquipmentForUser(
   if (!row) throw new Error("Alat tidak ditemukan.");
 
   const [item] = await db
-    .select({ name: equipmentItem.name, category: equipmentItem.category, image: equipmentItem.image })
+    .select({
+      name: equipmentItem.name,
+      category: equipmentItem.category,
+      image: equipmentItem.image,
+    })
     .from(equipmentItem)
     .where(eq(equipmentItem.id, row.itemId));
 

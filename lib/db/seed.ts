@@ -314,70 +314,77 @@ async function seed() {
     ])
     .returning();
 
-  const [tsGm52Unit, tsCx105Unit, gpsRtkUnit1, gpsRtkUnit2, droneUnit, waterpassUnit1, waterpassUnit2] =
-    await db
-      .insert(equipment)
-      .values([
-        {
-          itemId: tsGm52.id,
-          code: "TS-GM52-01",
-          serialNumber: "TS-GM52-001",
-          condition: "tersedia",
-          purchaseDate: "2024-03-10",
-          purchasePrice: 85_000_000,
-        },
-        {
-          itemId: tsCx105.id,
-          code: "TS-CX105-01",
-          serialNumber: "TS-CX105-002",
-          condition: "perawatan",
-          notes: "Layar retak, dikirim servis ke pusat Sokkia.",
-          purchaseDate: "2022-11-05",
-          purchasePrice: 65_000_000,
-        },
-        {
-          itemId: gpsRtk.id,
-          code: "RTK-R12-01",
-          serialNumber: "RTK-R12-001",
-          condition: "tersedia",
-          purchaseDate: "2025-01-20",
-          purchasePrice: 120_000_000,
-        },
-        {
-          itemId: gpsRtk.id,
-          code: "RTK-R12-02",
-          serialNumber: "RTK-R12-002",
-          condition: "tersedia",
-          purchaseDate: "2025-03-01",
-          purchasePrice: 120_000_000,
-        },
-        {
-          itemId: drone.id,
-          code: "DRN-P4RTK-01",
-          serialNumber: "DRN-P4RTK-001",
-          condition: "rusak",
-          notes: "Baling-baling patah, menunggu spare part.",
-          purchaseDate: "2023-07-15",
-          purchasePrice: 95_000_000,
-        },
-        {
-          itemId: waterpass.id,
-          code: "WP-B40A-01",
-          serialNumber: "WP-B40A-001",
-          condition: "tersedia",
-          purchaseDate: "2021-09-01",
-          purchasePrice: 12_000_000,
-        },
-        {
-          itemId: waterpass.id,
-          code: "WP-B40A-02",
-          serialNumber: "WP-B40A-002",
-          condition: "tersedia",
-          purchaseDate: "2022-05-01",
-          purchasePrice: 12_000_000,
-        },
-      ])
-      .returning();
+  const [
+    tsGm52Unit,
+    tsCx105Unit,
+    gpsRtkUnit1,
+    gpsRtkUnit2,
+    droneUnit,
+    waterpassUnit1,
+    waterpassUnit2,
+  ] = await db
+    .insert(equipment)
+    .values([
+      {
+        itemId: tsGm52.id,
+        code: "TS-GM52-01",
+        serialNumber: "TS-GM52-001",
+        condition: "tersedia",
+        purchaseDate: "2024-03-10",
+        purchasePrice: 85_000_000,
+      },
+      {
+        itemId: tsCx105.id,
+        code: "TS-CX105-01",
+        serialNumber: "TS-CX105-002",
+        condition: "perawatan",
+        notes: "Layar retak, dikirim servis ke pusat Sokkia.",
+        purchaseDate: "2022-11-05",
+        purchasePrice: 65_000_000,
+      },
+      {
+        itemId: gpsRtk.id,
+        code: "RTK-R12-01",
+        serialNumber: "RTK-R12-001",
+        condition: "tersedia",
+        purchaseDate: "2025-01-20",
+        purchasePrice: 120_000_000,
+      },
+      {
+        itemId: gpsRtk.id,
+        code: "RTK-R12-02",
+        serialNumber: "RTK-R12-002",
+        condition: "tersedia",
+        purchaseDate: "2025-03-01",
+        purchasePrice: 120_000_000,
+      },
+      {
+        itemId: drone.id,
+        code: "DRN-P4RTK-01",
+        serialNumber: "DRN-P4RTK-001",
+        condition: "rusak",
+        notes: "Baling-baling patah, menunggu spare part.",
+        purchaseDate: "2023-07-15",
+        purchasePrice: 95_000_000,
+      },
+      {
+        itemId: waterpass.id,
+        code: "WP-B40A-01",
+        serialNumber: "WP-B40A-001",
+        condition: "tersedia",
+        purchaseDate: "2021-09-01",
+        purchasePrice: 12_000_000,
+      },
+      {
+        itemId: waterpass.id,
+        code: "WP-B40A-02",
+        serialNumber: "WP-B40A-002",
+        condition: "tersedia",
+        purchaseDate: "2022-05-01",
+        purchasePrice: 12_000_000,
+      },
+    ])
+    .returning();
 
   // Tiga sesi pakai demo: dua MASIH BERJALAN (satu di Total Station, satu di
   // salah satu dari dua unit GPS RTK — supaya "1 tersedia, 1 dipinjam" jadi

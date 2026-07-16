@@ -9,7 +9,14 @@ import {
 import { borrowEquipmentForUser, createEquipmentForUser } from "@/lib/actions/equipment-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, equipment, equipmentItem, equipmentUsage, projects, users } from "@/lib/db/schema";
+import {
+  clients,
+  equipment,
+  equipmentItem,
+  equipmentUsage,
+  projects,
+  users,
+} from "@/lib/db/schema";
 
 let admin: SessionUser;
 let surveyor: SessionUser;
@@ -30,7 +37,12 @@ beforeAll(async () => {
 
   await db.insert(users).values([
     { id: adminId, name: "Item Admin", email: "item-admin@fixture.test", role: "admin" },
-    { id: surveyorId, name: "Item Surveyor", email: "item-surveyor@fixture.test", role: "surveyor" },
+    {
+      id: surveyorId,
+      name: "Item Surveyor",
+      email: "item-surveyor@fixture.test",
+      role: "surveyor",
+    },
     { id: clientUserId, name: "Item Client", email: "item-client@fixture.test", role: "client" },
   ]);
 
@@ -136,7 +148,10 @@ describe("gambar jenis alat", () => {
 
 describe("listEquipmentItemsForUser", () => {
   it("item tanpa unit tampil dengan summary nol", async () => {
-    const item = await createEquipmentItemForUser(admin, { name: "Item-Kosong", category: "laptop" });
+    const item = await createEquipmentItemForUser(admin, {
+      name: "Item-Kosong",
+      category: "laptop",
+    });
     const rows = await listEquipmentItemsForUser(admin);
     const row = rows.find((r) => r.item.id === item.id);
     expect(row).toBeDefined();
@@ -144,7 +159,10 @@ describe("listEquipmentItemsForUser", () => {
   });
 
   it("mengelompokkan unit per item dan menghitung agregat tersedia/dipinjam dengan benar", async () => {
-    const item = await createEquipmentItemForUser(admin, { name: "Item-Grup", category: "gps_rtk" });
+    const item = await createEquipmentItemForUser(admin, {
+      name: "Item-Grup",
+      category: "gps_rtk",
+    });
     const unit1 = await createEquipmentForUser(admin, {
       itemId: item.id,
       code: "GRP-01",

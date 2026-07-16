@@ -16,7 +16,14 @@ import {
 } from "@/lib/actions/equipment-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, equipment, equipmentItem, equipmentUsage, projects, users } from "@/lib/db/schema";
+import {
+  clients,
+  equipment,
+  equipmentItem,
+  equipmentUsage,
+  projects,
+  users,
+} from "@/lib/db/schema";
 
 /**
  * Berjalan terhadap DB dev sungguhan, pola yang sama dengan `payments.test.ts`.
@@ -129,7 +136,11 @@ describe("batas akses", () => {
   it("surveyor tidak bisa menambah alat", async () => {
     const item = await createEquipmentItemForUser(admin, { name: "Curang", category: "drone" });
     await expect(
-      createEquipmentForUser(surveyor, { itemId: item.id, code: "CURANG-01", condition: "tersedia" }),
+      createEquipmentForUser(surveyor, {
+        itemId: item.id,
+        code: "CURANG-01",
+        condition: "tersedia",
+      }),
     ).rejects.toThrow(/admin/i);
   });
 
