@@ -154,13 +154,13 @@ export function StatusPipeline({
             />
             <DropdownMenuContent align="start">
               {backwardStatus ? (
-                <DropdownMenuItem onSelect={() => run(backwardStatus)}>
+                <DropdownMenuItem onClick={() => run(backwardStatus)}>
                   Mundur ke {statusLabel[backwardStatus] ?? backwardStatus}
                 </DropdownMenuItem>
               ) : null}
               {canReactivate ? (
                 <DropdownMenuItem
-                  onSelect={() => setConfirm({ toStatus: "baru", label: "Aktifkan lagi proyek" })}
+                  onClick={() => setConfirm({ toStatus: "baru", label: "Aktifkan lagi proyek" })}
                 >
                   Aktifkan lagi
                 </DropdownMenuItem>
@@ -168,7 +168,7 @@ export function StatusPipeline({
               {canCancel ? (
                 <DropdownMenuItem
                   variant="destructive"
-                  onSelect={() => setConfirm({ toStatus: "dibatalkan", label: "Batalkan proyek" })}
+                  onClick={() => setConfirm({ toStatus: "dibatalkan", label: "Batalkan proyek" })}
                 >
                   Batalkan proyek
                 </DropdownMenuItem>
