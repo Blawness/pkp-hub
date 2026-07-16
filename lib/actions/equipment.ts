@@ -20,10 +20,10 @@ import {
 import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action";
 
 /**
- * Server action inventaris alat. Logika + guard ada di `equipment-logic.ts`
- * (diuji langsung); `adminActionClient`/`staffActionClient` di sini adalah
- * penegakan pertama yang terikat request — bukan penggantinya, melainkan
- * lapis pertamanya. `borrowEquipment`/`returnEquipment` memakai
+ * Server action inventaris alat — UNIT FISIK. Logika + guard ada di
+ * `equipment-logic.ts` (diuji langsung); `adminActionClient`/`staffActionClient`
+ * di sini adalah penegakan pertama yang terikat request — bukan penggantinya,
+ * melainkan lapis pertamanya. `borrowEquipment`/`returnEquipment` memakai
  * `staffActionClient` karena surveyor perlu memanggilnya; sisanya admin-only.
  */
 
@@ -40,7 +40,7 @@ export const updateEquipment = adminActionClient
   .action(async ({ parsedInput, ctx }) => {
     const item = await updateEquipmentForUser(ctx.user, parsedInput);
     revalidatePath("/dashboard/equipment");
-    revalidatePath(`/dashboard/equipment/${item.id}`);
+    revalidatePath(`/dashboard/equipment/unit/${item.id}`);
     return { success: true as const, item };
   });
 
@@ -49,7 +49,7 @@ export const archiveEquipment = adminActionClient
   .action(async ({ parsedInput, ctx }) => {
     const item = await archiveEquipmentForUser(ctx.user, parsedInput);
     revalidatePath("/dashboard/equipment");
-    revalidatePath(`/dashboard/equipment/${item.id}`);
+    revalidatePath(`/dashboard/equipment/unit/${item.id}`);
     return { success: true as const, item };
   });
 
@@ -58,7 +58,7 @@ export const borrowEquipment = staffActionClient
   .action(async ({ parsedInput, ctx }) => {
     const usage = await borrowEquipmentForUser(ctx.user, parsedInput);
     revalidatePath("/dashboard/equipment");
-    revalidatePath(`/dashboard/equipment/${usage.equipmentId}`);
+    revalidatePath(`/dashboard/equipment/unit/${usage.equipmentId}`);
     revalidatePath(`/dashboard/projects/${usage.projectId}`);
     return { success: true as const, usage };
   });
@@ -68,7 +68,7 @@ export const returnEquipment = staffActionClient
   .action(async ({ parsedInput, ctx }) => {
     const usage = await returnEquipmentForUser(ctx.user, parsedInput);
     revalidatePath("/dashboard/equipment");
-    revalidatePath(`/dashboard/equipment/${usage.equipmentId}`);
+    revalidatePath(`/dashboard/equipment/unit/${usage.equipmentId}`);
     revalidatePath(`/dashboard/projects/${usage.projectId}`);
     return { success: true as const, usage };
   });
@@ -78,7 +78,7 @@ export const correctUsage = adminActionClient
   .action(async ({ parsedInput, ctx }) => {
     const usage = await correctUsageForUser(ctx.user, parsedInput);
     revalidatePath("/dashboard/equipment");
-    revalidatePath(`/dashboard/equipment/${usage.equipmentId}`);
+    revalidatePath(`/dashboard/equipment/unit/${usage.equipmentId}`);
     revalidatePath(`/dashboard/projects/${usage.projectId}`);
     return { success: true as const, usage };
   });
