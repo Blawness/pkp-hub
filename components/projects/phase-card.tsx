@@ -7,6 +7,7 @@ import { PhaseFormDialog } from "@/components/projects/phase-form-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { deletePhase, setPhaseStatus, updatePhaseNote } from "@/lib/actions/phases";
@@ -80,12 +81,10 @@ export function PhaseCard({
     router.refresh();
   }
 
-  async function remove() {
-    if (!window.confirm(`Hapus fase "${phase.name}"? Tindakan ini tidak dapat dibatalkan.`)) {
-      return;
-    }
+  async function remove(): Promise<{ error?: string } | undefined> {
     const result = await executeDelete({ phaseId: phase.id });
-    if (!result?.serverError) router.refresh();
+    if (result?.serverError) return { error: result.serverError };
+    router.refresh();
   }
 
   return (
@@ -124,9 +123,18 @@ export function PhaseCard({
                   </Button>
                 }
               />
-              <Button variant="destructive" size="sm" disabled={isDeleting} onClick={remove}>
-                Hapus
-              </Button>
+              <ConfirmDialog
+                trigger={
+                  <Button variant="destructive" size="sm" disabled={isDeleting}>
+                    Hapus
+                  </Button>
+                }
+                title="Hapus fase?"
+                description={`"${phase.name}" akan dihapus. Tindakan ini tidak dapat dibatalkan.`}
+                confirmLabel="Hapus"
+                confirmVariant="destructive"
+                onConfirm={remove}
+              />
             </div>
           ) : null}
         </div>
