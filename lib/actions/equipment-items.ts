@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  archiveEquipmentItemForUser,
   createEquipmentItemForUser,
   updateEquipmentItemForUser,
 } from "@/lib/actions/equipment-items-logic";
 import {
+  archiveEquipmentItemInputSchema,
   createEquipmentItemInputSchema,
   updateEquipmentItemInputSchema,
 } from "@/lib/actions/equipment-items-schemas";
@@ -29,6 +31,14 @@ export const updateEquipmentItem = adminActionClient
   .inputSchema(updateEquipmentItemInputSchema)
   .action(async ({ parsedInput, ctx }) => {
     const item = await updateEquipmentItemForUser(ctx.user, parsedInput);
+    revalidatePath("/dashboard/equipment");
+    return { success: true as const, item };
+  });
+
+export const archiveEquipmentItem = adminActionClient
+  .inputSchema(archiveEquipmentItemInputSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const item = await archiveEquipmentItemForUser(ctx.user, parsedInput);
     revalidatePath("/dashboard/equipment");
     return { success: true as const, item };
   });

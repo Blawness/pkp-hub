@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
+import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { returnEquipment } from "@/lib/actions/equipment";
@@ -16,10 +17,12 @@ export function ReturnButton({
   usageId,
   equipmentName,
   durationLabel,
+  trigger,
 }: {
   usageId: string;
   equipmentName?: string;
   durationLabel?: string;
+  trigger?: ReactElement;
 }) {
   const router = useRouter();
   const { executeAsync } = useAction(returnEquipment);
@@ -36,9 +39,11 @@ export function ReturnButton({
   return (
     <ConfirmDialog
       trigger={
-        <Button size="sm" variant="outline">
-          Kembalikan
-        </Button>
+        trigger ?? (
+          <Button size="sm" variant="outline">
+            Kembalikan
+          </Button>
+        )
       }
       title="Kembalikan alat?"
       description={`Menutup sesi pakai${namePart}.${durationPart}`}

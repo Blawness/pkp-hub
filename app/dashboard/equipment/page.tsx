@@ -80,6 +80,10 @@ export default async function EquipmentPage({
         code: unit.code,
         serialNumber: unit.serialNumber,
         condition: unit.condition,
+        notes: unit.notes,
+        // Dua field ADMIN-ONLY: `listEquipmentForUser` memangkasnya dari bentuk
+        // objeknya sendiri untuk surveyor, jadi `in` di sini bukan basa-basi.
+        purchaseDate: "purchaseDate" in unit ? unit.purchaseDate : undefined,
         purchasePrice: "purchasePrice" in unit ? unit.purchasePrice : undefined,
         activeUsage: unit.activeUsage
           ? {

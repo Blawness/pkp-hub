@@ -408,6 +408,11 @@ export const equipmentItem = pgTable("equipment_item", {
   name: text("name").notNull(),
   category: equipmentCategory("category").notNull(),
   image: text("image"),
+  // Soft delete, alasan sama dengan `equipment`: `equipment.itemId` menunjuk ke
+  // sini dengan `onDelete: "restrict"`, dan riwayat pakai unit lama harus tetap
+  // bisa menyebut nama jenisnya. Diarsipkan hanya kalau semua unitnya sudah
+  // diarsipkan lebih dulu (`equipment-items-logic.ts`).
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
