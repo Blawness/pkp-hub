@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
-import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { archiveEquipmentItem } from "@/lib/actions/equipment-items";
 
 /**
@@ -11,7 +11,8 @@ import { archiveEquipmentItem } from "@/lib/actions/equipment-items";
  * DAN menolak jenis yang masih punya unit — ini bukan gantinya. Tombol tetap
  * dirender walau jenisnya masih berisi unit: penolakannya datang dengan pesan
  * yang menyebut jumlah unitnya, yang lebih menjelaskan daripada tombol mati
- * tanpa alasan.
+ * tanpa alasan. `ConfirmDialog` menampilkan pesan itu di dalam dialog tanpa
+ * menutupnya.
  */
 export function ArchiveEquipmentItemButton({
   itemId,
@@ -21,34 +22,26 @@ export function ArchiveEquipmentItemButton({
   itemName: string;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const { executeAsync, isExecuting } = useAction(archiveEquipmentItem);
+  const { executeAsync } = useAction(archiveEquipmentItem);
 
-  async function handleArchive() {
-    if (!window.confirm(`Hapus jenis alat "${itemName}"?`)) return;
-
-    setError(null);
+  async function handleArchive(): Promise<{ error?: string } | undefined> {
     const result = await executeAsync({ itemId });
-    if (result?.serverError) {
-      setError(result.serverError);
-      return;
-    }
+    if (result?.serverError) return { error: result.serverError };
     router.refresh();
   }
 
   return (
-    // Pesan error diposisikan absolut: kalau ikut alur normal, lebarnya
-    // melebarkan baris tombol dan menggeser "Edit" keluar dari sejajarnya
-    // dengan kartu-kartu lain.
-    <div className="relative">
-      <Button variant="outline" size="sm" disabled={isExecuting} onClick={handleArchive}>
-        {isExecuting ? "Menghapus..." : "Hapus"}
-      </Button>
-      {error ? (
-        <p className="absolute top-full right-0 mt-1 w-56 text-right text-xs text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </div>
+    <ConfirmDialog
+      trigger={
+        <Button size="sm" variant="outline">
+          Hapus
+        </Button>
+      }
+      title="Hapus jenis alat?"
+      description={`"${itemName}" akan hilang dari daftar inventaris. Riwayat pakai unitnya tetap tersimpan.`}
+      confirmLabel="Hapus"
+      confirmVariant="destructive"
+      onConfirm={handleArchive}
+    />
   );
 }
