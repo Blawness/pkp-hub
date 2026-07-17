@@ -1,12 +1,13 @@
-import { desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import type {
+  ArchiveEquipmentItemInput,
   CreateEquipmentItemInput,
   UpdateEquipmentItemInput,
 } from "@/lib/actions/equipment-items-schemas";
 import { type EquipmentListItem, listEquipmentForUser } from "@/lib/actions/equipment-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { equipmentItem } from "@/lib/db/schema";
+import { equipment, equipmentItem } from "@/lib/db/schema";
 import { summarizeUnits } from "@/lib/equipment/derive";
 import { storage } from "@/lib/storage";
 
@@ -33,6 +34,7 @@ export type EquipmentItemRow = {
   name: string;
   category: string;
   image: string | null;
+  archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -47,13 +49,18 @@ export type EquipmentItemWithUnits = {
  * Semua jenis alat + unit-unitnya (dikelompokkan dari `listEquipmentForUser`)
  * + agregat per jenis. Item tanpa unit tetap tampil, dengan summary nol —
  * supaya admin masih bisa "+ Tambah unit" untuk jenis yang baru dibuat.
+ * Jenis terarsip tidak ikut, sama seperti unit terarsip di `listEquipmentForUser`.
  */
 export async function listEquipmentItemsForUser(
   user: SessionUser,
 ): Promise<EquipmentItemWithUnits[]> {
   requireStaff(user);
 
-  const items = await db.select().from(equipmentItem).orderBy(desc(equipmentItem.createdAt));
+  const items = await db
+    .select()
+    .from(equipmentItem)
+    .where(isNull(equipmentItem.archivedAt))
+    .orderBy(desc(equipmentItem.createdAt));
   const units = await listEquipmentForUser(user);
 
   const unitsByItemId = new Map<string, EquipmentListItem[]>();
@@ -124,5 +131,49 @@ export async function updateEquipmentItemForUser(
   if (existing.image && existing.image !== nextImage) {
     await deleteImageObject(existing.image);
   }
+  return row;
+}
+
+/**
+ * Arsipkan JENIS alat — soft delete, sama alasan dengan unit: `equipment.itemId`
+ * pakai `onDelete: "restrict"` dan riwayat pakai harus tetap bisa menyebut nama
+ * jenisnya.
+ *
+ * Ditolak selama masih ada unit yang belum diarsipkan, supaya tidak ada unit
+ * yatim: unit yang jenisnya hilang dari daftar tapi dirinya sendiri masih
+ * aktif dan bisa dipinjam. Hitungannya query `equipment` LANGSUNG, bukan lewat
+ * `listEquipmentForUser` — list itu sudah menyaring unit terarsip, jadi dipakai
+ * sebagai penjaga di sini justru akan melaporkan nol untuk jenis yang unitnya
+ * masih ada.
+ */
+export async function archiveEquipmentItemForUser(
+  user: SessionUser,
+  input: ArchiveEquipmentItemInput,
+): Promise<EquipmentItemRow> {
+  requireAdmin(user);
+
+  const [existing] = await db
+    .select({ id: equipmentItem.id })
+    .from(equipmentItem)
+    .where(eq(equipmentItem.id, input.itemId));
+  if (!existing) throw new Error("Jenis alat tidak ditemukan.");
+
+  const [{ activeUnits }] = await db
+    .select({ activeUnits: count() })
+    .from(equipment)
+    .where(and(eq(equipment.itemId, input.itemId), isNull(equipment.archivedAt)));
+
+  if (activeUnits > 0) {
+    throw new Error(
+      `Masih ada ${activeUnits} unit — arsipkan unitnya dulu sebelum menghapus jenis ini.`,
+    );
+  }
+
+  const [row] = await db
+    .update(equipmentItem)
+    .set({ archivedAt: new Date(), updatedAt: new Date() })
+    .where(eq(equipmentItem.id, input.itemId))
+    .returning();
+  if (!row) throw new Error("Jenis alat tidak ditemukan.");
   return row;
 }

@@ -15,3 +15,6 @@ export const updateEquipmentItemInputSchema = createEquipmentItemInputSchema.ext
   itemId: z.uuid(),
 });
 export type UpdateEquipmentItemInput = z.infer<typeof updateEquipmentItemInputSchema>;
+
+export const archiveEquipmentItemInputSchema = z.object({ itemId: z.uuid() });
+export type ArchiveEquipmentItemInput = z.infer<typeof archiveEquipmentItemInputSchema>;

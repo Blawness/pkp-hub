@@ -4,6 +4,7 @@ import { ImageIcon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import { ArchiveEquipmentItemButton } from "@/components/equipment/archive-equipment-item-button";
 import { BorrowDialog } from "@/components/equipment/borrow-dialog";
 import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
 import { EquipmentItemFormDialog } from "@/components/equipment/equipment-item-form-dialog";
@@ -12,7 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import type { EquipmentCategoryInput } from "@/lib/actions/equipment-schemas";
+import type {
+  EquipmentCategoryInput,
+  EquipmentConditionInput,
+} from "@/lib/actions/equipment-schemas";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
 
 const conditionVariant: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
@@ -27,7 +31,12 @@ export type EquipmentUnitRow = {
   code: string;
   serialNumber: string | null;
   condition: string;
+  // `purchaseDate`/`purchasePrice`/`notes` hanya ada di payload admin —
+  // dipangkas di level query untuk surveyor (`equipment-logic.ts`), bukan
+  // disembunyikan di render. Form edit unit (admin-only) membutuhkan ketiganya.
+  purchaseDate?: string | null;
   purchasePrice?: number | null;
+  notes?: string | null;
   activeUsage: {
     usedByName: string;
     projectTitle: string;
@@ -137,20 +146,23 @@ export function EquipmentItemAccordion({
                     </div>
                   </button>
                   {isAdmin ? (
-                    <EquipmentItemFormDialog
-                      editing={{
-                        itemId: it.id,
-                        name: it.name,
-                        category: it.category as EquipmentCategoryInput,
-                        image: it.image,
-                        imageDisplayUrl: it.image,
-                      }}
-                      trigger={
-                        <Button variant="outline" size="sm">
-                          Edit
-                        </Button>
-                      }
-                    />
+                    <div className="flex shrink-0 items-start gap-2">
+                      <EquipmentItemFormDialog
+                        editing={{
+                          itemId: it.id,
+                          name: it.name,
+                          category: it.category as EquipmentCategoryInput,
+                          image: it.image,
+                          imageDisplayUrl: it.image,
+                        }}
+                        trigger={
+                          <Button variant="outline" size="sm">
+                            Edit
+                          </Button>
+                        }
+                      />
+                      <ArchiveEquipmentItemButton itemId={it.id} itemName={it.name} />
+                    </div>
                   ) : null}
                 </div>
 
@@ -160,23 +172,32 @@ export function EquipmentItemAccordion({
                       <p className="text-sm text-muted-foreground">Belum ada unit.</p>
                     ) : (
                       it.units.map((unit) => (
+                        // Seluruh kotak adalah link ke detail unit, KECUALI tombol
+                        // aksinya. Caranya link overlay (`absolute inset-0`) + tombol
+                        // di `z-10` di atasnya — bukan membungkus kotaknya dalam <a>,
+                        // karena <button> di dalam <a> itu HTML tidak valid dan bikin
+                        // klik "Pinjam"/"Edit" ikut memicu navigasi.
                         <div
                           key={unit.id}
-                          className="flex flex-col gap-2 rounded-md border border-border p-2 sm:flex-row sm:items-center sm:justify-between"
+                          className="group relative flex flex-col gap-2 rounded-md border border-border p-2 transition-colors hover:bg-accent/50 focus-within:ring-2 focus-within:ring-ring sm:flex-row sm:items-center sm:justify-between"
                         >
+                          <Link
+                            href={`/dashboard/equipment/unit/${unit.id}`}
+                            className="absolute inset-0 rounded-md focus:outline-none"
+                          >
+                            <span className="sr-only">Lihat detail unit {unit.code}</span>
+                          </Link>
+
                           <div className="min-w-0">
-                            <Link
-                              href={`/dashboard/equipment/unit/${unit.id}`}
-                              className="font-medium hover:underline"
-                            >
-                              {unit.code}
-                            </Link>
+                            <p className="font-medium group-hover:underline">{unit.code}</p>
                             <p className="text-xs text-muted-foreground">
                               {unit.serialNumber ? `SN ${unit.serialNumber}` : "Tanpa no. seri"}
                             </p>
                           </div>
 
                           <div className="flex items-center justify-between gap-2 sm:justify-end">
+                            {/* Badge non-interaktif — sengaja DI LUAR lapis z-10 supaya
+                                kliknya tetap tembus ke link overlay di bawahnya. */}
                             {unit.activeUsage ? (
                               <div className="flex min-w-0 flex-col gap-0.5">
                                 <Badge className="w-fit">Terpinjam</Badge>
@@ -190,27 +211,53 @@ export function EquipmentItemAccordion({
                               </Badge>
                             )}
 
-                            {unit.activeUsage ? (
-                              unit.activeUsage.canReturn ? (
-                                <ReturnButton
-                                  usageId={unit.activeUsage.usageId}
-                                  equipmentName={`${it.name} (${unit.code})`}
-                                  durationLabel={unit.activeUsage.durationLabel}
+                            <div className="relative z-10 flex shrink-0 items-center gap-2">
+                              {unit.activeUsage ? (
+                                unit.activeUsage.canReturn ? (
+                                  <ReturnButton
+                                    usageId={unit.activeUsage.usageId}
+                                    equipmentName={`${it.name} (${unit.code})`}
+                                    durationLabel={unit.activeUsage.durationLabel}
+                                  />
+                                ) : null
+                              ) : unit.canBorrow ? (
+                                <BorrowDialog
+                                  fixedEquipment={{
+                                    id: unit.id,
+                                    name: `${it.name} (${unit.code})`,
+                                  }}
+                                  projectOptions={projectOptions}
+                                  isAdmin={isAdmin}
+                                  surveyors={surveyors}
+                                  trigger={
+                                    <Button size="sm" variant="outline">
+                                      Pinjam
+                                    </Button>
+                                  }
                                 />
-                              ) : null
-                            ) : unit.canBorrow ? (
-                              <BorrowDialog
-                                fixedEquipment={{ id: unit.id, name: `${it.name} (${unit.code})` }}
-                                projectOptions={projectOptions}
-                                isAdmin={isAdmin}
-                                surveyors={surveyors}
-                                trigger={
-                                  <Button size="sm" variant="outline">
-                                    Pinjam
-                                  </Button>
-                                }
-                              />
-                            ) : null}
+                              ) : null}
+
+                              {isAdmin ? (
+                                <EquipmentFormDialog
+                                  itemId={it.id}
+                                  itemName={it.name}
+                                  editing={{
+                                    equipmentId: unit.id,
+                                    code: unit.code,
+                                    serialNumber: unit.serialNumber,
+                                    condition: unit.condition as EquipmentConditionInput,
+                                    purchaseDate: unit.purchaseDate ?? null,
+                                    purchasePrice: unit.purchasePrice ?? null,
+                                    notes: unit.notes ?? null,
+                                  }}
+                                  trigger={
+                                    <Button size="sm" variant="outline">
+                                      Edit
+                                    </Button>
+                                  }
+                                />
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       ))
