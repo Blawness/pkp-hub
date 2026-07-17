@@ -1,9 +1,10 @@
 "use client";
 
-import { ImageIcon } from "lucide-react";
+import { ArrowUpRightIcon, ImageIcon, PencilIcon, Trash2Icon, Undo2Icon } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import { ArchiveEquipmentButton } from "@/components/equipment/archive-equipment-button";
 import { ArchiveEquipmentItemButton } from "@/components/equipment/archive-equipment-item-button";
 import { BorrowDialog } from "@/components/equipment/borrow-dialog";
 import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
@@ -13,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type {
   EquipmentCategoryInput,
   EquipmentConditionInput,
@@ -211,51 +213,118 @@ export function EquipmentItemAccordion({
                               </Badge>
                             )}
 
-                            <div className="relative z-10 flex shrink-0 items-center gap-2">
+                            {/* Quick action: ikon semua. Setiap tombol tetap punya
+                                `aria-label` — tooltip itu petunjuk visual saat hover,
+                                bukan nama aksesibelnya. */}
+                            <div className="relative z-10 flex shrink-0 items-center gap-1">
                               {unit.activeUsage ? (
                                 unit.activeUsage.canReturn ? (
-                                  <ReturnButton
-                                    usageId={unit.activeUsage.usageId}
-                                    equipmentName={`${it.name} (${unit.code})`}
-                                    durationLabel={unit.activeUsage.durationLabel}
-                                  />
+                                  <Tooltip>
+                                    <ReturnButton
+                                      usageId={unit.activeUsage.usageId}
+                                      equipmentName={`${it.name} (${unit.code})`}
+                                      durationLabel={unit.activeUsage.durationLabel}
+                                      trigger={
+                                        <TooltipTrigger
+                                          render={
+                                            <Button
+                                              size="icon-sm"
+                                              variant="outline"
+                                              aria-label={`Kembalikan ${unit.code}`}
+                                            >
+                                              <Undo2Icon />
+                                            </Button>
+                                          }
+                                        />
+                                      }
+                                    />
+                                    <TooltipContent>Kembalikan</TooltipContent>
+                                  </Tooltip>
                                 ) : null
                               ) : unit.canBorrow ? (
-                                <BorrowDialog
-                                  fixedEquipment={{
-                                    id: unit.id,
-                                    name: `${it.name} (${unit.code})`,
-                                  }}
-                                  projectOptions={projectOptions}
-                                  isAdmin={isAdmin}
-                                  surveyors={surveyors}
-                                  trigger={
-                                    <Button size="sm" variant="outline">
-                                      Pinjam
-                                    </Button>
-                                  }
-                                />
+                                <Tooltip>
+                                  <BorrowDialog
+                                    fixedEquipment={{
+                                      id: unit.id,
+                                      name: `${it.name} (${unit.code})`,
+                                    }}
+                                    projectOptions={projectOptions}
+                                    isAdmin={isAdmin}
+                                    surveyors={surveyors}
+                                    trigger={
+                                      <TooltipTrigger
+                                        render={
+                                          <Button
+                                            size="icon-sm"
+                                            variant="outline"
+                                            aria-label={`Pinjam ${unit.code}`}
+                                          >
+                                            {/* Panah keluar / panah balik = pasangan
+                                                pinjam-kembali. `HandHelping` tidak
+                                                terbaca di ukuran 14px. */}
+                                            <ArrowUpRightIcon />
+                                          </Button>
+                                        }
+                                      />
+                                    }
+                                  />
+                                  <TooltipContent>Pinjam</TooltipContent>
+                                </Tooltip>
                               ) : null}
 
                               {isAdmin ? (
-                                <EquipmentFormDialog
-                                  itemId={it.id}
-                                  itemName={it.name}
-                                  editing={{
-                                    equipmentId: unit.id,
-                                    code: unit.code,
-                                    serialNumber: unit.serialNumber,
-                                    condition: unit.condition as EquipmentConditionInput,
-                                    purchaseDate: unit.purchaseDate ?? null,
-                                    purchasePrice: unit.purchasePrice ?? null,
-                                    notes: unit.notes ?? null,
-                                  }}
-                                  trigger={
-                                    <Button size="sm" variant="outline">
-                                      Edit
-                                    </Button>
-                                  }
-                                />
+                                <>
+                                  <Tooltip>
+                                    <EquipmentFormDialog
+                                      itemId={it.id}
+                                      itemName={it.name}
+                                      editing={{
+                                        equipmentId: unit.id,
+                                        code: unit.code,
+                                        serialNumber: unit.serialNumber,
+                                        condition: unit.condition as EquipmentConditionInput,
+                                        purchaseDate: unit.purchaseDate ?? null,
+                                        purchasePrice: unit.purchasePrice ?? null,
+                                        notes: unit.notes ?? null,
+                                      }}
+                                      trigger={
+                                        <TooltipTrigger
+                                          render={
+                                            <Button
+                                              size="icon-sm"
+                                              variant="outline"
+                                              aria-label={`Edit ${unit.code}`}
+                                            >
+                                              <PencilIcon />
+                                            </Button>
+                                          }
+                                        />
+                                      }
+                                    />
+                                    <TooltipContent>Edit unit</TooltipContent>
+                                  </Tooltip>
+
+                                  <Tooltip>
+                                    <ArchiveEquipmentButton
+                                      equipmentId={unit.id}
+                                      equipmentName={`${it.name} (${unit.code})`}
+                                      trigger={
+                                        <TooltipTrigger
+                                          render={
+                                            <Button
+                                              size="icon-sm"
+                                              variant="outline"
+                                              aria-label={`Hapus ${unit.code}`}
+                                            >
+                                              <Trash2Icon />
+                                            </Button>
+                                          }
+                                        />
+                                      }
+                                    />
+                                    <TooltipContent>Hapus unit</TooltipContent>
+                                  </Tooltip>
+                                </>
                               ) : null}
                             </div>
                           </div>
