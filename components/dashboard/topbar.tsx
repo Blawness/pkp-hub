@@ -5,63 +5,8 @@ import Link from "next/link";
 import { useSelectedLayoutSegments } from "next/navigation";
 import { Fragment } from "react";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
-import { buildLinks } from "@/components/dashboard/nav-config";
+import { buildCrumbs } from "@/components/dashboard/nav-config";
 import type { SessionUser } from "@/lib/auth-guards";
-
-/** Segmen aksi yang punya nama sendiri; sisanya dianggap id. */
-const ACTION_LABELS: Record<string, string> = {
-  new: "Baru",
-  edit: "Edit",
-  users: "User",
-};
-
-/** Segmen tingkat pertama yang punya halaman tapi bukan item sidebar. */
-const SECTION_LABELS: Record<string, string> = {
-  profile: "Profil Saya",
-};
-
-type Crumb = { key: string; label: string; href?: string };
-
-/**
- * Membangun breadcrumb dari segmen route aktif.
- *
- * Segmen dinamis ([id]) sengaja TIDAK ditampilkan apa adanya: nilainya UUID,
- * dan "Proyek › 5f2c1a3e-…" tidak memberi tahu pengguna apa pun. Judul entitas
- * yang sebenarnya hanya diketahui server, sementara komponen ini harus berupa
- * Client Component untuk membaca segmen — jadi id dipetakan ke "Detail", dan
- * judul asli tetap tampil sebagai <h1> di halamannya sendiri.
- */
-function buildCrumbs(segments: string[], user: SessionUser): Crumb[] {
-  const crumbs: Crumb[] = [{ key: "/dashboard", label: "Dashboard", href: "/dashboard" }];
-  if (segments.length === 0) return crumbs;
-
-  const [section, ...rest] = segments;
-  const sectionPath = `/dashboard/${section}`;
-  const link = buildLinks(user.role).find((l) => l.segment === section);
-  crumbs.push({
-    key: sectionPath,
-    // `profile` sengaja bukan item nav (ia dijangkau lewat menu pengguna), jadi
-    // `buildLinks` tidak punya labelnya dan fallback `?? section` akan menulis
-    // "profile" — huruf kecil, Inggris, di remah yang seluruhnya Indonesia.
-    label: link?.label ?? SECTION_LABELS[section] ?? section,
-    href: rest.length > 0 ? (link?.href ?? sectionPath) : undefined,
-  });
-
-  for (const [index, segment] of rest.entries()) {
-    const isLast = index === rest.length - 1;
-    // Kunci diambil dari path kumulatif, bukan indeks: dua remah bisa sama-sama
-    // berlabel "Detail", tapi path-nya tidak pernah sama.
-    const path = `${sectionPath}/${rest.slice(0, index + 1).join("/")}`;
-    crumbs.push({
-      key: path,
-      label: ACTION_LABELS[segment] ?? "Detail",
-      // Hanya remah terakhir yang tanpa tautan (ia halaman saat ini).
-      href: isLast ? undefined : path,
-    });
-  }
-
-  return crumbs;
-}
 
 export function Topbar({ user }: { user: SessionUser }) {
   const segments = useSelectedLayoutSegments();

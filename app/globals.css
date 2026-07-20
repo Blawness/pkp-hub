@@ -106,6 +106,9 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: var(--brand-accent);
+
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: oklch(0.85 0.01 260);
 }
 
 .dark {
@@ -142,6 +145,8 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: var(--brand-accent);
+
+  --scrollbar-thumb: oklch(1 0 0 / 18%);
 }
 
 @layer base {
@@ -153,6 +158,30 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /*
+   * Scrollbar custom pakai token brand. Sengaja hanya memakai properti standar
+   * (`scrollbar-width` / `scrollbar-color`), BUKAN `::-webkit-scrollbar`:
+   * pseudo-element itu memaksa scrollbar jadi mode klasik yang selalu terlihat
+   * dan memakan lebar konten di macOS/iOS, sementara properti standar tetap
+   * menghormati overlay scrollbar bawaan OS.
+   *
+   * `scrollbar-color` diwariskan, jadi satu deklarasi di `html` sudah menutup
+   * semua container `overflow-*` di app. Turunan yang latarnya beda (sidebar)
+   * cukup menimpa tokennya, bukan menulis ulang rule-nya.
+   */
+  html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+
+  /*
+   * Sidebar selalu gelap (`--sidebar: var(--brand-base)`) walau tema terang,
+   * jadi thumb versi terang tidak akan terlihat di atasnya.
+   */
+  [data-slot="sidebar"] {
+    --scrollbar-thumb: oklch(1 0 0 / 18%);
   }
 }
 

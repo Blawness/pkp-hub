@@ -40,6 +40,7 @@ export function DashboardSidebar({
 
   return (
     <aside
+      data-slot="sidebar"
       data-collapsed={collapsed}
       className={cn(
         "relative hidden shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex",
