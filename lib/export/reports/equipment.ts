@@ -1,10 +1,7 @@
-import { listEquipmentForUser, type EquipmentListItem } from "@/lib/actions/equipment-logic";
-import {
-  equipmentCategoryLabel,
-  equipmentConditionLabel,
-} from "@/lib/labels";
+import { type EquipmentListItem, listEquipmentForUser } from "@/lib/actions/equipment-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import type { Column, ReportDefinition } from "@/lib/export/types";
+import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
 
 /**
  * Satu baris per UNIT FISIK (bukan per jenis) — bentuk yang langsung bisa
@@ -38,7 +35,10 @@ export const equipmentReport: ReportDefinition<EquipmentListItem> = {
       },
       {
         header: "Status pakai",
-        get: (u) => (u.activeUsage ? `${u.activeUsage.usedByName} · ${u.activeUsage.projectTitle}` : "Tersedia"),
+        get: (u) =>
+          u.activeUsage
+            ? `${u.activeUsage.usedByName} · ${u.activeUsage.projectTitle}`
+            : "Tersedia",
         width: 170,
         format: "text",
       },

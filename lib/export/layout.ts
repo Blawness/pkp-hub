@@ -18,7 +18,8 @@ export function truncateToWidth(
 
   const ellipsisWidth = ellipsis.length * charWidth;
   // Kasus ekstrem: kolom lebih sempit dari ellipsis sendiri → balikkan ellipsis.
-  if (maxWidth <= ellipsisWidth) return ellipsis.slice(0, Math.max(1, Math.floor(maxWidth / charWidth)));
+  if (maxWidth <= ellipsisWidth)
+    return ellipsis.slice(0, Math.max(1, Math.floor(maxWidth / charWidth)));
 
   let len = text.length;
   while (len > 0 && len * charWidth + ellipsisWidth > maxWidth) {

@@ -1,6 +1,6 @@
 import ExcelJS from "exceljs";
 import { formatCellValue } from "@/lib/export/format";
-import type { Column, ReportMeta, ReportDefinition } from "@/lib/export/types";
+import type { Column, ReportMeta } from "@/lib/export/types";
 
 const NUM_FMT: Record<string, string> = {
   currency: '"Rp"#,##0',
@@ -18,7 +18,7 @@ const NUM_FMT: Record<string, string> = {
  * sel kosong. `footnote` di baris terakhir setelah satu baris spacer.
  */
 export async function buildReportXlsx<Row>(
-  def: Pick<ReportDefinition<Row>, "title" | "columns"> & { columns: Column<Row>[] },
+  def: { title: string; columns: Column<Row>[] },
   rows: Row[],
   meta: ReportMeta,
 ): Promise<Uint8Array> {

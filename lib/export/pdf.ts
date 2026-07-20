@@ -1,3 +1,4 @@
+import type { PDFPage } from "pdf-lib";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { formatCellText } from "@/lib/export/format";
 import { truncateToWidth } from "@/lib/export/layout";
@@ -10,7 +11,7 @@ const CHAR_WIDTH = 5;
 const FONT_SIZE = 9;
 const HEADER_H = 18;
 const ROW_H = 16;
-const MAX_ROWS_PER_PAGE = 38;
+const MAX_ROWS_PER_PAGE = 31;
 
 const ink = rgb(0.04, 0.05, 0.08);
 const muted = rgb(0.45, 0.47, 0.52);

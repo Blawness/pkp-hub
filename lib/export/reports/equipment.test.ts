@@ -1,14 +1,18 @@
-import { randomUUID } from "node:crypto";
 import { execSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createEquipmentItemForUser } from "@/lib/actions/equipment-items-logic";
-import {
-  createEquipmentForUser,
-  listEquipmentForUser,
-} from "@/lib/actions/equipment-logic";
+import { createEquipmentForUser, listEquipmentForUser } from "@/lib/actions/equipment-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, equipment, equipmentItem, equipmentUsage, projects, users } from "@/lib/db/schema";
+import {
+  clients,
+  equipment,
+  equipmentItem,
+  equipmentUsage,
+  projects,
+  users,
+} from "@/lib/db/schema";
 import { equipmentReport } from "@/lib/export/reports/equipment";
 
 let admin: SessionUser;
@@ -31,7 +35,12 @@ beforeAll(async () => {
     { id: surveyorId, name: "Exp Surveyor", email: "exp-surveyor@fixture.test", role: "surveyor" },
   ]);
   admin = { id: adminId, name: "Exp Admin", email: "exp-admin@fixture.test", role: "admin" };
-  surveyor = { id: surveyorId, name: "Exp Surveyor", email: "exp-surveyor@fixture.test", role: "surveyor" };
+  surveyor = {
+    id: surveyorId,
+    name: "Exp Surveyor",
+    email: "exp-surveyor@fixture.test",
+    role: "surveyor",
+  };
 
   const [clientA] = await db
     .insert(clients)
@@ -56,7 +65,9 @@ afterAll(() => {
   execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
-async function makeUnit(overrides: Partial<{ name: string; category: string; condition: string; price: number }> = {}) {
+async function makeUnit(
+  overrides: Partial<{ name: string; category: string; condition: string; price: number }> = {},
+) {
   unitSeq += 1;
   const item = await createEquipmentItemForUser(admin, {
     name: overrides.name ?? `EXP-${unitSeq}`,
@@ -107,7 +118,10 @@ describe("equipment report fetch + filter", () => {
       startedAt: new Date(),
     });
 
-    const { rows, filterLabel } = await equipmentReport.fetch(admin, new URLSearchParams("status=terpinjam"));
+    const { rows, filterLabel } = await equipmentReport.fetch(
+      admin,
+      new URLSearchParams("status=terpinjam"),
+    );
     expect(filterLabel).toBe("Status: Terpinjam");
     expect(rows.every((r) => Boolean(r.activeUsage))).toBe(true);
 

@@ -1,5 +1,5 @@
-import type { ReportDefinition } from "@/lib/export/types";
 import { equipmentReport } from "@/lib/export/reports/equipment";
+import type { ReportDefinition } from "@/lib/export/types";
 
 /**
  * Tempat tiap modul mendaftarkan laporannya. Menambah ekspor = satu file

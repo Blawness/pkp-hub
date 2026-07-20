@@ -1,7 +1,13 @@
-import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
-import { buildReportXlsx } from "@/lib/export/xlsx";
+import { describe, expect, it } from "vitest";
 import type { Column, ReportMeta } from "@/lib/export/types";
+import { buildReportXlsx } from "@/lib/export/xlsx";
+
+const wsAt = (wb: ExcelJS.Workbook) => {
+  const ws = wb.worksheets[0];
+  if (!ws) throw new Error("worksheet tidak ditemukan");
+  return ws;
+};
 
 type Row = { name: string; price: number | null; boughtAt: Date | null };
 
@@ -27,8 +33,8 @@ describe("buildReportXlsx", () => {
     const bytes = await buildReportXlsx({ title: meta.title, columns }, rows, meta);
 
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(bytes);
-    const ws = wb.worksheets[0]!;
+    await wb.xlsx.load(Buffer.from(bytes) as unknown as Parameters<typeof wb.xlsx.load>[0]);
+    const ws = wsAt(wb);
 
     // Header baris 1
     expect(ws.getCell(1, 1).value).toBe("Nama");
@@ -51,8 +57,8 @@ describe("buildReportXlsx", () => {
   it("footnote di baris terakhir setelah satu baris kosong", async () => {
     const bytes = await buildReportXlsx({ title: meta.title, columns }, [], meta);
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(bytes);
-    const ws = wb.worksheets[0]!;
+    await wb.xlsx.load(Buffer.from(bytes) as unknown as Parameters<typeof wb.xlsx.load>[0]);
+    const ws = wsAt(wb);
 
     // Baris 1 header, baris 2 kosong (spacer), baris 3 footnote.
     expect(ws.getCell(2, 1).value).toBeNull();
@@ -62,6 +68,6 @@ describe("buildReportXlsx", () => {
   it("byte diawali dengan PK tanda zip xlsx", async () => {
     const bytes = await buildReportXlsx({ title: meta.title, columns }, [], meta);
     // XLSX = zip → magic bytes "PK"
-    expect(Buffer.from(bytes.slice(0, 2)).toString("ascii")).toBe("PK");
+    expect(String.fromCharCode(bytes[0], bytes[1])).toBe("PK");
   });
 });

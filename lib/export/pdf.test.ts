@@ -1,6 +1,6 @@
+import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildReportPdf } from "@/lib/export/pdf";
-import { PDFDocument } from "pdf-lib";
 import type { Column, ReportMeta } from "@/lib/export/types";
 
 type Row = { code: string; name: string; price: number | null };

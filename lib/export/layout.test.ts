@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { truncateToWidth, paginateRows } from "@/lib/export/layout";
+import { paginateRows, truncateToWidth } from "@/lib/export/layout";
 
 describe("truncateToWidth", () => {
   it("teks yang muat persis tidak dipotong", () => {
