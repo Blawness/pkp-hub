@@ -38,7 +38,7 @@ export function formatFileSize(bytes: number): string {
   return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
-const BULAN = [
+export const BULAN = [
   "Januari",
   "Februari",
   "Maret",

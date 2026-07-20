@@ -1,9 +1,5 @@
 import type { CellFormat } from "@/lib/export/types";
-
-const BULAN = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
+import { BULAN } from "@/lib/format";
 
 /**
  * Nilai sel → teks untuk PDF. `null` selalu jadi string kosong: sel kosong,
