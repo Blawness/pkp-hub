@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import type { ReactNode } from "react";
+import { SessionHeartbeat } from "@/components/auth/session-heartbeat";
 import { SIDEBAR_COOKIE } from "@/components/dashboard/nav-config";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
@@ -25,6 +26,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
   return (
     <div className="flex min-h-svh">
+      <SessionHeartbeat />
       <DashboardSidebar user={user} defaultCollapsed={collapsed} />
 
       {/* `min-w-0` menahan kolom ini agar tidak melar mengikuti isinya — tanpa

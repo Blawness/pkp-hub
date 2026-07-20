@@ -1,5 +1,6 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { nextCookies } from "better-auth/next-js";
 import { env } from "@/env";
 import { db } from "@/lib/db";
 import { accounts, sessions, users, verifications } from "@/lib/db/schema";
@@ -73,6 +74,18 @@ export const auth = betterAuth({
       maxAge: 5 * 60,
     },
   },
+  // Tanpa plugin ini, header `Set-Cookie` yang dibuat panggilan `auth.api.*`
+  // di Server Action terbuang diam-diam — browser tidak pernah menerima
+  // perpanjangan `session_token`, jadi setiap user "lupa login" persis 7 hari
+  // setelah masuk walau sesinya di DB terus diperpanjang (bug remember-me).
+  // Catatan penting: flag skip-refresh RSC bawaan plugin ini TIDAK berlaku di
+  // Next 16 (terbukti di e2e — refresh RSC tetap terjadi), jadi jaminan bahwa
+  // render RSC tidak pernah me-refresh sesi ada di `disableRefresh` pada
+  // `lib/auth-guards.ts`. Perpanjangan sliding kini digerakkan
+  // `SessionHeartbeat` (components/auth/session-heartbeat.tsx) yang memanggil
+  // /api/auth/get-session dari browser — response HTTP-nya membawa cookie
+  // baru secara alami. Wajib plugin TERAKHIR.
+  plugins: [nextCookies()],
 });
 
 export type Session = typeof auth.$Infer.Session;

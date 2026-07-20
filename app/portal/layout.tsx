@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SessionHeartbeat } from "@/components/auth/session-heartbeat";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { requireClient } from "@/lib/auth-guards";
 
@@ -22,6 +23,7 @@ export default async function PortalLayout({ children }: { children: ReactNode }
   const user = await requireClient();
   return (
     <div className="flex min-h-svh flex-col">
+      <SessionHeartbeat />
       <nav className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 text-sm sm:px-8">
         <Link href="/portal" className="font-medium">
           PKP Hub

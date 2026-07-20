@@ -11,11 +11,12 @@ import { setUserName } from "@/lib/actions/users-logic";
  * harus bisa memakainya.
  *
  * Ganti password TIDAK ada di sini, dan itu disengaja: `revokeOtherSessions`
- * membuat Better Auth menghapus semua sesi lalu memasang cookie sesi BARU, dan
- * Server Action di app ini tidak bisa meneruskan `Set-Cookie` itu ke browser
- * (`nextCookies()` tidak terpasang). Hasilnya user akan ke-kick tepat setelah
- * berhasil ganti password. Jadi password ditangani `authClient.changePassword()`
- * dari komponen klien — lihat `components/profile/profile-form.tsx`.
+ * membuat Better Auth menghapus semua sesi lalu memasang cookie sesi BARU.
+ * Sejak `nextCookies()` terpasang (lib/auth.ts) Server Action sebenarnya sudah
+ * bisa meneruskan `Set-Cookie` itu, tapi pertukaran "hapus semua sesi + pasang
+ * sesi baru" paling aman dilakukan lewat `authClient.changePassword()` langsung
+ * dari komponen klien — satu roundtrip HTTP yang response-nya pasti membawa
+ * cookie baru. Lihat `components/profile/profile-form.tsx`.
  */
 export const updateOwnNameAction = authActionClient
   .inputSchema(updateOwnNameSchema)

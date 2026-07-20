@@ -12,17 +12,18 @@ import type { Role } from "@/lib/auth-guards";
  * Dua cookie yang dibaca di sini punya umur yang SANGAT berbeda, dan
  * membedakannya adalah inti dari gerbang ini:
  *
- *  - `session_token` (7 hari) — satu-satunya bukti "user ini sudah login".
+ *  - `session_token` (7 hari, sliding) — satu-satunya bukti "user ini sudah
+ *    login". Diperpanjang lewat response `/api/auth/get-session` (dipanggil
+ *    `SessionHeartbeat` dari browser + `nextCookies()` di lib/auth.ts).
  *  - `session_data`  (5 menit, `session.cookieCache.maxAge` di lib/auth.ts) —
- *    hanya cache berisi role, dan ia TIDAK PERNAH diperbarui: satu-satunya
- *    yang menulisnya adalah response dari `/api/auth/*`, sedangkan aplikasi
- *    ini tidak memakai `useSession` di klien dan tidak memasang `nextCookies()`
- *    (RSC pun tak boleh menyetel cookie saat render).
+ *    hanya cache berisi role. Ia kini ikut diperbarui oleh jalur yang sama,
+ *    tapi umurnya memang pendek dan boleh hilang kapan pun (tab baru dibuka,
+ *    user belum membuka app 5 menit, dsb).
  *
  * Menilai "sudah login atau belum" dari `session_data` — seperti versi
- * sebelumnya — berarti menendang setiap user ke /login 5 menit setelah masuk,
- * padahal sesinya di database masih sah berhari-hari. Itu bug produksi yang
- * nyata, dan `proxy.test.ts` menguncinya.
+ * sebelum 2026-07 — berarti menendang setiap user ke /login begitu cache itu
+ * basi, padahal `session_token`-nya masih sah berhari-hari. Itu bug produksi
+ * yang nyata, dan `proxy.test.ts` menguncinya.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

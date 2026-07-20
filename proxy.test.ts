@@ -9,11 +9,14 @@ import { proxy } from "@/proxy";
  *
  * Akarnya: `proxy.ts` dulu memutuskan sudah-login-atau-belum HANYA dari cookie
  * cache (`better-auth.session_data`), yang umurnya `session.cookieCache.maxAge`
- * = 5 menit dan TIDAK PERNAH diperbarui — satu-satunya penulisnya adalah
- * response dari `/api/auth/*`, sementara aplikasi ini tidak pernah memanggil
- * `useSession` di klien dan `nextCookies()` tidak terpasang. Lewat 5 menit
+ * = 5 menit dan saat itu TIDAK PERNAH diperbarui — satu-satunya penulisnya
+ * adalah response dari `/api/auth/*`, sementara aplikasi belum memanggil
+ * `useSession` di klien dan `nextCookies()` belum terpasang. Lewat 5 menit
  * cookie itu hilang dari browser, `getCookieCache` mengembalikan null, dan
  * proxy menendang user yang `better-auth.session_token`-nya (7 hari) masih sah.
+ * (Keduanya kini sudah ada — `SessionHeartbeat` + `nextCookies()` — tapi
+ * gerbang ini tetap HARUS menilai login dari `session_token`: cache 5 menit
+ * boleh hilang kapan pun tanpa berarti user sudah logout.)
  *
  * Karena itu tes di bawah memakai nama cookie non-`__Secure-`: `isProduction`
  * di better-auth bernilai false saat NODE_ENV=test, jadi itulah nama yang

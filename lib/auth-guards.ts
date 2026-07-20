@@ -46,9 +46,20 @@ export async function getSession(): Promise<{ user: SessionUser } | null> {
   // gate, but THIS is the security boundary (see file header), so it must
   // never trust the (up to 5-minute stale) signed cookie — a revoked/deleted
   // session or a role change (admin -> client) has to take effect immediately.
+  //
+  // `disableRefresh: true` sama pentingnya: guard ini jalan di Server
+  // Component, yang TIDAK BISA mengirim `Set-Cookie` ke browser. Kalau baca
+  // ini ikut me-refresh sesi, baris DB memanjang tapi cookie browser tetap
+  // berumur lama — dan lebih parah, sesi tergeser keluar dari jendela
+  // `updateAge` sehingga `SessionHeartbeat` yang datang beberapa milidetik
+  // kemudian tidak lagi menerbitkan ulang cookie-nya. User tetap ke-logout
+  // di hari ke-7 (terbukti di e2e: flag skip-RSC plugin `nextCookies()`
+  // tidak berlaku di Next 16, jadi refresh RSC benar-benar terjadi).
+  // Memperpanjang sesi HANYA boleh terjadi di route handler HTTP yang
+  // dipanggil heartbeat — di sana `Set-Cookie` pasti sampai ke browser.
   const session = await auth.api.getSession({
     headers: await headers(),
-    query: { disableCookieCache: true },
+    query: { disableCookieCache: true, disableRefresh: true },
   });
   if (!session) return null;
 
