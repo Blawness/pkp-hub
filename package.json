@@ -33,6 +33,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.2",
+    "exceljs": "^4.4.0",
     "leaflet": "1.9.4",
     "leaflet-draw": "1.0.4",
     "lucide-react": "^1.24.0",
