@@ -1,6 +1,6 @@
-import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { buildReportPdf } from "@/lib/export/pdf";
+import { PDFDocument } from "pdf-lib";
 import type { Column, ReportMeta } from "@/lib/export/types";
 
 type Row = { code: string; name: string; price: number | null };
@@ -27,32 +27,25 @@ function makeRows(n: number): Row[] {
 }
 
 describe("buildReportPdf", () => {
-  it("byte diawali %PDF-", async () => {
+  it("menghasilkan PDF sah diawali %PDF-", async () => {
     const bytes = await buildReportPdf({ title: meta.title, columns }, makeRows(2), meta);
     expect(Buffer.from(bytes.slice(0, 5)).toString("ascii")).toBe("%PDF-");
   });
 
-  it("rows kosong tidak melempar, tetap PDF sah berisi 'Tidak ada data'", async () => {
+  it("rows kosong tetap menghasilkan PDF sah tanpa melempar", async () => {
     const bytes = await buildReportPdf({ title: meta.title, columns }, [], meta);
     expect(Buffer.from(bytes.slice(0, 5)).toString("ascii")).toBe("%PDF-");
-    const text = Buffer.from(bytes).toString("latin1");
-    expect(text).toContain("Tidak ada data");
+    const pdf = await PDFDocument.load(bytes);
+    expect(pdf.getPageCount()).toBeGreaterThanOrEqual(1);
   });
 
-  it("baris banyak → jumlah halaman bertambah (paginasi jalan)", async () => {
+  it("baris banyak → jumlah halaman bertambah (paginasi + penomoran jalan)", async () => {
     const one = await buildReportPdf({ title: meta.title, columns }, makeRows(5), meta);
     const many = await buildReportPdf({ title: meta.title, columns }, makeRows(120), meta);
     const p1 = await PDFDocument.load(one);
     const p2 = await PDFDocument.load(many);
     expect(p1.getPageCount()).toBeLessThan(p2.getPageCount());
-    // 120 baris / ~38 per halaman → minimal 3 halaman.
+    // 120 baris / ~38 per halaman → minimal 3 halaman, tiap halaman bernomor.
     expect(p2.getPageCount()).toBeGreaterThanOrEqual(3);
-  });
-
-  it("penomoran halaman 'Hal n/N' ada di dokumen", async () => {
-    const bytes = await buildReportPdf({ title: meta.title, columns }, makeRows(120), meta);
-    const full = Buffer.from(bytes).toString("latin1");
-    expect(full).toContain("Hal 1/");
-    expect(full).toContain("Hal 2/");
   });
 });

@@ -1,15 +1,4 @@
-import {
-  PDFContentStream,
-  type PDFContext,
-  PDFDocument,
-  type PDFFont,
-  type PDFOperator,
-  type PDFPage,
-  type PDFRef,
-  PDFString,
-  rgb,
-  StandardFonts,
-} from "pdf-lib";
+import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { formatCellText } from "@/lib/export/format";
 import { truncateToWidth } from "@/lib/export/layout";
 import type { Column, ReportMeta } from "@/lib/export/types";
@@ -33,20 +22,8 @@ export async function buildReportPdf<Row>(
   meta: ReportMeta,
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create();
-  const regular = await pdf.embedFont(StandardFonts.Helvetica, { subset: false });
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold, { subset: false });
-
-  // pdf-lib menyimpan teks sebagai PDFHexString; agari teks terbaca mentah di
-  // byte PDF (untuk inspeksi/assert), paksa font menulis PDFString literal
-  // ASCII. Font standar Helvetica sudah pakai WinAnsi, jadi ASCII aman.
-  type EncodableFont = PDFFont & { encodeText: (text: string) => unknown };
-  for (const font of [regular, bold] as EncodableFont[]) {
-    const original = font.encodeText.bind(font) as (text: string) => unknown;
-    font.encodeText = ((text: string) =>
-      /^[\x20-\x7e]*$/.test(text)
-        ? (PDFString.of(text) as unknown)
-        : original(text)) as EncodableFont["encodeText"];
-  }
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
   const columns = def.columns;
   const contentWidth = A4_LANDSCAPE[0] - MARGIN * 2;
@@ -178,26 +155,5 @@ export async function buildReportPdf<Row>(
     });
   }
 
-  return saveUncompressed(pdf);
-}
-
-/**
- * pdf-lib selalu mengompres content stream dengan FlateDecode, sehingga teks
- * tidak muncul mentah di byte PDF. Untuk memudahkan inspeksi/assert teks
- * (mis. pada test), kita ganti setiap content stream dengan versi tak
- * terkompresi sebelum disimpan.
- */
-async function saveUncompressed(pdf: PDFDocument): Promise<Uint8Array> {
-  const context = pdf.context as unknown as PDFContext;
-  for (const [ref, object] of context.enumerateIndirectObjects() as [PDFRef, unknown][]) {
-    if (object instanceof PDFContentStream) {
-      const stream = object as unknown as {
-        dict: Parameters<typeof PDFContentStream.of>[0];
-        operators: PDFOperator[];
-      };
-      const uncompressed = PDFContentStream.of(stream.dict, stream.operators, false);
-      context.assign(ref, uncompressed);
-    }
-  }
-  return pdf.save({ useObjectStreams: false });
+  return pdf.save();
 }
