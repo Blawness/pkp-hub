@@ -13,7 +13,12 @@ export const recordPaymentInputSchema = z.object({
   projectId: z.uuid(),
   // Rupiah bulat, harus positif. Pembayaran nol bukan pembayaran, dan
   // pembayaran negatif adalah refund — fitur lain, dengan aturan lain.
-  amount: z.number().int().positive("Jumlah pembayaran harus lebih dari 0."),
+  // Max guard: bigint kolom kehilangan presisi di atas 2^53.
+  amount: z
+    .number()
+    .int()
+    .positive("Jumlah pembayaran harus lebih dari 0.")
+    .max(Number.MAX_SAFE_INTEGER),
   paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Tanggal harus dalam format YYYY-MM-DD."),
   method: paymentMethodSchema,
   note: z.string().trim().max(500).optional(),

@@ -1,4 +1,4 @@
-import { area as turfArea } from "@turf/turf";
+import area from "@turf/area";
 import type { Feature, FeatureCollection, Geometry } from "geojson";
 
 const SQM_PER_HECTARE = 10_000;
@@ -18,7 +18,7 @@ export function calculateAreaSqm(collection: FeatureCollection): number | null {
   );
   if (polygonFeatures.length === 0) return null;
 
-  const total = polygonFeatures.reduce((sum, feature) => sum + turfArea(feature), 0);
+  const total = polygonFeatures.reduce((sum, feature) => sum + area(feature), 0);
   return total;
 }
 

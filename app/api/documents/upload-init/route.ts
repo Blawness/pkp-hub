@@ -44,6 +44,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ukuran file maksimum 100MB." }, { status: 400 });
   }
 
+  const ALLOWED_MIME = new Set([
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/tiff",
+    "text/csv",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-word",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/zip",
+    "application/x-zip-compressed",
+    "application/octet-stream",
+  ]);
+  if (!ALLOWED_MIME.has(contentType)) {
+    return NextResponse.json({ error: "Tipe file tidak diizinkan." }, { status: 400 });
+  }
+
   const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const key = `documents/${projectId}/${randomUUID()}-${safeName}`;
 

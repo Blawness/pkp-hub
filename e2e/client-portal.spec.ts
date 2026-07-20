@@ -48,7 +48,7 @@ test.describe("Akses portal klien", () => {
 
       // Dialog tertutup; buka detail klien yang baru dibuat dari daftar.
       await expect(page.getByRole("dialog")).toBeHidden();
-      await page.getByRole("link", { name: clientName }).click();
+      await page.getByRole("link", { name: clientName, exact: true }).click();
 
       // Berada di halaman detail; tombol undangan tersedia.
       await expect(page.getByRole("button", { name: "Undang ke portal" })).toBeVisible();

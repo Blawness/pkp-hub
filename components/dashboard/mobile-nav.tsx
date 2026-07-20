@@ -38,7 +38,14 @@ export function MobileNav({ user }: { user: SessionUser }) {
       <SheetContent side="left" className="flex flex-col p-0">
         <SheetHeader className="h-16 justify-center px-4">
           <SheetTitle className="flex items-center gap-2 text-sm">
-            <Image src="/logo-pkp.webp" alt="" aria-hidden width={28} height={28} className="size-6" />
+            <Image
+              src="/logo-pkp.webp"
+              alt=""
+              aria-hidden
+              width={28}
+              height={28}
+              className="size-6"
+            />
             PKP Hub
           </SheetTitle>
         </SheetHeader>

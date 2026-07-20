@@ -27,7 +27,7 @@ export const createEquipmentInputSchema = z.object({
   serialNumber: z.string().trim().max(120).optional(),
   condition: equipmentConditionSchema.default("tersedia"),
   purchaseDate: dateString.nullable().optional(),
-  purchasePrice: z.number().int().nonnegative().nullable().optional(),
+  purchasePrice: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable().optional(),
   notes: z.string().trim().max(1000).optional(),
 });
 export type CreateEquipmentInput = z.infer<typeof createEquipmentInputSchema>;

@@ -18,7 +18,7 @@ export type PaymentStatus = z.infer<typeof paymentStatusSchema>;
  */
 export const updatePaymentInputSchema = z.object({
   projectId: z.uuid(),
-  projectValue: z.number().int().nonnegative().nullable(),
+  projectValue: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
   paymentNotes: z.string().trim().max(2000).optional(),
 });
 export type UpdatePaymentInput = z.infer<typeof updatePaymentInputSchema>;

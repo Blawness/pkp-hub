@@ -510,3 +510,28 @@ export const equipmentUsageRelations = relations(equipmentUsage, ({ one }) => ({
   usedBy: one(users, { fields: [equipmentUsage.usedById], references: [users.id] }),
   recordedBy: one(users, { fields: [equipmentUsage.recordedById], references: [users.id] }),
 }));
+
+/* -------------------------------------------------------------------------- */
+/* Audit log                                                                  */
+/* -------------------------------------------------------------------------- */
+
+export const auditLog = pgTable(
+  "audit_log",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorId: text("actor_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    detail: jsonb("detail"),
+    ipAddress: text("ip_address"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("audit_log_actor_id_idx").on(t.actorId),
+    index("audit_log_entity_idx").on(t.entityType, t.entityId),
+    index("audit_log_created_at_idx").on(t.createdAt),
+  ],
+);
