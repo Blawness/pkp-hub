@@ -53,7 +53,15 @@ export type EquipmentItemAccordionRow = {
   id: string;
   name: string;
   category: string;
+  /**
+   * URL presigned untuk DITAMPILKAN saja (`<img src>`), berumur 1 jam. Jangan
+   * pernah mengirimkannya balik ke server sebagai nilai yang disimpan — itu
+   * yang menjatuhkan halaman ini pada 2026-07-21. Nilai yang disimpan adalah
+   * `imageKey`.
+   */
   image: string | null;
+  /** Alamat objek storage kanonik — satu-satunya bentuk yang boleh ditulis ke DB. */
+  imageKey: string | null;
   units: EquipmentUnitRow[];
   summary: { total: number; tersedia: number; terpinjam: number; perawatan: number; rusak: number };
 };
@@ -154,7 +162,7 @@ export function EquipmentItemAccordion({
                           itemId: it.id,
                           name: it.name,
                           category: it.category as EquipmentCategoryInput,
-                          image: it.image,
+                          image: it.imageKey,
                           imageDisplayUrl: it.image,
                         }}
                         trigger={

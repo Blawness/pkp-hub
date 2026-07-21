@@ -92,3 +92,26 @@ export const storage: StorageDriver = createDriver();
 export function downloadUrlFor(fileUrl: string): Promise<string> {
   return storage.getSignedUrl(storage.keyFromUrl(fileUrl));
 }
+
+/**
+ * Versi `downloadUrlFor` untuk aset yang sifatnya HIASAN — thumbnail alat, dsb.
+ * Mengembalikan `null` alih-alih melempar kalau `fileUrl` tidak bisa dipetakan
+ * ke sebuah key.
+ *
+ * Alasannya konkret: pada 2026-07-21 satu baris `equipment_item.image` berisi
+ * URL presigned, `keyFromUrl` melempar, dan SELURUH halaman inventaris mati —
+ * seluruh daftar alat hilang gara-gara satu gambar. Radius ledakan segitu untuk
+ * sebuah thumbnail jelas salah.
+ *
+ * JANGAN pakai ini untuk dokumen. Di sana `null` diam-diam berarti "berkas
+ * klien lenyap tanpa jejak", dan itu justru harus berisik. Pemakaian yang benar
+ * hanya untuk gambar yang absennya sudah punya fallback visual.
+ */
+export async function optionalDisplayUrlFor(fileUrl: string): Promise<string | null> {
+  try {
+    return await downloadUrlFor(fileUrl);
+  } catch (error) {
+    console.error(`[storage] gagal membuat URL tampilan untuk ${fileUrl}:`, error);
+    return null;
+  }
+}

@@ -16,7 +16,7 @@ import { projects, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { formatIDR } from "@/lib/format";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
-import { downloadUrlFor } from "@/lib/storage";
+import { optionalDisplayUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ unitId: string }> }) {
   const { unitId } = await params;
@@ -46,7 +46,7 @@ export default async function EquipmentUnitDetailPage({
 
   const item = await getEquipmentForUser(user, unitId);
   const usages = await listUsageForEquipment(user, unitId);
-  const imageDisplayUrl = item.image ? await downloadUrlFor(item.image) : null;
+  const imageDisplayUrl = item.image ? await optionalDisplayUrlFor(item.image) : null;
 
   const userProjects = await listProjectsForUser(user);
   const projectOptions = userProjects.map((p) => ({ id: p.id, title: p.title }));

@@ -16,7 +16,7 @@ import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { formatDuration, summarizeUnits, usageDurationMs } from "@/lib/equipment/derive";
-import { downloadUrlFor } from "@/lib/storage";
+import { optionalDisplayUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Inventaris Alat" };
 
@@ -74,7 +74,11 @@ export default async function EquipmentPage({
       id: it.item.id,
       name: it.item.name,
       category: it.item.category,
-      image: it.item.image ? await downloadUrlFor(it.item.image) : null,
+      // `image` = URL presigned untuk <img> saja; `imageKey` = alamat objek
+      // kanonik yang boleh dikirim balik ke server oleh form edit. Menyatukan
+      // keduanya jadi satu field-lah yang merusak data pada 2026-07-21.
+      image: it.item.image ? await optionalDisplayUrlFor(it.item.image) : null,
+      imageKey: it.item.image,
       summary: summarizeUnits(it.units),
       units: it.units.map((unit) => ({
         id: unit.id,
