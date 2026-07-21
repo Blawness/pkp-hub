@@ -208,7 +208,7 @@ export const projectResource = defineResource({
             eq(projectPhases.assignedSurveyorId, ctx.user.id)),
       )),
     ),
-    own: (ctx) => eq(projects.clientId, ctx.clientId ?? NO_CLIENT),
+    own: (ctx) => (ctx.clientId ? eq(projects.clientId, ctx.clientId) : sql`false`),
   },
 
   // Didukung engine, TIDAK diisi di sub-proyek 1 (lihat Non-Goal).
@@ -245,7 +245,7 @@ const project = await requireScopedRow(ctx, "project.update", projectId);
 //   kosong → notFound(); lalu guards[action](row) → error kalau ditolak
 
 // 4. FIELD — buang kolom yang tidak boleh dilihat
-return redact(ctx, "project", project);
+return redact(ctx, projectResource, project);
 ```
 
 **Kenapa `rbacFilter` selalu mengembalikan SQL** (bukan `SQL | undefined`): satu
@@ -284,9 +284,11 @@ predikat harus sudah ada di context. `clientId` adalah satu-satunya kasus itu
 sekarang; kalau nanti ada yang lain, ia ikut ke sini juga dan tetap satu round
 trip berkat `Promise.all` + `cache()`.
 
-`NO_CLIENT` adalah sentinel string yang tidak mungkin cocok dengan `clients.id`
-mana pun, sehingga user portal yang belum tertaut ke baris client menghasilkan
-himpunan kosong — bukan `undefined` yang bocor jadi "tanpa filter".
+User portal yang belum tertaut ke baris client menghasilkan `sql`false`` —
+himpunan kosong. Sengaja BUKAN sentinel string seperti `"__none__"`:
+`clients.id` bertipe `uuid`, jadi membandingkannya dengan string non-UUID
+membuat Postgres melempar `invalid input syntax for type uuid`, bukan
+mengembalikan nol baris.
 
 ### Type-safety
 
@@ -331,7 +333,7 @@ konsisten dengan daftar proyek yang dilihat user, dan menaruhnya di resource
 terpisah justru membuka celah keduanya melenceng.
 
 ¹ Scope `own` untuk dokumen = proyek milik client saya **dan**
-`isSharedWithClient = true`. Kondisi tambahan itu tinggal di dalam fungsi scope
+`sharedWithClient = true`. Kondisi tambahan itu tinggal di dalam fungsi scope
 resource-nya, bukan jadi konsep baru di engine.
 
 `equipment.*` untuk surveyor scope-nya `all` — bukti model grant+scope tidak
@@ -360,7 +362,7 @@ setup data self-contained per file).
      id yang **identik** dengan `listProjectsForUser(user)` lama.
    - `requireScopedRow(ctx, "project.read", id)` `notFound()` pada kasus yang
      sama persis dengan `assertProjectAccess(id, user)` lama.
-   - Hal yang sama untuk `document.read` (termasuk aturan `isSharedWithClient`).
+   - Hal yang sama untuk `document.read` (termasuk aturan `sharedWithClient`).
 
 Seluruh test lama (`auth-guards.test.ts`, `auth-security.test.ts`, dan 20+
 `*.test.ts` domain) harus tetap hijau **tanpa diubah** — karena tidak ada call
