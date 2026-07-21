@@ -1,4 +1,4 @@
-import { type PDFPage, PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, type PDFPage, rgb, StandardFonts } from "pdf-lib";
 import { formatCellText } from "@/lib/export/format";
 import { truncateToWidth } from "@/lib/export/layout";
 import type { Column, ReportDefinition, ReportMeta } from "@/lib/export/types";
@@ -35,12 +35,13 @@ export async function buildReportPdf<Row>(
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-  const columns = def.columns;
   const totalWidth = A4_LANDSCAPE[0] - MARGIN * 2;
-  const usedWidth = columns.reduce((s, c) => s + c.width, 0);
+  const usedWidth = def.columns.reduce((s, c) => s + c.width, 0);
   // Skalakan kolom supaya pas di halaman (width dideklarasikan relatif).
   const scale = usedWidth > 0 ? totalWidth / usedWidth : 1;
-  const colWidths = columns.map((c) => c.width * scale);
+  // Lebar terpakai disatukan dengan kolomnya di sini supaya sisa berkas tidak
+  // perlu mengindeks dua array sejajar.
+  const columns = def.columns.map((c) => ({ ...c, drawWidth: c.width * scale }));
 
   /**
    * Gambar baris header tabel dengan sisi ATAS di `top`, kembalikan y baru.
@@ -51,19 +52,19 @@ export async function buildReportPdf<Row>(
     const y = top - HEADER_H;
     page.drawRectangle({ x: MARGIN, y, width: totalWidth, height: HEADER_H, color: headerFill });
     let x = MARGIN;
-    columns.forEach((c, i) => {
-      const text = truncateToWidth(c.header, CHAR_WIDTH, colWidths[i]! - 6, "...");
+    for (const c of columns) {
+      const text = truncateToWidth(c.header, CHAR_WIDTH, c.drawWidth - 6, "...");
       page.drawText(text, { x: x + 3, y: y + 5, size: FONT_SIZE, font: bold, color: ink });
-      x += colWidths[i]!;
-    });
+      x += c.drawWidth;
+    }
     return y;
   };
 
   const drawRow = (page: PDFPage, top: number, row: Row) => {
     let x = MARGIN;
-    columns.forEach((c, i) => {
+    for (const c of columns) {
       const text = formatCellText(c.get(row), c.format ?? "text");
-      const truncated = truncateToWidth(text, CHAR_WIDTH, colWidths[i]! - 6, "...");
+      const truncated = truncateToWidth(text, CHAR_WIDTH, c.drawWidth - 6, "...");
       page.drawText(truncated, {
         x: x + 3,
         y: top - 11,
@@ -71,8 +72,8 @@ export async function buildReportPdf<Row>(
         font: regular,
         color: ink,
       });
-      x += colWidths[i]!;
-    });
+      x += c.drawWidth;
+    }
   };
 
   let page = pdf.addPage(A4_LANDSCAPE);

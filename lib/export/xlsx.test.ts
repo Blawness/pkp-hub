@@ -11,6 +11,13 @@ const columns: Column<Row>[] = [
   { header: "Beli", get: (r) => r.boughtAt, width: 80, format: "date" },
 ];
 
+/** Sheet pertama workbook — exceljs mengetikkannya optional, di sini pasti ada. */
+function firstSheet(wb: ExcelJS.Workbook): ExcelJS.Worksheet {
+  const ws = wb.worksheets[0];
+  if (!ws) throw new Error("workbook tanpa sheet");
+  return ws;
+}
+
 const meta: ReportMeta = {
   title: "Laporan Tes",
   printedAt: "20 Juli 2026",
@@ -28,7 +35,7 @@ describe("buildReportXlsx", () => {
 
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(bytes as unknown as ArrayBuffer);
-    const ws = wb.worksheets[0]!;
+    const ws = firstSheet(wb);
 
     // Header baris 1
     expect(ws.getCell(1, 1).value).toBe("Nama");
@@ -52,7 +59,7 @@ describe("buildReportXlsx", () => {
     const bytes = await buildReportXlsx({ title: meta.title, columns }, [], meta);
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(bytes as unknown as ArrayBuffer);
-    const ws = wb.worksheets[0]!;
+    const ws = firstSheet(wb);
 
     // Baris 1 header, baris 2 kosong (spacer), baris 3 footnote.
     expect(ws.getCell(2, 1).value).toBeNull();

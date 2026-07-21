@@ -11,13 +11,7 @@ import { useSearchParams } from "next/navigation";
  * sedang aktif (filter kategori/status) lewat query string, server yang
  * mengambil ulang datanya.
  */
-export function ExportButton({
-  report,
-  label = "Ekspor",
-}: {
-  report: string;
-  label?: string;
-}) {
+export function ExportButton({ report, label = "Ekspor" }: { report: string; label?: string }) {
   const searchParams = useSearchParams();
   const params = new URLSearchParams(searchParams.toString());
 

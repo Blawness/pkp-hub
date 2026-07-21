@@ -8,6 +8,7 @@ import {
 } from "@/components/equipment/equipment-item-accordion";
 import { EquipmentItemFormDialog } from "@/components/equipment/equipment-item-form-dialog";
 import { EquipmentSummary } from "@/components/equipment/equipment-summary";
+import { ExportButton } from "@/components/export/export-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentItemsForUser } from "@/lib/actions/equipment-items-logic";
@@ -105,6 +106,8 @@ export default async function EquipmentPage({
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">
+      {/* Surveyor juga berhak ekspor — ia staf; kolom harga beli memang otomatis
+          absen untuknya (lihat `equipmentReport.columns`). */}
       <PageHeader
         title="Inventaris Alat"
         description={
@@ -112,7 +115,12 @@ export default async function EquipmentPage({
             ? "Alat ukur yang bisa Anda pinjam."
             : "Seluruh alat ukur studio."
         }
-        action={isAdmin ? <EquipmentItemFormDialog /> : undefined}
+        action={
+          <div className="flex items-center gap-2">
+            <ExportButton report="equipment" label="Ekspor" />
+            {isAdmin ? <EquipmentItemFormDialog /> : null}
+          </div>
+        }
       />
 
       <EquipmentSummary
