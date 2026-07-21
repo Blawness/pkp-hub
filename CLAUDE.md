@@ -71,6 +71,29 @@ All actions build on the shared clients in **`lib/actions/safe-action.ts`**:
 `authActionClient`, `staffActionClient`, `adminActionClient`. Never construct a
 bare `createSafeActionClient()` elsewhere — that bypasses the auth middleware.
 
+**RBAC lives in `lib/rbac/`, one file per resource.** A grant is a pair —
+`(permission, scope)` — stored in `role_permission`; roles are DB rows
+(`role`, `user_role_assignment`), and a user's effective permissions are the
+union of their roles with the widest scope winning (`all > assigned > own`).
+The permission catalog itself is code: each `lib/rbac/resources/<x>.ts`
+declares `actions`, `scopes` (Drizzle SQL predicates), and optionally
+`guards` / `fields`. **Adding a feature = adding one file there** — the
+`Permission` union grows automatically, so typos fail at compile time.
+
+Four functions are the whole public API: `can()` (action-level),
+`rbacFilter()` (list — always returns `SQL`, `false` when unauthorized, so a
+forgotten check yields an empty set rather than a leak), `requireScopedRow()`
+(single row — re-queries with *the same* filter, which is what keeps the
+list and the guard from ever drifting apart), and `redact()` (field-level).
+`getRbacContext()` loads effective permissions once per request via React
+`cache()` — never from the session cookie, for the same reason
+`auth-guards.ts` sets `disableCookieCache`.
+
+As of sub-project 1 the engine runs *alongside* the old `requireRole` /
+`adminActionClient` checks and is not yet wired into any call site; the three
+system roles are seeded to behave identically to the old hardcoded checks,
+proven by `lib/rbac/parity.test.ts`.
+
 **Derived state is never stored — it's computed from source rows.** Recurring
 lesson across the codebase: `paymentStatus`, phase progress %, equipment
 in-use/available, and usage duration are all derived (`lib/payments/derive.ts`,

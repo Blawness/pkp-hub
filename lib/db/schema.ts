@@ -9,6 +9,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -63,6 +64,11 @@ export const equipmentCondition = pgEnum("equipment_condition", [
   "rusak",
   "pensiun",
 ]);
+
+/* RBAC (spec 2026-07-21). `permission` sengaja BUKAN pgEnum — katalognya hidup
+ * di lib/rbac/resources/, jadi menambah fitur tidak boleh butuh migrasi DB. */
+export const roleArea = pgEnum("role_area", ["staff", "client"]);
+export const permissionScope = pgEnum("permission_scope", ["all", "assigned", "own"]);
 
 /* -------------------------------------------------------------------------- */
 /* Better Auth core tables (wired up in Phase 2) + `role`                     */
@@ -535,3 +541,75 @@ export const auditLog = pgTable(
     index("audit_log_created_at_idx").on(t.createdAt),
   ],
 );
+
+/* -------------------------------------------------------------------------- */
+/* RBAC (spec 2026-07-21)                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Role = baris DB, bukan enum. Tiga role bawaan di-seed dengan `isSystem`
+ * true dan tidak boleh dihapus — `proxy.ts` dan area /portal bergantung
+ * padanya. Role tidak di-soft-delete (beda dengan users/clients/equipment)
+ * karena tidak ada FK riwayat yang menunjuk ke sini.
+ */
+export const roles = pgTable("role", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  key: text("key").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description"),
+  // Menentukan area landing (/dashboard vs /portal). `users.role` tetap ada
+  // sebagai petunjuk kasar untuk proxy.ts, yang tidak boleh query DB.
+  area: roleArea("area").notNull(),
+  isSystem: boolean("is_system").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Satu grant = satu izin + jangkauan barisnya. */
+export const rolePermissions = pgTable(
+  "role_permission",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    permission: text("permission").notNull(),
+    scope: permissionScope("scope").notNull().default("own"),
+  },
+  (t) => [uniqueIndex("role_permission_uniq").on(t.roleId, t.permission)],
+);
+
+/**
+ * Multi-role: izin efektif user = gabungan seluruh role-nya.
+ *
+ * Nama fisiknya `user_role_assignment`, bukan `user_role`: Postgres menaruh
+ * tabel dan tipe di namespace yang sama, dan `user_role` sudah dipakai enum
+ * `userRole` milik kolom `user.role`.
+ */
+export const userRoles = pgTable(
+  "user_role_assignment",
+  {
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    roleId: uuid("role_id")
+      .notNull()
+      .references(() => roles.id, { onDelete: "cascade" }),
+    assignedAt: timestamp("assigned_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.roleId] })],
+);
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+  permissions: many(rolePermissions),
+  userRoles: many(userRoles),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(roles, { fields: [rolePermissions.roleId], references: [roles.id] }),
+}));
+
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, { fields: [userRoles.userId], references: [users.id] }),
+  role: one(roles, { fields: [userRoles.roleId], references: [roles.id] }),
+}));

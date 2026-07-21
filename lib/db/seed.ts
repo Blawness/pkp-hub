@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { eq, sql } from "drizzle-orm";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
 import { db } from "./index";
 import {
   accounts,
@@ -14,7 +15,10 @@ import {
   projectPhases,
   projectStatusLogs,
   projects,
+  rolePermissions,
+  roles,
   sessions,
+  userRoles,
   users,
 } from "./schema";
 
@@ -67,6 +71,10 @@ async function seed() {
     await db.delete(clients);
     await db.delete(sessions);
     await db.delete(accounts);
+    // Tabel RBAC sebelum `users`: `user_role_assignment` menunjuk ke `user`.
+    await db.delete(userRoles);
+    await db.delete(rolePermissions);
+    await db.delete(roles);
     await db.delete(users);
   }
 
@@ -419,6 +427,11 @@ async function seed() {
       recordedById: surveyor1Id,
     },
   ]);
+
+  // Role RBAC di-seed BELAKANGAN: `backfillUserRoles` membaca seluruh baris
+  // `user`, jadi ia harus jalan setelah user demo dibuat.
+  await seedSystemRoles();
+  await backfillUserRoles();
 
   console.log("seed OK:", {
     users: 4,
