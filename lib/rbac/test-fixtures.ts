@@ -1,4 +1,6 @@
 import type { SessionUser } from "@/lib/auth-guards";
+import { projects } from "@/lib/db/schema";
+import { defineResource } from "./define-resource";
 import type { RbacContext, Scope } from "./types";
 
 const FIXTURE_USER: SessionUser = {
@@ -23,3 +25,24 @@ export function fakeContext(
     ...overrides,
   };
 }
+
+/**
+ * Resource fixture untuk menguji `guards` dan `fields`.
+ *
+ * Sengaja TIDAK didaftarkan ke registry: resource nyata belum boleh memakai
+ * kedua fitur itu di sub-proyek 1 (mengisinya mengubah perilaku), tapi
+ * engine-nya tetap harus terbukti bekerja.
+ */
+export const demoGuardResource = defineResource({
+  name: "demo",
+  actions: ["update", "readFinance"],
+  table: { table: projects, id: projects.id },
+  guards: {
+    update: (row) =>
+      row.status === "selesai" ? "Proyek yang sudah selesai tidak bisa diubah." : true,
+  },
+  // `projectValue`, bukan `contractValue`: `fields` diketik terhadap kolom
+  // tabelnya, jadi nama yang tidak ada gagal saat compile — persis yang
+  // diinginkan.
+  fields: { projectValue: "demo.readFinance" },
+});

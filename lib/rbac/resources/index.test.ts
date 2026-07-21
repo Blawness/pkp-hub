@@ -1,5 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { PERMISSIONS, RESOURCES, isPermission, resourceOf } from "@/lib/rbac/resources";
+import {
+  isPermission,
+  PERMISSIONS,
+  RESOURCES,
+  resourceOf,
+  type ScopedPermission,
+} from "@/lib/rbac/resources";
+
+/**
+ * Assertion tipe, dicek `pnpm typecheck` bukan saat runtime.
+ *
+ * `ScopedPermission` gampang runtuh jadi `never` tanpa ada yang sadar —
+ * `defineResource` harus mempertahankan bentuk literal-nya supaya resource
+ * tanpa tabel benar-benar kehilangan key `table`. Kalau itu rusak, baris
+ * pertama gagal compile dan dua `@ts-expect-error` di bawah jadi "unused".
+ */
+const _scopedOk: ScopedPermission[] = ["project.read", "payment.void", "document.share"];
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _profileNotScoped: ScopedPermission = "profile.updateOwn";
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _reportNotScoped: ScopedPermission = "report.export";
 
 describe("registry resource", () => {
   it("memuat 11 resource", () => {

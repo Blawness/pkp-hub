@@ -1,8 +1,8 @@
 import type { AnyResource } from "../define-resource";
 import { clientResource } from "./client";
 import { documentResource } from "./document";
-import { equipmentItemResource } from "./equipment-item";
 import { equipmentResource } from "./equipment";
+import { equipmentItemResource } from "./equipment-item";
 import { mapResource } from "./map";
 import { paymentResource } from "./payment";
 import { phaseResource } from "./phase";

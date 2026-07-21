@@ -1,6 +1,6 @@
 import { type SQL, sql } from "drizzle-orm";
 import { scopeOf } from "./can";
-import { type ScopedPermission, resourceOf } from "./resources";
+import { resourceOf, type ScopedPermission } from "./resources";
 import type { RbacContext } from "./types";
 
 /**

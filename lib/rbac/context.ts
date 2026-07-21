@@ -3,8 +3,8 @@ import { cache } from "react";
 import { getClientIdForUser, requireUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { rolePermissions, userRoles } from "@/lib/db/schema";
-import { type Permission, isPermission } from "./resources";
-import { type RbacContext, type Scope, highestScope } from "./types";
+import { isPermission, type Permission } from "./resources";
+import { highestScope, type RbacContext, type Scope } from "./types";
 
 /**
  * Izin efektif seorang user = gabungan seluruh role-nya, mengambil scope

@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { rolePermissions, roles, userRoles, users } from "@/lib/db/schema";
 import { PERMISSIONS } from "@/lib/rbac/resources";
-import { SYSTEM_ROLE_GRANTS, backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { backfillUserRoles, SYSTEM_ROLE_GRANTS, seedSystemRoles } from "@/lib/rbac/system-roles";
 import type { Scope } from "@/lib/rbac/types";
 
 /**

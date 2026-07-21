@@ -65,12 +65,18 @@ export type AnyResource = {
  * Mendeklarasikan satu resource. Validasinya jalan saat modul dimuat, jadi
  * kesalahan penamaan meledak saat start — bukan diam-diam jadi permission
  * yang tidak pernah cocok saat request.
+ *
+ * Tipe hasilnya mempertahankan bentuk literal `Def`, bukan cuma
+ * `ResourceDefinition` — di situ `table` opsional, sehingga TIDAK ADA resource
+ * yang lolos `extends { table: object }` dan `ScopedPermission` runtuh jadi
+ * `never`. Dengan `Def`, resource tanpa tabel benar-benar kehilangan key-nya.
  */
 export function defineResource<
   const Name extends string,
   const Action extends string,
   T extends PgTable,
->(def: ResourceDefinition<Name, Action, T>): Resource<Name, Action, T> {
+  const Def extends ResourceDefinition<Name, Action, T>,
+>(def: Def & ResourceDefinition<Name, Action, T>): Def & Resource<Name, Action, T> {
   if (def.name.includes(".")) {
     throw new Error(`rbac: nama resource "${def.name}" tidak boleh mengandung titik.`);
   }
@@ -87,5 +93,5 @@ export function defineResource<
   }
 
   const permissions = def.actions.map((action) => `${def.name}.${action}` as const);
-  return { ...def, permissions };
+  return { ...def, permissions } as Def & Resource<Name, Action, T>;
 }
