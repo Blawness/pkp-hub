@@ -1,4 +1,4 @@
-import { type PDFFont, type PDFPage, PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { type PDFPage, PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { formatCellText } from "@/lib/export/format";
 import { truncateToWidth } from "@/lib/export/layout";
 import type { Column, ReportDefinition, ReportMeta } from "@/lib/export/types";
@@ -83,7 +83,7 @@ export async function buildReportPdf<Row>(
   y -= 14;
   page.drawText(STUDIO.address, { x: MARGIN, y: y - 10, size: 8, font: regular, color: muted });
   y -= 12;
-  page.drawText(`${STUDIO.phone} - ${STUDIO.email}`, {
+  page.drawText(`${STUDIO.phone} · ${STUDIO.email}`, {
     x: MARGIN,
     y: y - 10,
     size: 8,
