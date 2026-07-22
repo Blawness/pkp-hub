@@ -86,7 +86,7 @@ export default async function DocumentsSearchPage({
   // `listReceiptsForAdmin` mengembalikan `receiptFileUrl` mentah; presigned
   // URL dibuat di sini (sama seperti baris dokumen) agar layer logika tetap
   // bebas dari driver storage. Lihat catatan di `downloadUrlFor`.
-  const receiptSource = isAdmin ? await listReceiptsForAdmin(user) : [];
+  const receiptSource = isAdmin ? await listReceiptsForAdmin(ctx) : [];
   const receiptRows = await Promise.all(
     receiptSource.map(async (r) => ({
       ...r,

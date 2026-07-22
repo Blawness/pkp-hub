@@ -20,6 +20,9 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 import type { ReceiptStorage } from "@/lib/receipts";
 
 /**
@@ -54,6 +57,10 @@ let admin: SessionUser;
 let surveyor: SessionUser;
 let clientUser: SessionUser;
 let otherClientUser: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
+let clientUserCtx: RbacContext;
+let otherClientUserCtx: RbacContext;
 let projectId: string;
 let otherProjectId: string;
 
@@ -112,6 +119,14 @@ beforeAll(async () => {
     .values([{ name: "Klien B", type: "individual", userId: otherClientUserId }])
     .returning();
 
+  // Seed + backfill role SETELAH clients dibuat (ctx.clientId dari clients.userId).
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorCtx = await makeTestContextForUser(surveyor);
+  clientUserCtx = await makeTestContextForUser(clientUser);
+  otherClientUserCtx = await makeTestContextForUser(otherClientUser);
+
   const [projectA] = await db
     .insert(projects)
     .values({
@@ -146,13 +161,13 @@ afterAll(() => {
 
 describe("batas akses ledger", () => {
   it("surveyor TIDAK bisa melihat pembayaran proyek yang di-assign ke dia", async () => {
-    await expect(listPaymentsForProject(surveyor, projectId)).rejects.toThrow();
+    await expect(listPaymentsForProject(surveyorCtx, projectId)).rejects.toThrow();
   });
 
   it("surveyor TIDAK bisa mencatat pembayaran", async () => {
     await expect(
       recordPaymentForUser(
-        surveyor,
+        surveyorCtx,
         { projectId, amount: 1_000_000, paidAt: "2026-07-14", method: "transfer" },
         okStore,
       ),
@@ -165,7 +180,7 @@ describe("batas akses ledger", () => {
   it("klien TIDAK bisa mencatat pembayaran untuk proyeknya sendiri", async () => {
     await expect(
       recordPaymentForUser(
-        clientUser,
+        clientUserCtx,
         { projectId, amount: 1_000_000, paidAt: "2026-07-14", method: "transfer" },
         okStore,
       ),
@@ -173,15 +188,15 @@ describe("batas akses ledger", () => {
   });
 
   it("klien TIDAK bisa melihat pembayaran proyek klien lain", async () => {
-    await expect(listPaymentsForProject(otherClientUser, projectId)).rejects.toThrow();
+    await expect(listPaymentsForProject(otherClientUserCtx, projectId)).rejects.toThrow();
   });
 
   it("surveyor TIDAK bisa membuka arsip kwitansi", async () => {
-    await expect(listReceiptsForAdmin(surveyor)).rejects.toThrow();
+    await expect(listReceiptsForAdmin(surveyorCtx)).rejects.toThrow();
   });
 
   it("klien TIDAK bisa membuka arsip kwitansi", async () => {
-    await expect(listReceiptsForAdmin(clientUser)).rejects.toThrow();
+    await expect(listReceiptsForAdmin(clientUserCtx)).rejects.toThrow();
   });
 });
 
@@ -207,7 +222,7 @@ describe("arsip kwitansi (admin)", () => {
 
     // 4jt (kwitansi ke-0001) dan 5jt (kwitansi ke-0002) di proyek ini.
     const p1 = await recordPaymentForUser(
-      admin,
+      adminCtx,
       {
         projectId: projX.id,
         amount: 4_000_000,
@@ -218,12 +233,12 @@ describe("arsip kwitansi (admin)", () => {
       okStore,
     );
     const p2 = await recordPaymentForUser(
-      admin,
+      adminCtx,
       { projectId: projX.id, amount: 5_000_000, paidAt: "2026-07-15", method: "tunai" },
       okStore,
     );
 
-    const receipts = await listReceiptsForAdmin(admin);
+    const receipts = await listReceiptsForAdmin(adminCtx);
     const numbers = receipts.map((r) => r.receiptNumber);
     expect(numbers).toContain(p1.receiptNumber);
     expect(numbers).toContain(p2.receiptNumber);
@@ -234,8 +249,8 @@ describe("arsip kwitansi (admin)", () => {
     expect(receipts.every((r) => r.isVoided === false)).toBe(true);
 
     // Batalkan salah satu → tidak lagi muncul di arsip.
-    await voidPaymentForUser(admin, { paymentId: p1.id, reason: "salah" }, okStore);
-    const afterVoid = await listReceiptsForAdmin(admin);
+    await voidPaymentForUser(adminCtx, { paymentId: p1.id, reason: "salah" }, okStore);
+    const afterVoid = await listReceiptsForAdmin(adminCtx);
     expect(afterVoid.map((r) => r.receiptNumber)).not.toContain(p1.receiptNumber);
     expect(afterVoid.map((r) => r.receiptNumber)).toContain(p2.receiptNumber);
   });
@@ -257,7 +272,7 @@ describe("recordPaymentForUser", () => {
 
     await expect(
       recordPaymentForUser(
-        admin,
+        adminCtx,
         { projectId: noValue.id, amount: 1_000, paidAt: "2026-07-14", method: "tunai" },
         okStore,
       ),
@@ -266,7 +281,7 @@ describe("recordPaymentForUser", () => {
 
   it("mencatat pembayaran, menerbitkan nomor kwitansi, dan menurunkan status jadi sebagian", async () => {
     const payment = await recordPaymentForUser(
-      admin,
+      adminCtx,
       { projectId, amount: 4_000_000, paidAt: "2026-07-14", method: "transfer", note: "DP" },
       okStore,
     );
@@ -278,14 +293,14 @@ describe("recordPaymentForUser", () => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
     expect(project.paymentStatus).toBe("sebagian");
 
-    const summary = await getPaymentSummary(admin, projectId);
+    const summary = await getPaymentSummary(adminCtx, projectId);
     expect(summary.totalPaid).toBe(4_000_000);
     expect(summary.remaining).toBe(6_000_000);
   });
 
   it("pelunasan membuat status jadi lunas", async () => {
     await recordPaymentForUser(
-      admin,
+      adminCtx,
       { projectId, amount: 6_000_000, paidAt: "2026-07-20", method: "transfer" },
       okStore,
     );
@@ -293,19 +308,19 @@ describe("recordPaymentForUser", () => {
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
     expect(project.paymentStatus).toBe("lunas");
 
-    const summary = await getPaymentSummary(admin, projectId);
+    const summary = await getPaymentSummary(adminCtx, projectId);
     expect(summary.totalPaid).toBe(10_000_000);
     expect(summary.remaining).toBe(0);
   });
 
   it("dua pembayaran beruntun tidak pernah bernomor kwitansi sama", async () => {
     const a = await recordPaymentForUser(
-      admin,
+      adminCtx,
       { projectId: otherProjectId, amount: 1_000, paidAt: "2026-07-14", method: "tunai" },
       okStore,
     );
     const b = await recordPaymentForUser(
-      admin,
+      adminCtx,
       { projectId: otherProjectId, amount: 1_000, paidAt: "2026-07-14", method: "tunai" },
       okStore,
     );
@@ -317,7 +332,7 @@ describe("recordPaymentForUser", () => {
     // membuat studio tidak bisa mencatat uang masuk, kita sudah kalah. Test ini
     // HARUS jeblok kalau try/catch di sekitar generateAndStoreReceipt dicabut.
     const payment = await recordPaymentForUser(
-      admin,
+      adminCtx,
       { projectId: otherProjectId, amount: 2_000, paidAt: "2026-07-14", method: "tunai" },
       brokenStore,
     );
@@ -339,13 +354,13 @@ describe("voidPaymentForUser", () => {
       .where(eq(payments.projectId, projectId))
       .limit(1);
 
-    await voidPaymentForUser(admin, { paymentId: row.id, reason: "Salah nominal" }, okStore);
+    await voidPaymentForUser(adminCtx, { paymentId: row.id, reason: "Salah nominal" }, okStore);
 
     const [project] = await db.select().from(projects).where(eq(projects.id, projectId));
     // Sebelumnya lunas (10jt dari dua pembayaran). Satu dibatalkan -> mundur.
     expect(project.paymentStatus).toBe("sebagian");
 
-    const summary = await getPaymentSummary(admin, projectId);
+    const summary = await getPaymentSummary(adminCtx, projectId);
     expect(summary.totalPaid).toBeLessThan(10_000_000);
   });
 
@@ -357,12 +372,12 @@ describe("voidPaymentForUser", () => {
       .limit(1);
 
     await expect(
-      voidPaymentForUser(surveyor, { paymentId: row.id, reason: "coba-coba" }, okStore),
+      voidPaymentForUser(surveyorCtx, { paymentId: row.id, reason: "coba-coba" }, okStore),
     ).rejects.toThrow();
   });
 
   it("klien tidak pernah melihat baris yang dibatalkan", async () => {
-    const rows = await listPaymentsForProject(clientUser, projectId);
+    const rows = await listPaymentsForProject(clientUserCtx, projectId);
     expect(rows.every((r) => r.voidedAt === null)).toBe(true);
   });
 });

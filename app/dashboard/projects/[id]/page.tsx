@@ -77,8 +77,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // ditolak server-side — tapi jangan bergantung pada itu: jangan panggil sama
   // sekali, supaya tidak ada apa pun yang bisa masuk ke payload non-admin.
   const isAdmin = user.role === "admin";
-  const paymentRows = isAdmin ? await listPaymentsForProject(user, project.id) : [];
-  const paymentSummary = isAdmin ? await getPaymentSummary(user, project.id) : null;
+  const paymentRows = isAdmin ? await listPaymentsForProject(ctx, project.id) : [];
+  const paymentSummary = isAdmin ? await getPaymentSummary(ctx, project.id) : null;
   const paymentPanelRows = await Promise.all(
     paymentRows.map(async (p) => ({
       id: p.id,
