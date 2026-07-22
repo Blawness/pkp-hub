@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
+// Sanitasi + pemilihan tujuan per-role kini modul bersama — dipakai juga oleh
+// bounce server-side di `app/login/page.tsx` supaya keduanya tidak drift.
+import { loginDestination } from "@/lib/login-destination";
 
 const loginSchema = z.object({
   email: z.email("Enter a valid email address."),
@@ -19,22 +22,6 @@ const loginSchema = z.object({
 });
 
 type LoginValues = z.infer<typeof loginSchema>;
-
-/**
- * Only accept `redirectTo` values that are a same-app relative path, e.g.
- * `/dashboard/projects/123`. Rejects absolute URLs, protocol-relative URLs
- * (`//evil.com`), and backslash tricks (`/\evil.com`) that browsers can
- * interpret as scheme-relative — anything that isn't unambiguously a local
- * path is dropped in favor of the role's default landing page, so this can
- * never become an open redirect.
- */
-function sanitizeRedirectTo(value: string | null): string | null {
-  if (!value) return null;
-  if (!value.startsWith("/")) return null;
-  if (value.startsWith("//")) return null;
-  if (value.startsWith("/\\")) return null;
-  return value;
-}
 
 export function LoginForm() {
   const router = useRouter();
@@ -65,12 +52,12 @@ export function LoginForm() {
       return;
     }
 
-    const roleHome = data.user.role === "client" ? "/portal" : "/dashboard";
-    const redirectTo = sanitizeRedirectTo(searchParams.get("redirectTo"));
-    // Only honor `redirectTo` if it lands in the area the user's role is
-    // actually allowed into — a client's stale deep-link into /dashboard
-    // must not override the client's own portal home.
-    const destination = redirectTo?.startsWith(roleHome) ? redirectTo : roleHome;
+    // `additionalFields` mendeklarasikan role sebagai "string" polos, jadi
+    // authClient tidak meng-infer union-nya — nilainya sendiri selalu enum DB.
+    const destination = loginDestination(
+      data.user.role as Parameters<typeof loginDestination>[0],
+      searchParams.get("redirectTo"),
+    );
     router.push(destination);
     router.refresh();
   };
