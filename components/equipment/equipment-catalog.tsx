@@ -55,7 +55,12 @@ export function EquipmentCatalog({
           placeholder="Cari jenis alat, kode, atau no. seri…"
           className="min-w-48 flex-1"
         />
-        <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+        {/* biome-ignore lint/a11y/useSemanticElements: segmented toggle ikon, bukan grup field form — <fieldset> tidak tepat di sini */}
+        <div
+          role="group"
+          aria-label="Ganti tampilan"
+          className="flex items-center gap-1 rounded-md border border-border p-0.5"
+        >
           <Button
             size="icon-sm"
             variant={view === "gallery" ? "default" : "ghost"}
