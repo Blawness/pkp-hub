@@ -11,7 +11,7 @@ import {
   clientInputSchema,
   updateClientInputSchema,
 } from "@/lib/actions/clients-schemas";
-import { adminActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Admin-only server actions for client CRUD (PRD §3 Feature 1). Business
@@ -20,27 +20,30 @@ import { adminActionClient } from "@/lib/actions/safe-action";
  * request-bound enforcement of the same rule.
  */
 
-export const createClient = adminActionClient
+export const createClient = rbacActionClient
+  .metadata({ permission: "client.create" })
   .inputSchema(clientInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const client = await createClientForUser(ctx.user, parsedInput);
+    const client = await createClientForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/clients");
     return { success: true as const, client };
   });
 
-export const updateClient = adminActionClient
+export const updateClient = rbacActionClient
+  .metadata({ permission: "client.update" })
   .inputSchema(updateClientInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const client = await updateClientForUser(ctx.user, parsedInput);
+    const client = await updateClientForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/clients");
     revalidatePath(`/dashboard/clients/${client.id}`);
     return { success: true as const, client };
   });
 
-export const archiveClient = adminActionClient
+export const archiveClient = rbacActionClient
+  .metadata({ permission: "client.archive" })
   .inputSchema(archiveClientInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const client = await archiveClientForUser(ctx.user, parsedInput);
+    const client = await archiveClientForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/clients");
     revalidatePath(`/dashboard/clients/${client.id}`);
     return { success: true as const, client };

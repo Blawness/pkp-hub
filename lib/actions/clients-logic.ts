@@ -1,31 +1,23 @@
 import { eq, isNull } from "drizzle-orm";
-import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients } from "@/lib/db/schema";
+import { assertCan } from "@/lib/rbac/can";
+import type { RbacContext } from "@/lib/rbac/types";
 import type { ArchiveClientInput, ClientInput, UpdateClientInput } from "./clients-schemas";
 
 /**
  * Server-only business logic for client CRUD, deliberately separated from
  * the "use server" action wrappers in `clients.ts` so it can be unit tested
- * directly (next-safe-action's `requireUser()` needs `next/headers`' request
- * scope, which plain vitest doesn't have). Every function re-checks the
- * caller's role itself — this is defense in depth alongside
- * `adminActionClient` in `clients.ts`, not a replacement for it. If either
- * check is removed, the corresponding test in `clients.test.ts` fails.
+ * directly. Menegakkan izin lewat engine RBAC (`client.create/update/archive`,
+ * admin-only di matrix). Kalau cek dicabut, test di `clients.test.ts` gagal.
  */
-
-function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    throw new Error("Only the admin can manage clients.");
-  }
-}
 
 function nullableText(value?: string): string | null {
   return value && value.length > 0 ? value : null;
 }
 
-export async function createClientForUser(user: SessionUser, input: ClientInput) {
-  requireAdmin(user);
+export async function createClientForUser(ctx: RbacContext, input: ClientInput) {
+  assertCan(ctx, "client.create");
   const [client] = await db
     .insert(clients)
     .values({
@@ -40,8 +32,8 @@ export async function createClientForUser(user: SessionUser, input: ClientInput)
   return client;
 }
 
-export async function updateClientForUser(user: SessionUser, input: UpdateClientInput) {
-  requireAdmin(user);
+export async function updateClientForUser(ctx: RbacContext, input: UpdateClientInput) {
+  assertCan(ctx, "client.update");
   const [client] = await db
     .update(clients)
     .set({
@@ -59,8 +51,8 @@ export async function updateClientForUser(user: SessionUser, input: UpdateClient
   return client;
 }
 
-export async function archiveClientForUser(user: SessionUser, input: ArchiveClientInput) {
-  requireAdmin(user);
+export async function archiveClientForUser(ctx: RbacContext, input: ArchiveClientInput) {
+  assertCan(ctx, "client.archive");
   const [client] = await db
     .update(clients)
     .set({ archivedAt: new Date(), updatedAt: new Date() })
