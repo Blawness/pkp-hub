@@ -10,9 +10,9 @@ import { listClients } from "@/lib/actions/clients-logic";
 import { searchDocumentsForUser } from "@/lib/actions/documents-logic";
 import { documentCategorySchema } from "@/lib/actions/documents-schemas";
 import { listReceiptsForAdmin } from "@/lib/actions/payments-logic";
-import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { getRbacContext } from "@/lib/rbac/context";
 import { downloadUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Arsip Dokumen" };
@@ -39,11 +39,12 @@ export default async function DocumentsSearchPage({
   }>;
 }) {
   const filters = await searchParams;
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
+  const user = ctx.user;
   const isAdmin = user.role === "admin";
 
   const parsedCategory = documentCategorySchema.safeParse(filters.category);
-  const results = await searchDocumentsForUser(user, {
+  const results = await searchDocumentsForUser(ctx, {
     q: filters.q,
     category: parsedCategory.success ? parsedCategory.data : undefined,
     clientId: filters.clientId,

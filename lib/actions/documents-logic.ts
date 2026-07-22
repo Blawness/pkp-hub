@@ -1,8 +1,11 @@
-import { and, desc, eq, gte, ilike, inArray, lte } from "drizzle-orm";
-import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess, listProjectsForUser } from "@/lib/auth-guards";
+import { and, desc, eq, gte, ilike, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { clients, documents, projects } from "@/lib/db/schema";
+import { assertCan } from "@/lib/rbac/can";
+import { rbacFilter } from "@/lib/rbac/filter";
+import type { ScopedPermission } from "@/lib/rbac/resources";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
+import type { RbacContext } from "@/lib/rbac/types";
 import { storage } from "@/lib/storage";
 import type {
   DeleteDocumentInput,
@@ -14,36 +17,23 @@ import type {
 /**
  * Server-only business logic for document upload/share/delete/search,
  * separated from the "use server" wrappers in `documents.ts` so it's
- * directly unit-testable (see `documents.test.ts`). Every function here
- * re-checks the caller's role/scoping itself — defense in depth alongside
- * `adminActionClient` / `staffActionClient` in `documents.ts`, not a
- * replacement for it.
+ * directly unit-testable (see `documents.test.ts`). Setiap fungsi menegakkan
+ * izin sendiri lewat engine RBAC — `assertCan` untuk gerbang aksi,
+ * `requireScopedRow`/`rbacFilter` untuk scope baris.
  *
- * CRITICAL: any function that reads/writes a specific project's documents
- * MUST go through `assertProjectAccess`, and any cross-project listing MUST
- * go through `listProjectsForUser` — never a raw `db.select()` on
- * `projects`. That's the row-level scoping boundary this whole module
- * exists to protect (surveyor sees only their assigned projects' documents,
- * client sees only their own).
+ * CRITICAL: fungsi yang membaca/menulis dokumen proyek tertentu WAJIB lewat
+ * `requireScopedRow`, dan daftar lintas-proyek WAJIB lewat
+ * `rbacFilter(ctx, "document.read")` — bukan `db.select()` mentah. Scope `own`
+ * dokumen sudah memuat aturan `sharedWithClient = true` (lihat
+ * `lib/rbac/resources/document.ts`), jadi klien hanya melihat dokumen
+ * proyeknya yang sudah dibagikan.
  */
 
-function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    throw new Error("Only the admin can perform this action.");
-  }
-}
-
-function requireStaff(user: SessionUser) {
-  if (user.role !== "admin" && user.role !== "surveyor") {
-    throw new Error("You do not have permission to perform this action.");
-  }
-}
-
 /**
- * `notFound()`'s digest for this Next.js version — same rationale as
- * `projects-logic.ts#isNotFoundDigest`: translate `assertProjectAccess`'s
- * 404 signal into a plain rejection instead of letting it escape a server
- * action or a directly-unit-tested function.
+ * `notFound()`'s digest for this Next.js version — sama seperti
+ * `projects-logic.ts#isNotFoundDigest`: terjemahkan sinyal 404
+ * `requireScopedRow` jadi penolakan biasa alih-alih membiarkannya lolos dari
+ * server action atau fungsi yang diuji langsung.
  */
 function isNotFoundDigest(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -51,9 +41,10 @@ function isNotFoundDigest(error: unknown): boolean {
   return typeof digest === "string" && digest.startsWith("NEXT_HTTP_ERROR_FALLBACK;404");
 }
 
-async function assertProjectAccessOrReject(projectId: string, user: SessionUser) {
+/** Verifikasi `ctx` boleh mengakses proyek ini; 404 → penolakan biasa. */
+async function requireProjectReadOrReject(ctx: RbacContext, projectId: string) {
   try {
-    return await assertProjectAccess(projectId, user);
+    return await requireScopedRow(ctx, "project.read", projectId);
   } catch (error) {
     if (isNotFoundDigest(error)) {
       throw new Error("Project not found or you do not have access to it.");
@@ -62,10 +53,24 @@ async function assertProjectAccessOrReject(projectId: string, user: SessionUser)
   }
 }
 
-/** Admin + surveyor, and only for a project they can access. */
-export async function uploadDocumentForUser(user: SessionUser, input: UploadDocumentInput) {
-  requireStaff(user);
-  await assertProjectAccessOrReject(input.projectId, user);
+/** Ambil satu dokumen yang boleh dilihat `ctx` untuk `permission`; 404 → penolakan. */
+async function requireScopedDocOrReject(
+  ctx: RbacContext,
+  permission: ScopedPermission,
+  id: string,
+) {
+  try {
+    return (await requireScopedRow(ctx, permission, id)) as typeof documents.$inferSelect;
+  } catch (error) {
+    if (isNotFoundDigest(error)) throw new Error("Document not found.");
+    throw error;
+  }
+}
+
+/** Admin + surveyor, dan hanya untuk proyek yang boleh mereka akses. */
+export async function uploadDocumentForUser(ctx: RbacContext, input: UploadDocumentInput) {
+  assertCan(ctx, "document.upload");
+  await requireProjectReadOrReject(ctx, input.projectId);
 
   const [doc] = await db
     .insert(documents)
@@ -76,7 +81,7 @@ export async function uploadDocumentForUser(user: SessionUser, input: UploadDocu
       fileUrl: input.fileUrl,
       fileSize: input.fileSize,
       mimeType: input.mimeType,
-      uploadedById: user.id,
+      uploadedById: ctx.user.id,
     })
     .returning();
   return doc;
@@ -84,14 +89,11 @@ export async function uploadDocumentForUser(user: SessionUser, input: UploadDocu
 
 /** Admin only. */
 export async function toggleDocumentShareForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: ToggleDocumentShareInput,
 ) {
-  requireAdmin(user);
-
-  const [existing] = await db.select().from(documents).where(eq(documents.id, input.id));
-  if (!existing) throw new Error("Document not found.");
-  await assertProjectAccessOrReject(existing.projectId, user);
+  assertCan(ctx, "document.share");
+  await requireScopedDocOrReject(ctx, "document.share", input.id);
 
   const [doc] = await db
     .update(documents)
@@ -102,12 +104,9 @@ export async function toggleDocumentShareForUser(
 }
 
 /** Admin only; removes the object from storage too. */
-export async function deleteDocumentForUser(user: SessionUser, input: DeleteDocumentInput) {
-  requireAdmin(user);
-
-  const [existing] = await db.select().from(documents).where(eq(documents.id, input.id));
-  if (!existing) throw new Error("Document not found.");
-  await assertProjectAccessOrReject(existing.projectId, user);
+export async function deleteDocumentForUser(ctx: RbacContext, input: DeleteDocumentInput) {
+  assertCan(ctx, "document.delete");
+  const existing = await requireScopedDocOrReject(ctx, "document.delete", input.id);
 
   await db.delete(documents).where(eq(documents.id, input.id));
   try {
@@ -120,12 +119,12 @@ export async function deleteDocumentForUser(user: SessionUser, input: DeleteDocu
 }
 
 /** Scoped list of documents for a single project (used by the Dokumen tab). */
-export async function listDocumentsForProject(user: SessionUser, projectId: string) {
-  await assertProjectAccessOrReject(projectId, user);
+export async function listDocumentsForProject(ctx: RbacContext, projectId: string) {
+  await requireProjectReadOrReject(ctx, projectId);
   return db
     .select()
     .from(documents)
-    .where(eq(documents.projectId, projectId))
+    .where(and(rbacFilter(ctx, "document.read"), eq(documents.projectId, projectId)))
     .orderBy(desc(documents.createdAt));
 }
 
@@ -136,8 +135,8 @@ export async function listDocumentsForProject(user: SessionUser, projectId: stri
  * this is the one function that's allowed to serve documents to a client,
  * and it enforces that filter unconditionally regardless of caller role.
  */
-export async function listSharedDocumentsForProject(user: SessionUser, projectId: string) {
-  await assertProjectAccessOrReject(projectId, user);
+export async function listSharedDocumentsForProject(ctx: RbacContext, projectId: string) {
+  await requireProjectReadOrReject(ctx, projectId);
   return db
     .select()
     .from(documents)
@@ -162,32 +161,23 @@ export type DocumentSearchRow = {
 };
 
 /**
- * Cross-project document search (PRD §3 Feature 4). `listProjectsForUser` is
- * the scoping boundary here: a surveyor only ever sees documents whose
- * project is assigned to them, a client only their own projects' shared
- * documents — never a raw, unscoped `documents` query.
+ * Cross-project document search (PRD §3 Feature 4). `rbacFilter(ctx,
+ * "document.read")` adalah batas scoping-nya: satu predikat yang sudah memuat
+ * SEMUA aturan — admin melihat semua, surveyor hanya dokumen proyek yang
+ * ditugaskan padanya, klien hanya dokumen proyeknya yang `sharedWithClient`
+ * (scope `own` resource dokumen). Tanpa izin → `sql\`false\`` → himpunan
+ * kosong, bukan query mentah tak ter-scope.
  */
 export async function searchDocumentsForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: SearchDocumentsInput,
 ): Promise<DocumentSearchRow[]> {
-  const allowedProjects = await listProjectsForUser(user);
-  const allowedProjectIds = allowedProjects.map((p) => p.id);
-  if (allowedProjectIds.length === 0) return [];
-
-  const conditions = [inArray(documents.projectId, allowedProjectIds)];
+  const conditions = [rbacFilter(ctx, "document.read")];
   if (input.q) conditions.push(ilike(documents.name, `%${input.q}%`));
   if (input.category) conditions.push(eq(documents.category, input.category));
   if (input.clientId) conditions.push(eq(projects.clientId, input.clientId));
   if (input.dateFrom) conditions.push(gte(documents.createdAt, new Date(input.dateFrom)));
   if (input.dateTo) conditions.push(lte(documents.createdAt, new Date(input.dateTo)));
-
-  // Client role additionally only ever sees documents explicitly shared
-  // with them — `listProjectsForUser` scopes by project ownership, this
-  // adds the per-document visibility rule on top.
-  if (user.role === "client") {
-    conditions.push(eq(documents.sharedWithClient, true));
-  }
 
   return db
     .select({

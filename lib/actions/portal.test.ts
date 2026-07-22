@@ -15,6 +15,9 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -30,6 +33,8 @@ import {
 let clientUserA: SessionUser;
 let clientUserB: SessionUser;
 let surveyor: SessionUser;
+let clientUserACtx: RbacContext;
+let clientUserBCtx: RbacContext;
 let projectA: string;
 let projectB: string;
 
@@ -101,6 +106,13 @@ beforeAll(async () => {
     ])
     .returning();
 
+  // Seed + backfill role SETELAH clients dibuat: `ctx.clientId` (scope `own`)
+  // diturunkan dari `clients.userId`, jadi baris client harus sudah ada.
+  await seedSystemRoles();
+  await backfillUserRoles();
+  clientUserACtx = await makeTestContextForUser(clientUserA);
+  clientUserBCtx = await makeTestContextForUser(clientUserB);
+
   const [pA, pB] = await db
     .insert(projects)
     .values([
@@ -167,7 +179,7 @@ describe("client cross-tenant access", () => {
 
 describe("listSharedDocumentsForProject: shared-only filter", () => {
   it("CRITICAL: returns ONLY the document with sharedWithClient=true; the internal document is absent", async () => {
-    const rows = await listSharedDocumentsForProject(clientUserA, projectA);
+    const rows = await listSharedDocumentsForProject(clientUserACtx, projectA);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.name).toBe("shared-report.pdf");
     expect(rows.some((r) => r.name === "internal-only.pdf")).toBe(false);
@@ -175,7 +187,7 @@ describe("listSharedDocumentsForProject: shared-only filter", () => {
   });
 
   it("client B cannot list client A's project documents at all", async () => {
-    await expect(listSharedDocumentsForProject(clientUserB, projectA)).rejects.toThrow();
+    await expect(listSharedDocumentsForProject(clientUserBCtx, projectA)).rejects.toThrow();
   });
 });
 

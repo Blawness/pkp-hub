@@ -69,7 +69,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const [client, statusLogs, projectDocuments, mapLayerRows] = await Promise.all([
     getClientById(project.clientId),
     getStatusLogsForProject(project.id),
-    listDocumentsForProject(user, project.id),
+    listDocumentsForProject(ctx, project.id),
     listMapLayersForProject(user, project.id),
   ]);
 

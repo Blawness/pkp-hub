@@ -11,6 +11,9 @@ import {
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -22,6 +25,8 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
 
 let admin: SessionUser;
 let surveyorAssigned: SessionUser;
+let adminCtx: RbacContext;
+let surveyorAssignedCtx: RbacContext;
 let clientA: { id: string };
 let clientB: { id: string };
 let projectAssigned: string;
@@ -72,6 +77,13 @@ beforeAll(async () => {
     email: "test-surveyor-assigned-documents@fixture.test",
     role: "surveyor",
   };
+
+  // Wipe `users` menghapus penugasan role (FK cascade); seed + backfill lagi.
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorAssignedCtx = await makeTestContextForUser(surveyorAssigned);
+
   const [ca, cb] = await db
     .insert(clients)
     .values([
@@ -112,7 +124,7 @@ afterAll(() => {
 describe("uploadDocumentForUser", () => {
   it("a surveyor CANNOT upload a document to a project they are not assigned to", async () => {
     await expect(
-      uploadDocumentForUser(surveyorAssigned, {
+      uploadDocumentForUser(surveyorAssignedCtx, {
         projectId: projectOther,
         name: "foto.jpg",
         category: "foto_lapangan",
@@ -127,7 +139,7 @@ describe("uploadDocumentForUser", () => {
   });
 
   it("the assigned surveyor CAN upload a document to their own project", async () => {
-    const doc = await uploadDocumentForUser(surveyorAssigned, {
+    const doc = await uploadDocumentForUser(surveyorAssignedCtx, {
       projectId: projectAssigned,
       name: "laporan.pdf",
       category: "laporan",
@@ -142,7 +154,7 @@ describe("uploadDocumentForUser", () => {
 
 describe("toggleDocumentShareForUser", () => {
   it("a surveyor CANNOT toggle sharedWithClient (admin-only)", async () => {
-    const doc = await uploadDocumentForUser(admin, {
+    const doc = await uploadDocumentForUser(adminCtx, {
       projectId: projectAssigned,
       name: "sertifikat.pdf",
       category: "sertifikat",
@@ -152,7 +164,7 @@ describe("toggleDocumentShareForUser", () => {
     });
 
     await expect(
-      toggleDocumentShareForUser(surveyorAssigned, { id: doc.id, sharedWithClient: true }),
+      toggleDocumentShareForUser(surveyorAssignedCtx, { id: doc.id, sharedWithClient: true }),
     ).rejects.toThrow();
 
     const [row] = await db.select().from(documents).where(eq(documents.id, doc.id));
@@ -160,7 +172,7 @@ describe("toggleDocumentShareForUser", () => {
   });
 
   it("the admin CAN toggle sharedWithClient", async () => {
-    const doc = await uploadDocumentForUser(admin, {
+    const doc = await uploadDocumentForUser(adminCtx, {
       projectId: projectAssigned,
       name: "data.csv",
       category: "data_mentah",
@@ -169,7 +181,10 @@ describe("toggleDocumentShareForUser", () => {
       mimeType: "text/csv",
     });
 
-    const updated = await toggleDocumentShareForUser(admin, { id: doc.id, sharedWithClient: true });
+    const updated = await toggleDocumentShareForUser(adminCtx, {
+      id: doc.id,
+      sharedWithClient: true,
+    });
     expect(updated.sharedWithClient).toBe(true);
   });
 });
@@ -178,7 +193,7 @@ describe("searchDocumentsForUser: cross-project scoping", () => {
   it("a surveyor's search only returns documents from projects assigned to them", async () => {
     // `projectAssigned` already has documents from the tests above;
     // add one to `projectOther`, owned by a different surveyor.
-    await uploadDocumentForUser(admin, {
+    await uploadDocumentForUser(adminCtx, {
       projectId: projectOther,
       name: "other-project-doc.pdf",
       category: "laporan",
@@ -187,26 +202,26 @@ describe("searchDocumentsForUser: cross-project scoping", () => {
       mimeType: "application/pdf",
     });
 
-    const results = await searchDocumentsForUser(surveyorAssigned, {});
+    const results = await searchDocumentsForUser(surveyorAssignedCtx, {});
     expect(results.length).toBeGreaterThan(0);
     expect(results.every((r) => r.projectId === projectAssigned)).toBe(true);
     expect(results.some((r) => r.name === "other-project-doc.pdf")).toBe(false);
   });
 
   it("the admin's search returns documents across all projects", async () => {
-    const results = await searchDocumentsForUser(admin, {});
+    const results = await searchDocumentsForUser(adminCtx, {});
     const projectIds = new Set(results.map((r) => r.projectId));
     expect(projectIds.has(projectAssigned)).toBe(true);
     expect(projectIds.has(projectOther)).toBe(true);
   });
 
   it("filters by category", async () => {
-    const results = await searchDocumentsForUser(admin, { category: "sertifikat" });
+    const results = await searchDocumentsForUser(adminCtx, { category: "sertifikat" });
     expect(results.length).toBeGreaterThan(0);
     expect(results.every((r) => r.category === "sertifikat")).toBe(true);
   });
 
   it("this test fails if the guard is removed: a surveyor querying a project they don't own via listDocumentsForProject is rejected", async () => {
-    await expect(listDocumentsForProject(surveyorAssigned, projectOther)).rejects.toThrow();
+    await expect(listDocumentsForProject(surveyorAssignedCtx, projectOther)).rejects.toThrow();
   });
 });

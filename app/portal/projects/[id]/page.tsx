@@ -16,6 +16,7 @@ import { assertProjectAccess, requireClient } from "@/lib/auth-guards";
 import { formatArea } from "@/lib/geo/area";
 import { surveyTypeLabel } from "@/lib/labels";
 import { todayString } from "@/lib/phases/derive";
+import { getRbacContext } from "@/lib/rbac/context";
 import { downloadUrlFor } from "@/lib/storage";
 
 /**
@@ -44,13 +45,16 @@ export default async function PortalProjectDetailPage({
 }) {
   const { id } = await params;
   const user = await requireClient();
+  // Domain dokumen sudah bermigrasi ke `ctx`; sisanya (peta, pembayaran,
+  // portal-logic) masih menerima `user` sampai pass-nya tiba.
+  const ctx = await getRbacContext();
 
   const project = await assertProjectAccess(id, user);
   const statusLogs = await getStatusLogsForProject(project.id);
   const phases = await listPortalPhases(user, project.id);
   const phaseProgress = await getPortalProgress(user, project.id);
   const mapLayerRows = await listMapLayersForProject(user, project.id);
-  const documentRows = await listSharedDocumentsForProject(user, project.id);
+  const documentRows = await listSharedDocumentsForProject(ctx, project.id);
   const paymentRows = await listPaymentsForProject(user, project.id);
   const paymentSummary = await getPaymentSummary(user, project.id);
   const paymentTableRows = await Promise.all(
