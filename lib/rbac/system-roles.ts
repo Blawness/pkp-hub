@@ -61,6 +61,8 @@ export const SYSTEM_ROLE_GRANTS: Record<SystemRoleKey, Partial<Record<Permission
     "phase.read": "assigned",
     "phase.setStatus": "assigned",
     "phase.updateNote": "assigned",
+    // Surveyor melihat catatan internal/bobot/penanggung jawab fase; klien tidak.
+    "phase.readInternal": "assigned",
     "map.read": "assigned",
     "map.write": "assigned",
     "document.read": "assigned",
@@ -74,6 +76,8 @@ export const SYSTEM_ROLE_GRANTS: Record<SystemRoleKey, Partial<Record<Permission
 
   client: {
     "project.read": "own",
+    // Klien melihat nilai & status bayar proyeknya sendiri (read-only).
+    "project.readFinance": "own",
     "phase.read": "own",
     "map.read": "own",
     "document.read": "own",
