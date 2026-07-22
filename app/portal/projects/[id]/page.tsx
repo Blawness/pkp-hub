@@ -45,7 +45,7 @@ export default async function PortalProjectDetailPage({
 }) {
   const { id } = await params;
   const user = await requireClient();
-  // Domain dokumen sudah bermigrasi ke `ctx`; sisanya (peta, pembayaran,
+  // Domain dokumen & peta sudah bermigrasi ke `ctx`; sisanya (pembayaran,
   // portal-logic) masih menerima `user` sampai pass-nya tiba.
   const ctx = await getRbacContext();
 
@@ -53,7 +53,7 @@ export default async function PortalProjectDetailPage({
   const statusLogs = await getStatusLogsForProject(project.id);
   const phases = await listPortalPhases(user, project.id);
   const phaseProgress = await getPortalProgress(user, project.id);
-  const mapLayerRows = await listMapLayersForProject(user, project.id);
+  const mapLayerRows = await listMapLayersForProject(ctx, project.id);
   const documentRows = await listSharedDocumentsForProject(ctx, project.id);
   const paymentRows = await listPaymentsForProject(user, project.id);
   const paymentSummary = await getPaymentSummary(user, project.id);

@@ -70,7 +70,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     getClientById(project.clientId),
     getStatusLogsForProject(project.id),
     listDocumentsForProject(ctx, project.id),
-    listMapLayersForProject(user, project.id),
+    listMapLayersForProject(ctx, project.id),
   ]);
 
   // Ledger pembayaran HANYA untuk admin. Memanggilnya untuk surveyor akan
