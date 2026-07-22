@@ -41,45 +41,43 @@ export function EquipmentGallery({
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((it) => {
           const badge = equipmentStockBadge(it.summary);
+          // Seluruh kartu = satu <button>. Isi Card WAJIB non-interaktif
+          // (gambar/teks/Badge) — menaruh tombol/link di dalamnya bikin
+          // nested interactive HTML yang tidak valid. Aksi ada di dialog.
           return (
-            <>
-              {/* Seluruh kartu = satu <button>. Isi Card WAJIB non-interaktif
-                  (gambar/teks/Badge) — menaruh tombol/link di dalamnya bikin
-                  nested interactive HTML yang tidak valid. Aksi ada di dialog. */}
-              <button
-                key={it.id}
-                type="button"
-                onClick={() => setOpenId(it.id)}
-                className="group block h-full w-full rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Card className="h-full gap-0 p-0 transition-colors group-hover:border-ring">
-                  <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden border-b border-border bg-muted">
-                    {it.image ? (
-                      // biome-ignore lint/performance/noImgElement: gambar hasil upload, bukan aset statis
-                      <img
-                        src={it.image}
-                        alt={it.name}
-                        className="size-full object-cover transition-transform group-hover:scale-105"
-                      />
-                    ) : (
-                      <ImageIcon className="size-8 text-muted-foreground" aria-hidden />
-                    )}
-                  </div>
-                  <div className="flex flex-col gap-1 p-3">
-                    <p className="truncate font-medium">{it.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {equipmentCategoryLabel[it.category] ?? it.category}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {it.summary.total} unit · {it.summary.tersedia} tersedia
-                    </p>
-                    <Badge variant={badge.variant} className="mt-1 w-fit">
-                      {badge.label}
-                    </Badge>
-                  </div>
-                </Card>
-              </button>
-            </>
+            <button
+              key={it.id}
+              type="button"
+              onClick={() => setOpenId(it.id)}
+              className="group block h-full w-full rounded-xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Card className="h-full gap-0 p-0 transition-colors group-hover:border-ring">
+                <div className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden border-b border-border bg-muted">
+                  {it.image ? (
+                    // biome-ignore lint/performance/noImgElement: gambar hasil upload, bukan aset statis
+                    <img
+                      src={it.image}
+                      alt={it.name}
+                      className="size-full object-cover transition-transform group-hover:scale-105"
+                    />
+                  ) : (
+                    <ImageIcon className="size-8 text-muted-foreground" aria-hidden />
+                  )}
+                </div>
+                <div className="flex flex-col gap-1 p-3">
+                  <p className="truncate font-medium">{it.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {equipmentCategoryLabel[it.category] ?? it.category}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {it.summary.total} unit · {it.summary.tersedia} tersedia
+                  </p>
+                  <Badge variant={badge.variant} className="mt-1 w-fit">
+                    {badge.label}
+                  </Badge>
+                </div>
+              </Card>
+            </button>
           );
         })}
       </div>
