@@ -1,13 +1,11 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { WrenchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { EquipmentCatalog } from "@/components/equipment/equipment-catalog";
 import { EquipmentFilters } from "@/components/equipment/equipment-filters";
-import {
-  EquipmentItemAccordion,
-  type EquipmentItemAccordionRow,
-} from "@/components/equipment/equipment-item-accordion";
 import { EquipmentItemFormDialog } from "@/components/equipment/equipment-item-form-dialog";
 import { EquipmentSummary } from "@/components/equipment/equipment-summary";
+import type { EquipmentItemAccordionRow } from "@/components/equipment/equipment-unit-list";
 import { ExportButton } from "@/components/export/export-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -138,7 +136,7 @@ export default async function EquipmentPage({
 
       <EquipmentFilters />
 
-      <EquipmentItemAccordion
+      <EquipmentCatalog
         items={rows}
         isAdmin={isAdmin}
         projectOptions={projectOptions}

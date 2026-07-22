@@ -1,8 +1,7 @@
 "use client";
 
 import { ImageIcon } from "lucide-react";
-import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ArchiveEquipmentItemButton } from "@/components/equipment/archive-equipment-item-button";
 import { EquipmentItemFormDialog } from "@/components/equipment/equipment-item-form-dialog";
 import {
@@ -11,7 +10,6 @@ import {
 } from "@/components/equipment/equipment-unit-list";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import type { EquipmentCategoryInput } from "@/lib/actions/equipment-schemas";
 import { equipmentCategoryLabel } from "@/lib/labels";
 
@@ -30,29 +28,13 @@ export function EquipmentItemAccordion({
   isAdmin,
   projectOptions,
   surveyors,
-  emptyMessage,
 }: {
   items: EquipmentItemAccordionRow[];
   isAdmin: boolean;
   projectOptions: { id: string; title: string }[];
   surveyors: { id: string; name: string }[];
-  emptyMessage: ReactNode;
 }) {
-  const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter(
-      (it) =>
-        it.name.toLowerCase().includes(q) ||
-        it.units.some(
-          (u) =>
-            u.code.toLowerCase().includes(q) || (u.serialNumber ?? "").toLowerCase().includes(q),
-        ),
-    );
-  }, [items, query]);
 
   function toggle(id: string) {
     setExpanded((prev) => {
@@ -65,83 +47,75 @@ export function EquipmentItemAccordion({
 
   return (
     <div className="flex flex-col gap-3">
-      <Input
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Cari jenis alat, kode, atau no. seri…"
-      />
-
-      {filtered.length === 0
-        ? emptyMessage
-        : filtered.map((it) => {
-            const isOpen = expanded.has(it.id);
-            return (
-              <Card key={it.id} className="flex flex-col gap-3 p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <button
-                    type="button"
-                    onClick={() => toggle(it.id)}
-                    className="flex flex-1 items-start gap-3 text-left"
-                  >
-                    <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
-                      {it.image ? (
-                        // biome-ignore lint/performance/noImgElement: gambar hasil upload, bukan aset statis
-                        <img src={it.image} alt={it.name} className="size-full object-cover" />
-                      ) : (
-                        <ImageIcon className="size-5 text-muted-foreground" aria-hidden />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium">{it.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {equipmentCategoryLabel[it.category] ?? it.category}
-                      </p>
-                      <div className="mt-1 flex flex-wrap gap-x-1.5 text-xs text-muted-foreground">
-                        <span>{it.summary.total} total</span>
-                        <span>· {it.summary.tersedia} tersedia</span>
-                        <span>· {it.summary.terpinjam} dipinjam</span>
-                        {it.summary.perawatan > 0 ? (
-                          <span>· {it.summary.perawatan} perawatan</span>
-                        ) : null}
-                        {it.summary.rusak > 0 ? <span>· {it.summary.rusak} rusak</span> : null}
-                      </div>
-                    </div>
-                  </button>
-                  {isAdmin ? (
-                    <div className="flex shrink-0 items-start gap-2">
-                      <EquipmentItemFormDialog
-                        editing={{
-                          itemId: it.id,
-                          name: it.name,
-                          category: it.category as EquipmentCategoryInput,
-                          image: it.imageKey,
-                          imageDisplayUrl: it.image,
-                        }}
-                        trigger={
-                          <Button variant="outline" size="sm">
-                            Edit
-                          </Button>
-                        }
-                      />
-                      <ArchiveEquipmentItemButton itemId={it.id} itemName={it.name} />
-                    </div>
-                  ) : null}
+      {items.map((it) => {
+        const isOpen = expanded.has(it.id);
+        return (
+          <Card key={it.id} className="flex flex-col gap-3 p-3">
+            <div className="flex items-start justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => toggle(it.id)}
+                className="flex flex-1 items-start gap-3 text-left"
+              >
+                <div className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+                  {it.image ? (
+                    // biome-ignore lint/performance/noImgElement: gambar hasil upload, bukan aset statis
+                    <img src={it.image} alt={it.name} className="size-full object-cover" />
+                  ) : (
+                    <ImageIcon className="size-5 text-muted-foreground" aria-hidden />
+                  )}
                 </div>
-
-                {isOpen ? (
-                  <div className="border-t border-border pt-3">
-                    <EquipmentUnitList
-                      item={{ id: it.id, name: it.name }}
-                      units={it.units}
-                      isAdmin={isAdmin}
-                      projectOptions={projectOptions}
-                      surveyors={surveyors}
-                    />
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium">{it.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {equipmentCategoryLabel[it.category] ?? it.category}
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-x-1.5 text-xs text-muted-foreground">
+                    <span>{it.summary.total} total</span>
+                    <span>· {it.summary.tersedia} tersedia</span>
+                    <span>· {it.summary.terpinjam} dipinjam</span>
+                    {it.summary.perawatan > 0 ? (
+                      <span>· {it.summary.perawatan} perawatan</span>
+                    ) : null}
+                    {it.summary.rusak > 0 ? <span>· {it.summary.rusak} rusak</span> : null}
                   </div>
-                ) : null}
-              </Card>
-            );
-          })}
+                </div>
+              </button>
+              {isAdmin ? (
+                <div className="flex shrink-0 items-start gap-2">
+                  <EquipmentItemFormDialog
+                    editing={{
+                      itemId: it.id,
+                      name: it.name,
+                      category: it.category as EquipmentCategoryInput,
+                      image: it.imageKey,
+                      imageDisplayUrl: it.image,
+                    }}
+                    trigger={
+                      <Button variant="outline" size="sm">
+                        Edit
+                      </Button>
+                    }
+                  />
+                  <ArchiveEquipmentItemButton itemId={it.id} itemName={it.name} />
+                </div>
+              ) : null}
+            </div>
+
+            {isOpen ? (
+              <div className="border-t border-border pt-3">
+                <EquipmentUnitList
+                  item={{ id: it.id, name: it.name }}
+                  units={it.units}
+                  isAdmin={isAdmin}
+                  projectOptions={projectOptions}
+                  surveyors={surveyors}
+                />
+              </div>
+            ) : null}
+          </Card>
+        );
+      })}
     </div>
   );
 }
