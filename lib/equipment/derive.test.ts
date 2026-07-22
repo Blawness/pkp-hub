@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   borrowRejection,
+  equipmentStockBadge,
   formatDuration,
   summarizeUnits,
   usageDurationMs,
@@ -138,5 +139,31 @@ describe("summarizeUnits", () => {
       perawatan: 0,
       rusak: 0,
     });
+  });
+});
+
+describe("equipmentStockBadge", () => {
+  it("ada unit tersedia -> label jumlah tersedia, variant secondary", () => {
+    expect(
+      equipmentStockBadge({ total: 3, tersedia: 2, terpinjam: 1, perawatan: 0, rusak: 0 }),
+    ).toEqual({ label: "2 tersedia", variant: "secondary" });
+  });
+
+  it("tidak ada tersedia tapi ada yang dipinjam -> Semua dipinjam, variant default", () => {
+    expect(
+      equipmentStockBadge({ total: 2, tersedia: 0, terpinjam: 2, perawatan: 0, rusak: 0 }),
+    ).toEqual({ label: "Semua dipinjam", variant: "default" });
+  });
+
+  it("tidak ada tersedia & tidak ada yang dipinjam -> Tidak tersedia, variant outline", () => {
+    expect(
+      equipmentStockBadge({ total: 1, tersedia: 0, terpinjam: 0, perawatan: 1, rusak: 0 }),
+    ).toEqual({ label: "Tidak tersedia", variant: "outline" });
+  });
+
+  it("tanpa unit sama sekali -> Tidak tersedia", () => {
+    expect(
+      equipmentStockBadge({ total: 0, tersedia: 0, terpinjam: 0, perawatan: 0, rusak: 0 }),
+    ).toEqual({ label: "Tidak tersedia", variant: "outline" });
   });
 });

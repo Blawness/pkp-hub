@@ -87,3 +87,25 @@ export function summarizeUnits(units: { condition: EquipmentCondition; activeUsa
     rusak: units.filter((u) => !u.activeUsage && u.condition === "rusak").length,
   };
 }
+
+/**
+ * Satu badge status ringkas untuk kartu galeri (spec 2026-07-22). Diturunkan
+ * dari agregat `summarizeUnits` — bukan kolom tersimpan. Prioritas: ada yang
+ * bisa dipinjam dulu, lalu "semua dipinjam", lalu tidak tersedia (perawatan/
+ * rusak/kosong).
+ */
+export function equipmentStockBadge(summary: {
+  total: number;
+  tersedia: number;
+  terpinjam: number;
+  perawatan: number;
+  rusak: number;
+}): { label: string; variant: "default" | "secondary" | "destructive" | "outline" } {
+  if (summary.tersedia > 0) {
+    return { label: `${summary.tersedia} tersedia`, variant: "secondary" };
+  }
+  if (summary.terpinjam > 0) {
+    return { label: "Semua dipinjam", variant: "default" };
+  }
+  return { label: "Tidak tersedia", variant: "outline" };
+}
