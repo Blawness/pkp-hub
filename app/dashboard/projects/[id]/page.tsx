@@ -116,8 +116,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .from(clients)
     .where(or(isNull(clients.archivedAt), eq(clients.id, project.clientId)));
 
-  const phases = await listPhasesForProject(user, project.id);
-  const progress = await getProjectProgress(user, project.id);
+  const phases = await listPhasesForProject(ctx, project.id);
+  const progress = await getProjectProgress(ctx, project.id);
   const phasesDone = phases.filter((p) => p.status === "selesai").length;
   const phasesTotal = phases.length;
   // Daftar surveyor untuk dropdown penanggung jawab fase — hanya admin yang

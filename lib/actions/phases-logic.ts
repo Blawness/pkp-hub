@@ -7,11 +7,13 @@ import type {
   UpdatePhaseInput,
   UpdatePhaseNoteInput,
 } from "@/lib/actions/phases-schemas";
-import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projectPhases } from "@/lib/db/schema";
 import { calculateProgress, completedAtFor, nextSortOrder, resequence } from "@/lib/phases/derive";
+import { assertCan } from "@/lib/rbac/can";
+import type { ScopedPermission } from "@/lib/rbac/resources";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Timeline fase (spec 2026-07-14). Logika + guard dipisah dari pembungkus
@@ -19,18 +21,13 @@ import { calculateProgress, completedAtFor, nextSortOrder, resequence } from "@/
  * pola yang sama dengan `payments-logic.ts`.
  *
  * PEMBAGIAN HAK: admin memegang RENCANA (buat/hapus/susun/bobot/target),
- * surveyor melaporkan PEKERJAAN (status + catatan). Kalau surveyor bisa
- * menyusun ulang atau mengubah bobot, persen progres berhenti berarti apa pun —
- * orang yang dinilai olehnya juga yang menyusunnya.
+ * surveyor melaporkan PEKERJAAN (status + catatan). Ditegakkan lewat engine
+ * RBAC — `phase.create/update/delete/reorder` admin-only, `phase.setStatus`/
+ * `.updateNote` juga untuk surveyor ber-akses. Kalau surveyor bisa menyusun
+ * ulang atau mengubah bobot, persen progres berhenti berarti apa pun.
  */
 
 export type PhaseRow = typeof projectPhases.$inferSelect;
-
-function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    throw new Error("Hanya admin yang bisa mengelola fase proyek.");
-  }
-}
 
 /** Sama seperti `payments-logic.ts`: ubah sinyal 404 `notFound()` jadi penolakan biasa. */
 function isNotFoundDigest(error: unknown): boolean {
@@ -39,9 +36,10 @@ function isNotFoundDigest(error: unknown): boolean {
   return typeof digest === "string" && digest.startsWith("NEXT_HTTP_ERROR_FALLBACK;404");
 }
 
-async function assertProjectAccessOrReject(projectId: string, user: SessionUser) {
+/** Verifikasi `ctx` boleh mengakses proyek ini; 404 → penolakan biasa. */
+async function requireProjectReadOrReject(ctx: RbacContext, projectId: string) {
   try {
-    return await assertProjectAccess(projectId, user);
+    return await requireScopedRow(ctx, "project.read", projectId);
   } catch (error) {
     if (isNotFoundDigest(error)) {
       throw new Error("Proyek tidak ditemukan atau kamu tidak punya akses.");
@@ -50,20 +48,26 @@ async function assertProjectAccessOrReject(projectId: string, user: SessionUser)
   }
 }
 
-/** Ambil fase + pastikan pemanggil boleh menyentuh proyeknya. */
-async function loadPhaseWithAccess(phaseId: string, user: SessionUser): Promise<PhaseRow> {
-  const [phase] = await db.select().from(projectPhases).where(eq(projectPhases.id, phaseId));
-  if (!phase) throw new Error("Fase tidak ditemukan.");
-  await assertProjectAccessOrReject(phase.projectId, user);
-  return phase;
+/** Ambil satu fase yang boleh disentuh `ctx` untuk `permission`; 404 → penolakan. */
+async function requireScopedPhaseOrReject(
+  ctx: RbacContext,
+  permission: ScopedPermission,
+  phaseId: string,
+): Promise<PhaseRow> {
+  try {
+    return (await requireScopedRow(ctx, permission, phaseId)) as PhaseRow;
+  } catch (error) {
+    if (isNotFoundDigest(error)) throw new Error("Fase tidak ditemukan.");
+    throw error;
+  }
 }
 
 /** Klien BOLEH memanggil ini — pemangkasan field internal terjadi di lapisan portal. */
 export async function listPhasesForProject(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<PhaseRow[]> {
-  await assertProjectAccessOrReject(projectId, user);
+  await requireProjectReadOrReject(ctx, projectId);
   return db
     .select()
     .from(projectPhases)
@@ -72,19 +76,19 @@ export async function listPhasesForProject(
 }
 
 export async function getProjectProgress(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<number | null> {
-  const phases = await listPhasesForProject(user, projectId);
+  const phases = await listPhasesForProject(ctx, projectId);
   return calculateProgress(phases);
 }
 
 export async function createPhaseForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: CreatePhaseInput,
 ): Promise<PhaseRow> {
-  requireAdmin(user);
-  await assertProjectAccessOrReject(input.projectId, user);
+  assertCan(ctx, "phase.create");
+  await requireProjectReadOrReject(ctx, input.projectId);
 
   const existing = await db
     .select({ sortOrder: projectPhases.sortOrder })
@@ -108,11 +112,11 @@ export async function createPhaseForUser(
 }
 
 export async function updatePhaseForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: UpdatePhaseInput,
 ): Promise<PhaseRow> {
-  requireAdmin(user);
-  await loadPhaseWithAccess(input.phaseId, user);
+  assertCan(ctx, "phase.update");
+  await requireScopedPhaseOrReject(ctx, "phase.update", input.phaseId);
 
   const [row] = await db
     .update(projectPhases)
@@ -132,13 +136,11 @@ export async function updatePhaseForUser(
 
 /** Admin ATAU surveyor ber-akses. `completedAt` diurus `completedAtFor`, bukan pemanggil. */
 export async function setPhaseStatusForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: SetPhaseStatusInput,
 ): Promise<PhaseRow> {
-  const phase = await loadPhaseWithAccess(input.phaseId, user);
-  if (user.role === "client") {
-    throw new Error("Klien tidak bisa mengubah status fase.");
-  }
+  assertCan(ctx, "phase.setStatus");
+  const phase = await requireScopedPhaseOrReject(ctx, "phase.setStatus", input.phaseId);
 
   const [row] = await db
     .update(projectPhases)
@@ -154,13 +156,11 @@ export async function setPhaseStatusForUser(
 }
 
 export async function updatePhaseNoteForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: UpdatePhaseNoteInput,
 ): Promise<PhaseRow> {
-  await loadPhaseWithAccess(input.phaseId, user);
-  if (user.role === "client") {
-    throw new Error("Klien tidak bisa mengubah catatan fase.");
-  }
+  assertCan(ctx, "phase.updateNote");
+  await requireScopedPhaseOrReject(ctx, "phase.updateNote", input.phaseId);
 
   const [row] = await db
     .update(projectPhases)
@@ -175,11 +175,11 @@ export async function updatePhaseNoteForUser(
 }
 
 export async function deletePhaseForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: DeletePhaseInput,
 ): Promise<{ projectId: string }> {
-  requireAdmin(user);
-  const phase = await loadPhaseWithAccess(input.phaseId, user);
+  assertCan(ctx, "phase.delete");
+  const phase = await requireScopedPhaseOrReject(ctx, "phase.delete", input.phaseId);
 
   await db.delete(projectPhases).where(eq(projectPhases.id, input.phaseId));
   return { projectId: phase.projectId };
@@ -191,11 +191,11 @@ export async function deletePhaseForUser(
  * `sortOrder` kembar di fase yang tidak disebut.
  */
 export async function reorderPhasesForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: ReorderPhasesInput,
 ): Promise<PhaseRow[]> {
-  requireAdmin(user);
-  await assertProjectAccessOrReject(input.projectId, user);
+  assertCan(ctx, "phase.reorder");
+  await requireProjectReadOrReject(ctx, input.projectId);
 
   const current = await db
     .select({ id: projectPhases.id })
