@@ -2,8 +2,9 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Inventaris alat — quantity per item (spec 2026-07-16). Alur: admin login →
- * `/dashboard/equipment` → tambah JENIS alat → expand item → tambah UNIT →
- * buka proyek → tab Alat → pinjam unit → assert badge item berubah jadi "1
+ * `/dashboard/equipment` → tambah JENIS alat → klik kartu galeri (tampilan
+ * default sejak spec 2026-07-22) → tambah UNIT lewat dialog detail → buka
+ * proyek → tab Alat → pinjam unit → assert badge kartu berubah jadi "Semua
  * dipinjam" → kembalikan dari halaman detail unit → assert durasi muncul di
  * riwayat.
  *
@@ -13,6 +14,7 @@ import { expect, test } from "@playwright/test";
 const suffix = Date.now();
 const itemName = `E2E Total Station ${suffix}`;
 const unitCode = `E2E-TS-${suffix}`;
+const longItemName = `E2E Logitech G304 Lightspeed Wireless Gaming Mouse ${suffix}`;
 
 test.describe("Inventaris alat — quantity per item (2026-07-16)", () => {
   test.use({ storageState: "e2e/.auth/admin.json" });
@@ -31,12 +33,13 @@ test.describe("Inventaris alat — quantity per item (2026-07-16)", () => {
     await expect(page.getByText(itemName)).toBeVisible();
 
     // Kartu item ini di-scope lewat `data-slot="card"` + itemName supaya
-    // assertion ringkasan seperti "1 total"/"1 dipinjam" tidak nyasar ke
+    // assertion ringkasan seperti "1 unit · 1 tersedia" tidak nyasar ke
     // kartu jenis alat lain di daftar (banyak item seed lain juga punya
-    // ringkasan "1 total" dst. — teksnya sendiri tidak unik).
+    // ringkasan serupa — teksnya sendiri tidak unik).
     const itemCard = page.locator('[data-slot="card"]').filter({ hasText: itemName });
 
-    // 2. Expand item yang baru dibuat, tambah unit dengan kode unik.
+    // 2. Klik kartu galeri item yang baru dibuat (membuka dialog detail),
+    //    lalu tambah unit dengan kode unik dari dalam dialog.
     await page.getByText(itemName).click();
     await page.getByRole("button", { name: "+ Tambah unit" }).click();
 
@@ -46,7 +49,8 @@ test.describe("Inventaris alat — quantity per item (2026-07-16)", () => {
     await unitDialog.getByRole("button", { name: "Tambah unit" }).click();
 
     await expect(page.getByRole("link", { name: unitCode })).toBeVisible();
-    await expect(itemCard.getByText("1 total")).toBeVisible();
+    // Ringkasan kartu galeri (di belakang dialog) ikut ter-revalidate.
+    await expect(itemCard.getByText("1 unit · 1 tersedia")).toBeVisible();
 
     // 3. Buka proyek, tab Alat, pinjam unit yang baru dibuat. Pemilih alat
     //    adalah Combobox (dialog cari-sendiri), bukan <select> native, dan
@@ -79,10 +83,11 @@ test.describe("Inventaris alat — quantity per item (2026-07-16)", () => {
     await expect(page.getByRole("cell", { name: equipmentLabel })).toBeVisible();
     await expect(page.getByText("Sedang dipakai")).toBeVisible();
 
-    // 4. Assert badge item di daftar inventaris berubah jadi "1 dipinjam".
+    // 4. Assert badge kartu galeri berubah jadi "Semua dipinjam" (satu-satunya
+    //    unit sedang dipakai), lalu buka dialog detail untuk lanjut ke unit.
     await page.goto("/dashboard/equipment");
+    await expect(itemCard.getByText("Semua dipinjam")).toBeVisible();
     await page.getByText(itemName).click();
-    await expect(itemCard.getByText("1 dipinjam")).toBeVisible();
 
     // 5. Kembalikan, dari halaman detail unit. Tombol "Kembalikan" membuka
     //    dialog konfirmasi lebih dulu (ada di kartu Status pakai), lalu
@@ -100,5 +105,30 @@ test.describe("Inventaris alat — quantity per item (2026-07-16)", () => {
       .filter({ hasText: "Pengukuran batas tanah Cimahi" })
       .last();
     await expect(historyRow.getByText(/menit|jam|hari/)).toBeVisible();
+  });
+
+  // Regresi overflow dialog galeri (bug 2026-07-22): judul nowrap (`truncate`)
+  // menyumbang min-content penuh ke grid item DialogContent (`min-width: auto`),
+  // sehingga track grid melebar melewati lebar dialog dan `overflow-y-auto`
+  // memunculkan scrollbar HORIZONTAL. Assert: konten dialog tidak lebih lebar
+  // dari dialognya.
+  test("dialog galeri tidak overflow horizontal saat nama alat panjang", async ({ page }) => {
+    await page.goto("/dashboard/equipment");
+    await page.getByRole("button", { name: "Tambah jenis alat" }).click();
+
+    const itemDialog = page.getByRole("dialog", { name: "Jenis alat baru" });
+    await itemDialog.locator("#item-name").fill(longItemName);
+    await itemDialog.getByRole("button", { name: "Tambah jenis alat" }).click();
+
+    // Tampilan default = galeri; klik kartunya membuka dialog detail.
+    await page.getByRole("button", { name: longItemName }).click();
+    const detail = page.getByRole("dialog", { name: longItemName });
+    await expect(detail).toBeVisible();
+
+    const { clientW, scrollW } = await detail.evaluate((el) => ({
+      clientW: el.clientWidth,
+      scrollW: el.scrollWidth,
+    }));
+    expect(scrollW).toBeLessThanOrEqual(clientW);
   });
 });
