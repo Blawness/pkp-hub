@@ -14,6 +14,9 @@ import {
   users,
 } from "@/lib/db/schema";
 import { equipmentReport } from "@/lib/export/reports/equipment";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Berjalan terhadap DB dev sungguhan, pola yang sama dengan
@@ -25,6 +28,8 @@ import { equipmentReport } from "@/lib/export/reports/equipment";
 
 let admin: SessionUser;
 let surveyor: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
 let projectId: string;
 let unitSeq = 0;
 
@@ -49,6 +54,11 @@ beforeAll(async () => {
     email: "exp-surveyor@fixture.test",
     role: "surveyor",
   };
+
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorCtx = await makeTestContextForUser(surveyor);
 
   const [clientA] = await db
     .insert(clients)
@@ -85,11 +95,11 @@ async function makeUnit(
   }> = {},
 ) {
   unitSeq += 1;
-  const item = await createEquipmentItemForUser(admin, {
+  const item = await createEquipmentItemForUser(adminCtx, {
     name: overrides.name ?? `EXP-${unitSeq}`,
     category: overrides.category ?? "gps_rtk",
   });
-  return createEquipmentForUser(admin, {
+  return createEquipmentForUser(adminCtx, {
     itemId: item.id,
     code: `EXP-${unitSeq}`,
     condition: overrides.condition ?? "tersedia",
@@ -99,8 +109,8 @@ async function makeUnit(
 
 describe("equipment report columns", () => {
   it("admin mendapat kolom Harga beli; surveyor TIDAK", () => {
-    const adminCols = equipmentReport.columns(admin).map((c) => c.header);
-    const surveyorCols = equipmentReport.columns(surveyor).map((c) => c.header);
+    const adminCols = equipmentReport.columns(adminCtx).map((c) => c.header);
+    const surveyorCols = equipmentReport.columns(surveyorCtx).map((c) => c.header);
     expect(adminCols).toContain("Harga beli");
     expect(surveyorCols).not.toContain("Harga beli");
   });
@@ -108,14 +118,14 @@ describe("equipment report columns", () => {
   it("baris surveyor tidak membawa nilai harga sama sekali", async () => {
     await makeUnit({ name: "Mahal", category: "gps_rtk", price: 300_000_000 });
 
-    const { rows } = await equipmentReport.fetch(surveyor, new URLSearchParams());
+    const { rows } = await equipmentReport.fetch(surveyorCtx, new URLSearchParams());
     expect(rows.length).toBeGreaterThan(0);
     // Dipangkas di level query (`listEquipmentForUser`), bukan disembunyikan di
     // render: field-nya benar-benar tidak ada di objeknya.
     expect(rows.every((r) => !("purchasePrice" in r))).toBe(true);
 
     // Dan tidak ada kolom yang bisa membocorkannya lewat pintu belakang.
-    expect(equipmentReport.columns(surveyor).some((c) => c.header === "Harga beli")).toBe(false);
+    expect(equipmentReport.columns(surveyorCtx).some((c) => c.header === "Harga beli")).toBe(false);
   });
 });
 
@@ -123,7 +133,7 @@ describe("equipment report fetch + filter", () => {
   it("filterLabel & footnote sesuai filter kategori", async () => {
     await makeUnit({ name: "Drone A", category: "drone", condition: "tersedia" });
     const params = new URLSearchParams("category=drone");
-    const { rows, filterLabel, footnote } = await equipmentReport.fetch(admin, params);
+    const { rows, filterLabel, footnote } = await equipmentReport.fetch(adminCtx, params);
     expect(filterLabel).toBe("Kategori: Drone");
     expect(rows.every((r) => r.category === "drone")).toBe(true);
     expect(footnote).toMatch(/^Total: \d+ unit — /);
@@ -140,7 +150,7 @@ describe("equipment report fetch + filter", () => {
     });
 
     const { rows, filterLabel } = await equipmentReport.fetch(
-      admin,
+      adminCtx,
       new URLSearchParams("status=terpinjam"),
     );
     expect(filterLabel).toBe("Status: Terpinjam");
@@ -152,9 +162,9 @@ describe("equipment report fetch + filter", () => {
   });
 
   it("tanpa filter → filterLabel null, semua baris ikut", async () => {
-    const { rows, filterLabel } = await equipmentReport.fetch(admin, new URLSearchParams());
+    const { rows, filterLabel } = await equipmentReport.fetch(adminCtx, new URLSearchParams());
     expect(filterLabel).toBeNull();
-    const all = await listEquipmentForUser(admin);
+    const all = await listEquipmentForUser(adminCtx);
     expect(rows.length).toBe(all.length);
   });
 });

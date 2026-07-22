@@ -24,6 +24,9 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Berjalan terhadap DB dev sungguhan, pola yang sama dengan `payments.test.ts`.
@@ -32,6 +35,9 @@ import {
 let admin: SessionUser;
 let surveyor: SessionUser;
 let clientUser: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
+let clientUserCtx: RbacContext;
 let projectId: string;
 let otherProjectId: string;
 let unitSeq = 0;
@@ -72,6 +78,13 @@ beforeAll(async () => {
     .insert(clients)
     .values([{ name: "Klien A", type: "individual", userId: clientUserId }])
     .returning();
+
+  // Seed + backfill role SETELAH clients dibuat (ctx.clientId dari clients.userId).
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorCtx = await makeTestContextForUser(surveyor);
+  clientUserCtx = await makeTestContextForUser(clientUser);
 
   const [projectA] = await db
     .insert(projects)
@@ -119,11 +132,11 @@ async function createTestUnit(
   }> = {},
 ) {
   unitSeq += 1;
-  const item = await createEquipmentItemForUser(admin, {
+  const item = await createEquipmentItemForUser(adminCtx, {
     name: overrides.itemName ?? `TS-${unitSeq}`,
     category: "instrumen_ukur",
   });
-  return createEquipmentForUser(admin, {
+  return createEquipmentForUser(adminCtx, {
     itemId: item.id,
     code: `UNIT-${unitSeq}`,
     condition: overrides.condition ?? "tersedia",
@@ -134,32 +147,30 @@ async function createTestUnit(
 
 describe("batas akses", () => {
   it("surveyor tidak bisa menambah alat", async () => {
-    const item = await createEquipmentItemForUser(admin, { name: "Curang", category: "drone" });
+    const item = await createEquipmentItemForUser(adminCtx, { name: "Curang", category: "drone" });
     await expect(
-      createEquipmentForUser(surveyor, {
+      createEquipmentForUser(surveyorCtx, {
         itemId: item.id,
         code: "CURANG-01",
         condition: "tersedia",
       }),
-    ).rejects.toThrow(/admin/i);
+    ).rejects.toThrow();
   });
 
   it("surveyor tidak bisa mengubah kondisi alat", async () => {
     const unit = await createTestUnit();
     await expect(
-      updateEquipmentForUser(surveyor, {
+      updateEquipmentForUser(surveyorCtx, {
         equipmentId: unit.id,
         code: unit.code,
         condition: "rusak",
       }),
-    ).rejects.toThrow(/admin/i);
+    ).rejects.toThrow();
   });
 
   it("surveyor tidak bisa mengarsipkan alat", async () => {
     const unit = await createTestUnit();
-    await expect(archiveEquipmentForUser(surveyor, { equipmentId: unit.id })).rejects.toThrow(
-      /admin/i,
-    );
+    await expect(archiveEquipmentForUser(surveyorCtx, { equipmentId: unit.id })).rejects.toThrow();
   });
 
   // Dikunci pada BENTUK hasil query, bukan pada render — UI bukan batas keamanan.
@@ -170,14 +181,14 @@ describe("batas akses", () => {
       purchaseDate: "2025-01-10",
     });
 
-    const rows = await listEquipmentForUser(surveyor);
+    const rows = await listEquipmentForUser(surveyorCtx);
     const row = rows.find((r) => r.itemName === "TS-Harga");
     expect(row).toBeDefined();
     expect(row).not.toHaveProperty("purchasePrice");
     expect(row).not.toHaveProperty("purchaseDate");
     expect(JSON.stringify(rows)).not.toContain("250000000");
 
-    const adminRows = await listEquipmentForUser(admin);
+    const adminRows = await listEquipmentForUser(adminCtx);
     const adminRow = adminRows.find((r) => r.itemName === "TS-Harga") as EquipmentRow | undefined;
     expect(adminRow?.purchasePrice).toBe(250_000_000);
   });
@@ -185,7 +196,7 @@ describe("batas akses", () => {
   it("surveyor tidak bisa mencatat pemakaian untuk proyek yang bukan miliknya", async () => {
     const unit = await createTestUnit();
     await expect(
-      borrowEquipmentForUser(surveyor, {
+      borrowEquipmentForUser(surveyorCtx, {
         equipmentId: unit.id,
         projectId: otherProjectId,
         startedAt: new Date(),
@@ -197,7 +208,7 @@ describe("batas akses", () => {
   // request yang dirakit tangan bisa mencatat alat di tangan orang lain.
   it("surveyor yang mengisi usedById orang lain tetap tercatat atas namanya sendiri", async () => {
     const unit = await createTestUnit();
-    const usage = await borrowEquipmentForUser(surveyor, {
+    const usage = await borrowEquipmentForUser(surveyorCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(),
@@ -210,7 +221,7 @@ describe("batas akses", () => {
 
   it("admin BOLEH mencatat atas nama surveyor", async () => {
     const unit = await createTestUnit();
-    const usage = await borrowEquipmentForUser(admin, {
+    const usage = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(),
@@ -222,16 +233,20 @@ describe("batas akses", () => {
   });
 
   it("klien tidak bisa melihat daftar alat", async () => {
-    await expect(listEquipmentForUser(clientUser)).rejects.toThrow();
+    await expect(listEquipmentForUser(clientUserCtx)).rejects.toThrow();
   });
 });
 
 describe("kode unit unik", () => {
   it("kode unit yang sudah dipakai unit lain ditolak", async () => {
-    const item = await createEquipmentItemForUser(admin, { name: "Dup", category: "drone" });
-    await createEquipmentForUser(admin, { itemId: item.id, code: "DUP-01", condition: "tersedia" });
+    const item = await createEquipmentItemForUser(adminCtx, { name: "Dup", category: "drone" });
+    await createEquipmentForUser(adminCtx, {
+      itemId: item.id,
+      code: "DUP-01",
+      condition: "tersedia",
+    });
     await expect(
-      createEquipmentForUser(admin, { itemId: item.id, code: "DUP-01", condition: "tersedia" }),
+      createEquipmentForUser(adminCtx, { itemId: item.id, code: "DUP-01", condition: "tersedia" }),
     ).rejects.toThrow(/kode/i);
   });
 });
@@ -240,15 +255,15 @@ describe("aturan pinjam", () => {
   it("alat rusak tidak bisa dipinjam", async () => {
     const unit = await createTestUnit({ condition: "rusak" });
     await expect(
-      borrowEquipmentForUser(admin, { equipmentId: unit.id, projectId, startedAt: new Date() }),
+      borrowEquipmentForUser(adminCtx, { equipmentId: unit.id, projectId, startedAt: new Date() }),
     ).rejects.toThrow(/rusak/i);
   });
 
   it("alat terarsip tidak bisa dipinjam", async () => {
     const unit = await createTestUnit();
-    await archiveEquipmentForUser(admin, { equipmentId: unit.id });
+    await archiveEquipmentForUser(adminCtx, { equipmentId: unit.id });
     await expect(
-      borrowEquipmentForUser(admin, { equipmentId: unit.id, projectId, startedAt: new Date() }),
+      borrowEquipmentForUser(adminCtx, { equipmentId: unit.id, projectId, startedAt: new Date() }),
     ).rejects.toThrow(/arsip/i);
   });
 
@@ -256,13 +271,13 @@ describe("aturan pinjam", () => {
     const unit = await createTestUnit();
     const besok = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await expect(
-      borrowEquipmentForUser(admin, { equipmentId: unit.id, projectId, startedAt: besok }),
+      borrowEquipmentForUser(adminCtx, { equipmentId: unit.id, projectId, startedAt: besok }),
     ).rejects.toThrow(/masa depan/i);
   });
 
   it("meminjam alat yang sudah dipinjam ditolak, dengan menyebut pemegangnya", async () => {
     const unit = await createTestUnit();
-    await borrowEquipmentForUser(admin, {
+    await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(),
@@ -270,20 +285,20 @@ describe("aturan pinjam", () => {
     });
 
     await expect(
-      borrowEquipmentForUser(admin, { equipmentId: unit.id, projectId, startedAt: new Date() }),
+      borrowEquipmentForUser(adminCtx, { equipmentId: unit.id, projectId, startedAt: new Date() }),
     ).rejects.toThrow(/sedang dipakai/i);
   });
 
   it("mengembalikan lalu meminjam lagi BOLEH — kuncinya sesi aktif, bukan seumur hidup", async () => {
     const unit = await createTestUnit();
-    const first = await borrowEquipmentForUser(admin, {
+    const first = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(Date.now() - 60 * 60 * 1000),
     });
-    await returnEquipmentForUser(admin, { usageId: first.id });
+    await returnEquipmentForUser(adminCtx, { usageId: first.id });
 
-    const second = await borrowEquipmentForUser(admin, {
+    const second = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(),
@@ -293,20 +308,20 @@ describe("aturan pinjam", () => {
 
   it("status pakai adalah TURUNAN: alat dengan sesi terbuka tampil sedang dipakai, setelah dikembalikan tidak lagi", async () => {
     const unit = await createTestUnit();
-    const usage = await borrowEquipmentForUser(admin, {
+    const usage = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(),
       usedById: surveyor.id,
     });
 
-    const dipakai = await getEquipmentForUser(admin, unit.id);
+    const dipakai = await getEquipmentForUser(adminCtx, unit.id);
     expect(dipakai.activeUsage?.usedById).toBe(surveyor.id);
     expect(dipakai.activeUsage?.projectId).toBe(projectId);
 
-    await returnEquipmentForUser(admin, { usageId: usage.id });
+    await returnEquipmentForUser(adminCtx, { usageId: usage.id });
 
-    const bebas = await getEquipmentForUser(admin, unit.id);
+    const bebas = await getEquipmentForUser(adminCtx, unit.id);
     expect(bebas.activeUsage).toBeNull();
   });
 });
@@ -351,54 +366,54 @@ describe("kunci sesi ganda di level database", () => {
 describe("koreksi sesi (admin-only)", () => {
   it("surveyor tidak bisa mengoreksi sesi", async () => {
     const unit = await createTestUnit();
-    const usage = await borrowEquipmentForUser(admin, {
+    const usage = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(Date.now() - 60 * 60 * 1000),
     });
-    await returnEquipmentForUser(admin, { usageId: usage.id });
+    await returnEquipmentForUser(adminCtx, { usageId: usage.id });
 
     await expect(
-      correctUsageForUser(surveyor, {
+      correctUsageForUser(surveyorCtx, {
         usageId: usage.id,
         startedAt: new Date(Date.now() - 30 * 60 * 1000),
         endedAt: new Date(),
       }),
-    ).rejects.toThrow(/admin/i);
+    ).rejects.toThrow();
   });
 
   it("klien tidak bisa mengoreksi sesi", async () => {
     const unit = await createTestUnit();
-    const usage = await borrowEquipmentForUser(admin, {
+    const usage = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(Date.now() - 60 * 60 * 1000),
     });
-    await returnEquipmentForUser(admin, { usageId: usage.id });
+    await returnEquipmentForUser(adminCtx, { usageId: usage.id });
 
     await expect(
-      correctUsageForUser(clientUser, {
+      correctUsageForUser(clientUserCtx, {
         usageId: usage.id,
         startedAt: new Date(Date.now() - 30 * 60 * 1000),
         endedAt: new Date(),
       }),
-    ).rejects.toThrow(/admin/i);
+    ).rejects.toThrow();
   });
 
   it("admin bisa mengoreksi startedAt/endedAt sesi yang sudah ditutup, dan nilainya berubah di DB", async () => {
     const unit = await createTestUnit();
     const originalStart = new Date(Date.now() - 3 * 60 * 60 * 1000);
-    const usage = await borrowEquipmentForUser(admin, {
+    const usage = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: originalStart,
     });
     const originalEnd = new Date(Date.now() - 2 * 60 * 60 * 1000);
-    await returnEquipmentForUser(admin, { usageId: usage.id, endedAt: originalEnd });
+    await returnEquipmentForUser(adminCtx, { usageId: usage.id, endedAt: originalEnd });
 
     const correctedStart = new Date(Date.now() - 90 * 60 * 1000);
     const correctedEnd = new Date(Date.now() - 30 * 60 * 1000);
-    const corrected = await correctUsageForUser(admin, {
+    const corrected = await correctUsageForUser(adminCtx, {
       usageId: usage.id,
       startedAt: correctedStart,
       endedAt: correctedEnd,
@@ -414,16 +429,16 @@ describe("koreksi sesi (admin-only)", () => {
 
   it("koreksi dengan endedAt <= startedAt ditolak", async () => {
     const unit = await createTestUnit();
-    const usage = await borrowEquipmentForUser(admin, {
+    const usage = await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit.id,
       projectId,
       startedAt: new Date(Date.now() - 60 * 60 * 1000),
     });
-    await returnEquipmentForUser(admin, { usageId: usage.id });
+    await returnEquipmentForUser(adminCtx, { usageId: usage.id });
 
     const sameTime = new Date(Date.now() - 30 * 60 * 1000);
     await expect(
-      correctUsageForUser(admin, {
+      correctUsageForUser(adminCtx, {
         usageId: usage.id,
         startedAt: sameTime,
         endedAt: sameTime,

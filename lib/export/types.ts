@@ -1,4 +1,5 @@
-import type { SessionUser } from "@/lib/auth-guards";
+import type { Permission } from "@/lib/rbac/resources";
+import type { RbacContext } from "@/lib/rbac/types";
 
 export type CellFormat = "text" | "currency" | "number" | "date";
 export type CellAlign = "left" | "right";
@@ -22,9 +23,11 @@ export type ReportMeta = {
 export type ReportDefinition<Row> = {
   title: string;
   filename: string;
-  columns: (user: SessionUser) => Column<Row>[];
+  /** Izin yang harus dimiliki caller untuk mengekspor laporan ini. */
+  permission: Permission;
+  columns: (ctx: RbacContext) => Column<Row>[];
   fetch: (
-    user: SessionUser,
+    ctx: RbacContext,
     params: URLSearchParams,
   ) => Promise<{ rows: Row[]; filterLabel: string | null; footnote: string | null }>;
 };

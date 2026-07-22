@@ -1,24 +1,25 @@
-import { requireStaff } from "@/lib/auth-guards";
 import { buildReportPdf } from "@/lib/export/pdf";
 import { getReport } from "@/lib/export/reports/registry";
 import { buildReportXlsx } from "@/lib/export/xlsx";
 import { formatTanggalIndo } from "@/lib/format";
+import { can } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
 
 /**
  * Satu route untuk SEMUA laporan. GET `/api/export/<id>?format=pdf|xlsx&<filter>`.
  *
- * Keamanan: `requireStaff()` DULU — sebelum validasi format maupun lookup
- * registry — supaya penelepon anonim tidak bisa memetakan id laporan yang ada
- * dari beda 404/400. Data lalu DIAMBIL ULANG di server via
- * `def.fetch(user, params)`; klien TIDAK pernah mengirim baris, jadi surveyor
- * tak bisa mengarang isi atau meminta data di luar scope-nya (`listEquipment
- * ForUser` yang memangkas, bukan render).
+ * Keamanan: `getRbacContext()` DULU (butuh user login) — sebelum validasi
+ * format maupun lookup registry — supaya penelepon anonim tidak bisa memetakan
+ * id laporan yang ada dari beda 404/400. Lalu izin per-laporan dicek
+ * (`can(ctx, def.permission)`). Data DIAMBIL ULANG di server via
+ * `def.fetch(ctx, params)`; klien TIDAK pernah mengirim baris, jadi surveyor
+ * tak bisa mengarang isi atau meminta data di luar scope-nya.
  *
  * Route handler (bukan server action): butuh nama file + streaming biner yang
  * benar tanpa akal-akalan di klien.
  */
 export async function GET(request: Request, { params }: { params: Promise<{ report: string }> }) {
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
 
   const { report: reportId } = await params;
   const url = new URL(request.url);
@@ -33,8 +34,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
     return new Response("Laporan tidak ditemukan.", { status: 404 });
   }
 
-  const { rows, filterLabel, footnote } = await def.fetch(user, url.searchParams);
-  const columns = def.columns(user);
+  if (!can(ctx, def.permission)) {
+    return new Response("Anda tidak punya izin untuk mengekspor laporan ini.", { status: 403 });
+  }
+
+  const { rows, filterLabel, footnote } = await def.fetch(ctx, url.searchParams);
+  const columns = def.columns(ctx);
 
   const datePart = new Date().toISOString().slice(0, 10);
   const meta = {

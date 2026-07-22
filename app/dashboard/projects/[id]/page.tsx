@@ -135,8 +135,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // dipinjam. `listUsageForProject` sudah lewat `assertProjectAccess` (di
   // dalam `equipment-logic.ts`), jadi surveyor cuma melihat riwayat proyeknya
   // sendiri — konsisten dengan pola di seluruh halaman ini.
-  const projectEquipmentUsages = await listUsageForProject(user, project.id);
-  const allEquipment = await listEquipmentForUser(user);
+  const projectEquipmentUsages = await listUsageForProject(ctx, project.id);
+  const allEquipment = await listEquipmentForUser(ctx);
   // "${itemName} (${code})" — beberapa unit sejenis kini mungkin ada (spec
   // 2026-07-16), jadi nama alat saja tidak lagi cukup membedakan unit mana.
   const equipmentNameById = new Map(allEquipment.map((e) => [e.id, `${e.itemName} (${e.code})`]));

@@ -12,10 +12,11 @@ import { ExportButton } from "@/components/export/export-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentItemsForUser } from "@/lib/actions/equipment-items-logic";
-import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
+import { listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { formatDuration, summarizeUnits, usageDurationMs } from "@/lib/equipment/derive";
+import { getRbacContext } from "@/lib/rbac/context";
 import { optionalDisplayUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Inventaris Alat" };
@@ -34,10 +35,11 @@ export default async function EquipmentPage({
   searchParams: Promise<{ category?: string; status?: string }>;
 }) {
   const filters = await searchParams;
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
+  const user = ctx.user;
   const isAdmin = user.role === "admin";
 
-  const itemsWithUnits = await listEquipmentItemsForUser(user);
+  const itemsWithUnits = await listEquipmentItemsForUser(ctx);
 
   const userProjects = await listProjectsForUser(user);
   const projectOptions = userProjects.map((p) => ({ id: p.id, title: p.title }));

@@ -7,8 +7,6 @@ import type {
   ReturnEquipmentInput,
   UpdateEquipmentInput,
 } from "@/lib/actions/equipment-schemas";
-import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { equipment, equipmentItem, equipmentUsage, projects, users } from "@/lib/db/schema";
 import {
@@ -16,6 +14,9 @@ import {
   type EquipmentCondition,
   validateUsageWindow,
 } from "@/lib/equipment/derive";
+import { assertCan, can } from "@/lib/rbac/can";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Inventaris alat — UNIT FISIK (spec 2026-07-14, direvisi spec 2026-07-16).
@@ -25,9 +26,12 @@ import {
  *
  * DUA ATURAN YANG MUDAH DILANGGAR TANPA SADAR:
  *
- * 1. `purchasePrice`/`purchaseDate` TIDAK BOLEH sampai ke surveyor. Karena itu
- *    query untuk non-admin memilih kolom secara eksplisit — jangan sekali-kali
- *    ganti jadi `db.select().from(equipment)`, itu mengirim semuanya.
+ * 1. `purchasePrice`/`purchaseDate` TIDAK BOLEH sampai ke surveyor. Karena
+ *    query-nya adalah JOIN (equipment + equipmentItem), pilihan kolom disetir
+ *    `can(ctx, "equipment.readCost")` (admin punya, surveyor tidak) — bukan
+ *    `db.select().from(equipment)` yang mengirim semuanya. Ini penerapan
+ *    `fields` resource equipment (lihat `lib/rbac/resources/equipment.ts`) untuk
+ *    bentuk join yang tidak muat di `scopedColumns` satu-tabel.
  * 2. `usedById` untuk surveyor SELALU dipaksa jadi id dirinya di server. Form
  *    yang tidak merender pilihannya bukan penegakan.
  */
@@ -76,18 +80,6 @@ export type UsageRow = {
   createdAt: Date;
 };
 
-function requireStaff(user: SessionUser) {
-  if (user.role === "client") {
-    throw new Error("Inventaris alat hanya untuk staf studio.");
-  }
-}
-
-function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    throw new Error("Hanya admin yang bisa mengelola data alat.");
-  }
-}
-
 /** Sama seperti `payments-logic.ts`: ubah sinyal 404 `notFound()` jadi penolakan biasa. */
 function isNotFoundDigest(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -95,9 +87,10 @@ function isNotFoundDigest(error: unknown): boolean {
   return typeof digest === "string" && digest.startsWith("NEXT_HTTP_ERROR_FALLBACK;404");
 }
 
-async function assertProjectAccessOrReject(projectId: string, user: SessionUser) {
+/** Verifikasi `ctx` boleh mengakses proyek ini; 404 → penolakan biasa. */
+async function requireProjectReadOrReject(ctx: RbacContext, projectId: string) {
   try {
-    return await assertProjectAccess(projectId, user);
+    return await requireScopedRow(ctx, "project.read", projectId);
   } catch (error) {
     if (isNotFoundDigest(error)) {
       throw new Error("Proyek tidak ditemukan atau Anda tidak punya akses.");
@@ -170,23 +163,16 @@ async function activeUsageByEquipmentId(): Promise<Map<string, ActiveUsage>> {
 }
 
 /** Admin: seluruh kolom termasuk harga & tanggal beli. Surveyor: TANPA keduanya. Baris terarsip tidak ikut — dikelompokkan per jenis di `equipment-items-logic.ts`. */
-export async function listEquipmentForUser(user: SessionUser): Promise<EquipmentListItem[]> {
-  requireStaff(user);
+export async function listEquipmentForUser(ctx: RbacContext): Promise<EquipmentListItem[]> {
+  assertCan(ctx, "equipment.read");
 
   const activeMap = await activeUsageByEquipmentId();
 
-  if (user.role === "admin") {
-    const rows = await db
-      .select(adminColumns)
-      .from(equipment)
-      .innerJoin(equipmentItem, eq(equipment.itemId, equipmentItem.id))
-      .where(isNull(equipment.archivedAt))
-      .orderBy(desc(equipment.createdAt));
-    return rows.map((row) => ({ ...row, activeUsage: activeMap.get(row.id) ?? null }));
-  }
-
+  // Kolom harga/tanggal beli hanya untuk pemegang `equipment.readCost` (admin);
+  // untuk surveyor keduanya TIDAK ikut ter-SELECT.
+  const columns = can(ctx, "equipment.readCost") ? adminColumns : safeColumns;
   const rows = await db
-    .select(safeColumns)
+    .select(columns)
     .from(equipment)
     .innerJoin(equipmentItem, eq(equipment.itemId, equipmentItem.id))
     .where(isNull(equipment.archivedAt))
@@ -195,12 +181,12 @@ export async function listEquipmentForUser(user: SessionUser): Promise<Equipment
 }
 
 export async function getEquipmentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   equipmentId: string,
 ): Promise<EquipmentListItem> {
-  requireStaff(user);
+  assertCan(ctx, "equipment.read");
 
-  const columns = user.role === "admin" ? adminColumns : safeColumns;
+  const columns = can(ctx, "equipment.readCost") ? adminColumns : safeColumns;
   const [row] = await db
     .select(columns)
     .from(equipment)
@@ -238,10 +224,10 @@ export async function getEquipmentForUser(
 
 /** Riwayat pakai untuk satu alat, terbaru dulu. */
 export async function listUsageForEquipment(
-  user: SessionUser,
+  ctx: RbacContext,
   equipmentId: string,
 ): Promise<UsageRow[]> {
-  requireStaff(user);
+  assertCan(ctx, "equipment.read");
   return db
     .select()
     .from(equipmentUsage)
@@ -250,15 +236,15 @@ export async function listUsageForEquipment(
 }
 
 /**
- * Riwayat pakai untuk satu proyek. `assertProjectAccess` di sini adalah yang
+ * Riwayat pakai untuk satu proyek. `requireProjectReadOrReject` di sini yang
  * membuat surveyor cuma melihat riwayat alat di proyeknya sendiri.
  */
 export async function listUsageForProject(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<UsageRow[]> {
-  requireStaff(user);
-  await assertProjectAccessOrReject(projectId, user);
+  assertCan(ctx, "equipment.read");
+  await requireProjectReadOrReject(ctx, projectId);
   return db
     .select()
     .from(equipmentUsage)
@@ -276,10 +262,10 @@ function isCodeUniqueViolation(error: unknown): boolean {
 }
 
 export async function createEquipmentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: CreateEquipmentInput,
 ): Promise<EquipmentRow> {
-  requireAdmin(user);
+  assertCan(ctx, "equipment.create");
 
   const [item] = await db
     .select({
@@ -316,10 +302,10 @@ export async function createEquipmentForUser(
 }
 
 export async function updateEquipmentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: UpdateEquipmentInput,
 ): Promise<EquipmentRow> {
-  requireAdmin(user);
+  assertCan(ctx, "equipment.update");
 
   const [existing] = await db
     .select({ itemId: equipment.itemId })
@@ -362,10 +348,10 @@ export async function updateEquipmentForUser(
 }
 
 export async function archiveEquipmentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: ArchiveEquipmentInput,
 ): Promise<EquipmentRow> {
-  requireAdmin(user);
+  assertCan(ctx, "equipment.archive");
 
   const [row] = await db
     .update(equipment)
@@ -402,18 +388,18 @@ function isActiveUsageUniqueViolation(error: unknown): boolean {
 
 /** Staf. Mencatat sesi pinjam baru. */
 export async function borrowEquipmentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: BorrowEquipmentInput,
 ): Promise<UsageRow> {
-  requireStaff(user);
-  await assertProjectAccessOrReject(input.projectId, user);
+  assertCan(ctx, "equipment.borrow");
+  await requireProjectReadOrReject(ctx, input.projectId);
 
   // Paksa: surveyor tidak pernah bisa mencatat alat di tangan orang lain.
-  const usedById = user.role === "admin" ? (input.usedById ?? user.id) : user.id;
+  const usedById = ctx.user.role === "admin" ? (input.usedById ?? ctx.user.id) : ctx.user.id;
 
   // Kolom eksplisit: `borrowRejection` hanya butuh `condition`/`archivedAt`.
-  // Ini dipanggil surveyor lewat `staffActionClient` — `purchasePrice`/
-  // `purchaseDate` (admin-only) tidak boleh sampai ke memori server di sini.
+  // Dipanggil surveyor juga — `purchasePrice`/`purchaseDate` (admin-only) tidak
+  // boleh sampai ke memori server di sini.
   const [item] = await db
     .select({ id: equipment.id, condition: equipment.condition, archivedAt: equipment.archivedAt })
     .from(equipment)
@@ -440,7 +426,7 @@ export async function borrowEquipmentForUser(
         usedById,
         startedAt: input.startedAt,
         note: input.note && input.note.length > 0 ? input.note : null,
-        recordedById: user.id,
+        recordedById: ctx.user.id,
       })
       .returning();
     return row;
@@ -454,10 +440,10 @@ export async function borrowEquipmentForUser(
 
 /** Staf. Menutup sesi pakai. Surveyor hanya boleh menutup sesinya sendiri. */
 export async function returnEquipmentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: ReturnEquipmentInput,
 ): Promise<UsageRow> {
-  requireStaff(user);
+  assertCan(ctx, "equipment.return");
 
   const [session] = await db
     .select()
@@ -466,7 +452,7 @@ export async function returnEquipmentForUser(
   if (!session) throw new Error("Sesi pakai tidak ditemukan.");
   if (session.endedAt) throw new Error("Sesi pakai ini sudah ditutup.");
 
-  if (user.role === "surveyor" && session.usedById !== user.id) {
+  if (ctx.user.role === "surveyor" && session.usedById !== ctx.user.id) {
     throw new Error("Anda hanya bisa mengembalikan alat yang Anda pegang sendiri.");
   }
 
@@ -487,10 +473,10 @@ export async function returnEquipmentForUser(
 
 /** Admin-only. Mengoreksi jam mulai/selesai sesi yang sudah ditutup. */
 export async function correctUsageForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: CorrectUsageInput,
 ): Promise<UsageRow> {
-  requireAdmin(user);
+  assertCan(ctx, "equipment.correctUsage");
 
   const [session] = await db
     .select()

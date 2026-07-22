@@ -5,29 +5,20 @@ import type {
   UpdateEquipmentItemInput,
 } from "@/lib/actions/equipment-items-schemas";
 import { type EquipmentListItem, listEquipmentForUser } from "@/lib/actions/equipment-logic";
-import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { equipment, equipmentItem } from "@/lib/db/schema";
 import { summarizeUnits } from "@/lib/equipment/derive";
+import { assertCan } from "@/lib/rbac/can";
+import type { RbacContext } from "@/lib/rbac/types";
 import { storage } from "@/lib/storage";
 
 /**
  * Jenis alat (`equipmentItem`) — spec 2026-07-16. Unit fisiknya (`equipment`)
  * dan logikanya ada di `equipment-logic.ts`; file ini hanya mengurus jenis +
- * pengelompokan unit per jenis untuk daftar inventaris.
+ * pengelompokan unit per jenis untuk daftar inventaris. Izin lewat engine RBAC:
+ * `equipmentItem.create/update/archive` admin-only; daftar dibaca dengan
+ * `equipment.read` (sama seperti daftar unit yang diagregasikannya).
  */
-
-function requireStaff(user: SessionUser) {
-  if (user.role === "client") {
-    throw new Error("Inventaris alat hanya untuk staf studio.");
-  }
-}
-
-function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    throw new Error("Hanya admin yang bisa mengelola data alat.");
-  }
-}
 
 export type EquipmentItemRow = {
   id: string;
@@ -52,16 +43,16 @@ export type EquipmentItemWithUnits = {
  * Jenis terarsip tidak ikut, sama seperti unit terarsip di `listEquipmentForUser`.
  */
 export async function listEquipmentItemsForUser(
-  user: SessionUser,
+  ctx: RbacContext,
 ): Promise<EquipmentItemWithUnits[]> {
-  requireStaff(user);
+  assertCan(ctx, "equipment.read");
 
   const items = await db
     .select()
     .from(equipmentItem)
     .where(isNull(equipmentItem.archivedAt))
     .orderBy(desc(equipmentItem.createdAt));
-  const units = await listEquipmentForUser(user);
+  const units = await listEquipmentForUser(ctx);
 
   const unitsByItemId = new Map<string, EquipmentListItem[]>();
   for (const unit of units) {
@@ -77,10 +68,10 @@ export async function listEquipmentItemsForUser(
 }
 
 export async function createEquipmentItemForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: CreateEquipmentItemInput,
 ): Promise<EquipmentItemRow> {
-  requireAdmin(user);
+  assertCan(ctx, "equipmentItem.create");
 
   const [row] = await db
     .insert(equipmentItem)
@@ -103,10 +94,10 @@ async function deleteImageObject(fileUrl: string): Promise<void> {
 }
 
 export async function updateEquipmentItemForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: UpdateEquipmentItemInput,
 ): Promise<EquipmentItemRow> {
-  requireAdmin(user);
+  assertCan(ctx, "equipmentItem.update");
 
   const [existing] = await db
     .select({ image: equipmentItem.image })
@@ -147,10 +138,10 @@ export async function updateEquipmentItemForUser(
  * masih ada.
  */
 export async function archiveEquipmentItemForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: ArchiveEquipmentItemInput,
 ): Promise<EquipmentItemRow> {
-  requireAdmin(user);
+  assertCan(ctx, "equipmentItem.archive");
 
   const [existing] = await db
     .select({ id: equipmentItem.id })

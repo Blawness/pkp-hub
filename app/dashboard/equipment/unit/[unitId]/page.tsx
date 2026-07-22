@@ -10,18 +10,19 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getEquipmentForUser, listUsageForEquipment } from "@/lib/actions/equipment-logic";
 import type { EquipmentConditionInput } from "@/lib/actions/equipment-schemas";
-import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
+import { listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { formatIDR } from "@/lib/format";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
+import { getRbacContext } from "@/lib/rbac/context";
 import { optionalDisplayUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ unitId: string }> }) {
   const { unitId } = await params;
-  const user = await requireStaff();
-  const item = await getEquipmentForUser(user, unitId);
+  const ctx = await getRbacContext();
+  const item = await getEquipmentForUser(ctx, unitId);
   return { title: `${item.itemName} — ${item.code}` };
 }
 
@@ -41,11 +42,12 @@ export default async function EquipmentUnitDetailPage({
   params: Promise<{ unitId: string }>;
 }) {
   const { unitId } = await params;
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
+  const user = ctx.user;
   const isAdmin = user.role === "admin";
 
-  const item = await getEquipmentForUser(user, unitId);
-  const usages = await listUsageForEquipment(user, unitId);
+  const item = await getEquipmentForUser(ctx, unitId);
+  const usages = await listUsageForEquipment(ctx, unitId);
   const imageDisplayUrl = item.image ? await optionalDisplayUrlFor(item.image) : null;
 
   const userProjects = await listProjectsForUser(user);
