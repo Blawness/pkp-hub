@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /home/blawness/projects/pkp-hub -name \"*.test.ts\" -o -name \"*.test.tsx\" | wc -l)"
+    ]
+  }
+}

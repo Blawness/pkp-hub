@@ -4,6 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 import { getProjectDetailForUser } from "./projects-logic";
 
 /**
@@ -21,8 +24,9 @@ import { getProjectDetailForUser } from "./projects-logic";
  * MUST fail if that server-side omission is ever removed.
  */
 
-let admin: SessionUser;
-let surveyor: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
+let unassignedCtx: RbacContext;
 let projectId: string;
 
 beforeAll(async () => {
@@ -35,34 +39,37 @@ beforeAll(async () => {
 
   const adminId = randomUUID();
   const surveyorId = randomUUID();
+  const unassignedId = randomUUID();
 
-  await db.insert(users).values([
-    {
-      id: adminId,
-      name: "Project Detail Test Admin",
-      email: "test-admin-project-detail@fixture.test",
-      role: "admin",
-    },
-    {
-      id: surveyorId,
-      name: "Project Detail Test Surveyor",
-      email: "test-surveyor-project-detail@fixture.test",
-      role: "surveyor",
-    },
-  ]);
-
-  admin = {
+  const adminUser: SessionUser = {
     id: adminId,
     name: "Project Detail Test Admin",
     email: "test-admin-project-detail@fixture.test",
     role: "admin",
   };
-  surveyor = {
+  const surveyorUser: SessionUser = {
     id: surveyorId,
     name: "Project Detail Test Surveyor",
     email: "test-surveyor-project-detail@fixture.test",
     role: "surveyor",
   };
+  const unassignedUser: SessionUser = {
+    id: unassignedId,
+    name: "Unassigned Surveyor",
+    email: "test-unassigned-project-detail@fixture.test",
+    role: "surveyor",
+  };
+
+  await db.insert(users).values([adminUser, surveyorUser, unassignedUser].map((u) => ({ ...u })));
+
+  // Role wajib di-seed & di-backfill: menghapus `users` di atas ikut menghapus
+  // penugasan role-nya (FK cascade), jadi `makeTestContextForUser` butuh ini.
+  await seedSystemRoles();
+  await backfillUserRoles();
+
+  adminCtx = await makeTestContextForUser(adminUser);
+  surveyorCtx = await makeTestContextForUser(surveyorUser);
+  unassignedCtx = await makeTestContextForUser(unassignedUser);
 
   const [client] = await db
     .insert(clients)
@@ -91,7 +98,7 @@ afterAll(() => {
 
 describe("getProjectDetailForUser", () => {
   it("CRITICAL: a SURVEYOR's project detail payload contains NO finance keys at all", async () => {
-    const detail = await getProjectDetailForUser(surveyor, projectId);
+    const detail = await getProjectDetailForUser(surveyorCtx, projectId);
     expect(Object.keys(detail)).not.toContain("projectValue");
     expect(Object.keys(detail)).not.toContain("paymentStatus");
     expect(Object.keys(detail)).not.toContain("paymentNotes");
@@ -107,27 +114,23 @@ describe("getProjectDetailForUser", () => {
   });
 
   it("an OWNER's project detail payload DOES contain the finance keys, with correct values", async () => {
-    const detail = await getProjectDetailForUser(admin, projectId);
+    const detail = await getProjectDetailForUser(adminCtx, projectId);
     expect(detail).toHaveProperty("projectValue", 85_000_000);
     expect(detail).toHaveProperty("paymentStatus", "sebagian");
     expect(detail).toHaveProperty("paymentNotes", "DP diterima.");
   });
 
   it("non-finance fields are identical for both roles", async () => {
-    const adminDetail = await getProjectDetailForUser(admin, projectId);
-    const surveyorDetail = await getProjectDetailForUser(surveyor, projectId);
+    const adminDetail = await getProjectDetailForUser(adminCtx, projectId);
+    const surveyorDetail = await getProjectDetailForUser(surveyorCtx, projectId);
     expect(surveyorDetail.id).toBe(adminDetail.id);
     expect(surveyorDetail.title).toBe(adminDetail.title);
     expect(surveyorDetail.status).toBe(adminDetail.status);
   });
 
   it("a surveyor not assigned to the project is rejected (row-level scoping still applies)", async () => {
-    const unassignedSurveyor: SessionUser = {
-      id: randomUUID(),
-      name: "Unassigned Surveyor",
-      email: "unassigned@fixture.test",
-      role: "surveyor",
-    };
-    await expect(getProjectDetailForUser(unassignedSurveyor, projectId)).rejects.toThrow();
+    // `unassignedCtx` punya izin surveyor NYATA (project.read:assigned), jadi
+    // penolakan datang dari scope BARIS — bukan dari izin kosong.
+    await expect(getProjectDetailForUser(unassignedCtx, projectId)).rejects.toThrow();
   });
 });

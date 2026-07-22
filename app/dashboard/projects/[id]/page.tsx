@@ -28,11 +28,11 @@ import {
   type ProjectStatus,
 } from "@/lib/actions/projects-logic";
 import type { projectInputSchema } from "@/lib/actions/projects-schemas";
-import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { todayString } from "@/lib/phases/derive";
+import { getRbacContext } from "@/lib/rbac/context";
 import { downloadUrlFor } from "@/lib/storage";
 
 type ProjectFormValues = z.infer<typeof projectInputSchema>;
@@ -42,23 +42,26 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // Defense in depth: re-run the same scoped lookup `generateMetadata` will
   // otherwise skip if it ran before the page body — `getProjectDetailForUser`
   // 404s a surveyor who isn't assigned rather than leaking the title.
-  const user = await requireStaff();
-  const project = await getProjectDetailForUser(user, id);
+  const ctx = await getRbacContext();
+  const project = await getProjectDetailForUser(ctx, id);
   return { title: project.title };
 }
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
+  // Domain-domain lain di halaman ini belum bermigrasi ke `ctx`; sampai
+  // pass-nya tiba mereka tetap menerima `user`. Area-gate staf tetap ditegakkan
+  // oleh `app/dashboard/layout.tsx`.
+  const user = ctx.user;
 
-  // Mandatory scoping rule: `getProjectDetailForUser` (which internally
-  // calls `assertProjectAccess`) is the only entry point for reading a
-  // single project here — it 404s a surveyor who isn't assigned to this
-  // project rather than leaking it, AND it strips `projectValue` /
-  // `paymentStatus` / `paymentNotes` from the returned object entirely for
-  // any non-admin caller (Phase 6+7 review fix — CRITICAL). `project` below
-  // never contains those keys unless `user.role === "admin"`.
-  const project = await getProjectDetailForUser(user, id);
+  // Mandatory scoping rule: `getProjectDetailForUser` (lewat `requireScopedRow`)
+  // adalah satu-satunya pintu baca satu proyek di sini — ia 404 surveyor yang
+  // tak ditugaskan ke proyek ini, DAN `redact` membuang `projectValue` /
+  // `paymentStatus` / `paymentNotes` dari objek untuk pemanggil tanpa
+  // `project.readFinance` (regresi Phase 6+7 — CRITICAL). `project` di bawah tak
+  // pernah punya key itu kecuali `ctx` boleh membaca finance.
+  const project = await getProjectDetailForUser(ctx, id);
 
   // Empat pembacaan ini hanya bergantung pada `project`/`user` dan tidak saling
   // membutuhkan — dijalankan paralel supaya waktu buka halaman detail (yang
@@ -345,8 +348,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <CardContent>
                 <PaymentForm
                   projectId={project.id}
-                  projectValue={project.projectValue}
-                  paymentNotes={project.paymentNotes}
+                  projectValue={project.projectValue ?? null}
+                  paymentNotes={project.paymentNotes ?? null}
                 />
               </CardContent>
             </Card>

@@ -1,10 +1,13 @@
 import { eq } from "drizzle-orm";
-import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projectStatusLogs, projects, users } from "@/lib/db/schema";
 import { statusLabel } from "@/lib/labels";
 import { notifyClientOfStatusChange } from "@/lib/notifications/project-status";
+import { assertCan } from "@/lib/rbac/can";
+import { redact } from "@/lib/rbac/fields";
+import { projectResource } from "@/lib/rbac/resources/project";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
+import type { RbacContext } from "@/lib/rbac/types";
 import type {
   AssignSurveyorInput,
   ChangeProjectStatusInput,
@@ -86,36 +89,24 @@ function isNotFoundDigest(error: unknown): boolean {
 /**
  * Server-only business logic for project CRUD + status pipeline, separated
  * from the "use server" action wrappers in `projects.ts` so it's directly
- * unit-testable (next-safe-action's `requireUser()` needs `next/headers`'
- * request scope, which plain vitest doesn't have). Every function re-checks
- * the caller's role/scoping itself — defense in depth alongside
- * `adminActionClient` / `staffActionClient` in `projects.ts`, not a
- * replacement for it.
+ * unit-testable (next-safe-action's request-scoped context isn't available in
+ * plain vitest). Setiap fungsi menerima `RbacContext` dan menegakkan izin
+ * sendiri lewat engine RBAC — `assertCan` untuk gerbang aksi, `requireScopedRow`
+ * untuk scope baris.
  *
- * CRITICAL: any function here that reads a specific project MUST go through
- * `assertProjectAccess` — never a raw `db.select()` — that's the row-level
- * scoping boundary (surveyor sees only their assigned projects, client sees
- * only their own).
+ * CRITICAL: fungsi yang membaca satu proyek tertentu WAJIB lewat
+ * `requireScopedRow` — bukan `db.select()` mentah — itulah batas scoping baris
+ * (surveyor hanya proyek yang ditugaskan padanya, klien hanya miliknya). Ia
+ * memakai `rbacFilter` yang SAMA dengan jalur daftar, jadi keduanya mustahil
+ * melenceng.
  */
-
-function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    throw new Error("Only the admin can perform this action.");
-  }
-}
-
-function requireStaff(user: SessionUser) {
-  if (user.role !== "admin" && user.role !== "surveyor") {
-    throw new Error("You do not have permission to perform this action.");
-  }
-}
 
 function nullableText(value?: string): string | null {
   return value && value.length > 0 ? value : null;
 }
 
-export async function createProjectForUser(user: SessionUser, input: ProjectInput) {
-  requireAdmin(user);
+export async function createProjectForUser(ctx: RbacContext, input: ProjectInput) {
+  assertCan(ctx, "project.create");
   return db.transaction(async (tx) => {
     const [inserted] = await tx
       .insert(projects)
@@ -133,14 +124,14 @@ export async function createProjectForUser(user: SessionUser, input: ProjectInpu
       projectId: inserted.id,
       fromStatus: null,
       toStatus: "baru",
-      changedById: user.id,
+      changedById: ctx.user.id,
     });
     return inserted;
   });
 }
 
-export async function updateProjectForUser(user: SessionUser, input: UpdateProjectInput) {
-  requireAdmin(user);
+export async function updateProjectForUser(ctx: RbacContext, input: UpdateProjectInput) {
+  assertCan(ctx, "project.update");
   const [project] = await db
     .update(projects)
     .set({
@@ -158,8 +149,8 @@ export async function updateProjectForUser(user: SessionUser, input: UpdateProje
   return project;
 }
 
-export async function assignSurveyorForUser(user: SessionUser, input: AssignSurveyorInput) {
-  requireAdmin(user);
+export async function assignSurveyorForUser(ctx: RbacContext, input: AssignSurveyorInput) {
+  assertCan(ctx, "project.assignSurveyor");
 
   const surveyorId = nullableText(input.surveyorId);
   if (surveyorId) {
@@ -190,19 +181,23 @@ export async function assignSurveyorForUser(user: SessionUser, input: AssignSurv
  * reaching Resend.
  */
 export async function changeProjectStatusForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: ChangeProjectStatusInput,
   notify: typeof notifyClientOfStatusChange = notifyClientOfStatusChange,
 ) {
-  requireStaff(user);
+  assertCan(ctx, "project.changeStatus");
 
-  // `assertProjectAccess` is the row-level scoping boundary: it throws
-  // (via `notFound()`) if a surveyor isn't assigned to this project. We
-  // translate that into a plain rejection here rather than letting Next's
-  // not-found signal escape a server action.
-  let project: Awaited<ReturnType<typeof assertProjectAccess>>;
+  // `requireScopedRow` is the row-level scoping boundary: it 404s (via
+  // `notFound()`) a surveyor who isn't assigned to this project, using the
+  // SAME `rbacFilter` as the list path. We translate that not-found signal
+  // into a plain rejection here rather than letting it escape a server action.
+  let project: typeof projects.$inferSelect;
   try {
-    project = await assertProjectAccess(input.projectId, user);
+    project = (await requireScopedRow(
+      ctx,
+      "project.changeStatus",
+      input.projectId,
+    )) as typeof projects.$inferSelect;
   } catch (error) {
     if (isNotFoundDigest(error)) {
       throw new Error("Project not found or you do not have access to it.");
@@ -210,8 +205,9 @@ export async function changeProjectStatusForUser(
     throw error;
   }
 
-  // `requireStaff` above guarantees role is "admin" | "surveyor".
-  const role = user.role as "admin" | "surveyor";
+  // `assertCan("project.changeStatus")` above menjamin role staf (admin |
+  // surveyor); klien tidak punya grant ini.
+  const role = ctx.user.role as "admin" | "surveyor";
   const allowedNext = getAllowedNextStatuses(project.status as ProjectStatus, role);
   if (!allowedNext.includes(input.toStatus)) {
     const allowedText = allowedNext.length
@@ -234,7 +230,7 @@ export async function changeProjectStatusForUser(
       projectId: project.id,
       fromStatus: project.status,
       toStatus: input.toStatus,
-      changedById: user.id,
+      changedById: ctx.user.id,
     });
     return row;
   });
@@ -269,73 +265,30 @@ export async function getStatusLogsForProject(projectId: string) {
     .orderBy(projectStatusLogs.createdAt);
 }
 
+type ProjectRow = typeof projects.$inferSelect;
+
 /**
- * Non-finance fields of a project, safe to hand to ANY staff role.
+ * Baris proyek dengan kolom Keuangan Ringan (`projectValue` / `paymentStatus`
+ * / `paymentNotes`) sebagai OPSIONAL: `redact` benar-benar membuang key-nya
+ * dari objek untuk pemanggil tanpa `project.readFinance`, jadi tipenya jujur
+ * bahwa key itu bisa tidak ada. Kolom lain tetap wajib.
  */
-export type ProjectDetailBase = {
-  id: string;
-  title: string;
-  clientId: string;
-  surveyType: string;
-  locationLabel: string | null;
-  assignedSurveyorId: string | null;
-  status: string;
-  orderDate: Date;
-  description: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-/** Admin-only view: adds the Keuangan Ringan fields. */
-export type ProjectDetailForAdmin = ProjectDetailBase & {
-  projectValue: number | null;
-  paymentStatus: string;
-  paymentNotes: string | null;
-};
-
-export type ProjectDetail = ProjectDetailForAdmin | ProjectDetailBase;
+export type ProjectDetail = Omit<ProjectRow, "projectValue" | "paymentStatus" | "paymentNotes"> &
+  Partial<Pick<ProjectRow, "projectValue" | "paymentStatus" | "paymentNotes">>;
 
 /**
- * The project detail dashboard page's ONLY source for project data
- * (Phase 6+7 review fix — CRITICAL). Like `dashboard-logic.ts`'s
- * `getSurveyorDashboardData`, this builds its return value as an explicit
- * field-by-field projection and NEVER spreads the raw `assertProjectAccess`
- * row: `projectValue` / `paymentStatus` / `paymentNotes` are only ever
- * copied onto the returned object when `user.role === "admin"`. For any
- * other role those keys are simply never present on the object — not
- * hidden by a client-side conditional, not present-but-unused — so they
- * cannot leak into a non-admin's RSC payload no matter what the page does
- * with the result. Enforced by `project-detail.test.ts`'s key-absence
- * assertion, the exact regression test for this finding.
+ * Sumber tunggal data proyek untuk halaman detail dashboard (regresi Phase 6+7
+ * — CRITICAL). Baris diambil lewat `requireScopedRow` (scope baris = aturan
+ * yang sama persis dengan daftar), lalu `redact` MEMBUANG kolom finance yang
+ * `ctx` tak boleh lihat — bukan sekadar menyembunyikannya di UI. Untuk
+ * pemanggil non-finance, `projectValue`/`paymentStatus`/`paymentNotes` benar-
+ * benar tidak ada di objek, jadi tak bisa bocor ke payload RSC-nya. Dijaga
+ * `project-detail.test.ts` (assertion key-absence).
  */
 export async function getProjectDetailForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<ProjectDetail> {
-  const project = await assertProjectAccess(projectId, user);
-
-  const base: ProjectDetailBase = {
-    id: project.id,
-    title: project.title,
-    clientId: project.clientId,
-    surveyType: project.surveyType,
-    locationLabel: project.locationLabel,
-    assignedSurveyorId: project.assignedSurveyorId,
-    status: project.status,
-    orderDate: project.orderDate,
-    description: project.description,
-    createdAt: project.createdAt,
-    updatedAt: project.updatedAt,
-  };
-
-  if (user.role !== "admin") {
-    return base;
-  }
-
-  return {
-    ...base,
-    projectValue: project.projectValue,
-    paymentStatus: project.paymentStatus,
-    paymentNotes: project.paymentNotes,
-  };
+  const row = (await requireScopedRow(ctx, "project.read", projectId)) as ProjectRow;
+  return redact(ctx, projectResource, row) as ProjectDetail;
 }

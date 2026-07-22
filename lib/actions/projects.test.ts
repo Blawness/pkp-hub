@@ -7,6 +7,9 @@ import { assignSurveyorForUser, changeProjectStatusForUser } from "@/lib/actions
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database. Exercises the mandatory
@@ -21,6 +24,9 @@ let admin: SessionUser;
 let surveyorAssigned: SessionUser;
 let surveyorOther: SessionUser;
 let clientUser: SessionUser;
+let adminCtx: RbacContext;
+let surveyorAssignedCtx: RbacContext;
+let surveyorOtherCtx: RbacContext;
 let clientId: string;
 let projectId: string;
 
@@ -84,6 +90,14 @@ beforeAll(async () => {
     role: "client",
   };
 
+  // Role wajib di-seed & di-backfill sebelum membangun `ctx`: wipe `users` di
+  // atas ikut menghapus penugasan role lama (FK cascade).
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorAssignedCtx = await makeTestContextForUser(surveyorAssigned);
+  surveyorOtherCtx = await makeTestContextForUser(surveyorOther);
+
   const [client] = await db
     .insert(clients)
     .values({ name: "Fixture Client", type: "individual" })
@@ -110,7 +124,7 @@ afterAll(() => {
 describe("changeProjectStatusForUser", () => {
   it("a surveyor NOT assigned to the project cannot change its status", async () => {
     await expect(
-      changeProjectStatusForUser(surveyorOther, { projectId, toStatus: "dijadwalkan" }),
+      changeProjectStatusForUser(surveyorOtherCtx, { projectId, toStatus: "dijadwalkan" }),
     ).rejects.toThrow();
 
     const [row] = await db.select().from(projects).where(eq(projects.id, projectId));
@@ -124,7 +138,7 @@ describe("changeProjectStatusForUser", () => {
   });
 
   it("the assigned surveyor CAN change its status, writing exactly one log row", async () => {
-    const updated = await changeProjectStatusForUser(surveyorAssigned, {
+    const updated = await changeProjectStatusForUser(surveyorAssignedCtx, {
       projectId,
       toStatus: "dijadwalkan",
     });
@@ -141,7 +155,7 @@ describe("changeProjectStatusForUser", () => {
   });
 
   it("the admin can change status too, adding a second, distinct log row", async () => {
-    const updated = await changeProjectStatusForUser(admin, {
+    const updated = await changeProjectStatusForUser(adminCtx, {
       projectId,
       toStatus: "data_diambil",
     });
@@ -183,7 +197,7 @@ async function insertFixtureProject(status: (typeof projects.$inferInsert)["stat
 describe("changeProjectStatusForUser: status transition table", () => {
   it("the assigned surveyor CAN move exactly one step forward", async () => {
     const id = await insertFixtureProject("baru");
-    const updated = await changeProjectStatusForUser(surveyorAssigned, {
+    const updated = await changeProjectStatusForUser(surveyorAssignedCtx, {
       projectId: id,
       toStatus: "dijadwalkan",
     });
@@ -193,7 +207,7 @@ describe("changeProjectStatusForUser: status transition table", () => {
   it("a surveyor CANNOT skip a step forward (baru -> selesai)", async () => {
     const id = await insertFixtureProject("baru");
     await expect(
-      changeProjectStatusForUser(surveyorAssigned, { projectId: id, toStatus: "selesai" }),
+      changeProjectStatusForUser(surveyorAssignedCtx, { projectId: id, toStatus: "selesai" }),
     ).rejects.toThrow();
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
@@ -203,7 +217,7 @@ describe("changeProjectStatusForUser: status transition table", () => {
   it("a surveyor CANNOT cancel a project (admin-only)", async () => {
     const id = await insertFixtureProject("baru");
     await expect(
-      changeProjectStatusForUser(surveyorAssigned, { projectId: id, toStatus: "dibatalkan" }),
+      changeProjectStatusForUser(surveyorAssignedCtx, { projectId: id, toStatus: "dibatalkan" }),
     ).rejects.toThrow();
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
@@ -214,10 +228,10 @@ describe("changeProjectStatusForUser: status transition table", () => {
     const id = await insertFixtureProject("selesai");
 
     await expect(
-      changeProjectStatusForUser(surveyorAssigned, { projectId: id, toStatus: "diproses" }),
+      changeProjectStatusForUser(surveyorAssignedCtx, { projectId: id, toStatus: "diproses" }),
     ).rejects.toThrow();
     await expect(
-      changeProjectStatusForUser(surveyorAssigned, { projectId: id, toStatus: "baru" }),
+      changeProjectStatusForUser(surveyorAssignedCtx, { projectId: id, toStatus: "baru" }),
     ).rejects.toThrow();
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
@@ -226,7 +240,7 @@ describe("changeProjectStatusForUser: status transition table", () => {
 
   it("the admin CAN cancel a project", async () => {
     const id = await insertFixtureProject("baru");
-    const updated = await changeProjectStatusForUser(admin, {
+    const updated = await changeProjectStatusForUser(adminCtx, {
       projectId: id,
       toStatus: "dibatalkan",
     });
@@ -235,7 +249,7 @@ describe("changeProjectStatusForUser: status transition table", () => {
 
   it("the admin CAN reopen a `selesai` project back to `diproses`", async () => {
     const id = await insertFixtureProject("selesai");
-    const updated = await changeProjectStatusForUser(admin, {
+    const updated = await changeProjectStatusForUser(adminCtx, {
       projectId: id,
       toStatus: "diproses",
     });
@@ -244,7 +258,7 @@ describe("changeProjectStatusForUser: status transition table", () => {
 
   it("the admin CAN reactivate a `dibatalkan` project back to `baru`", async () => {
     const id = await insertFixtureProject("dibatalkan");
-    const updated = await changeProjectStatusForUser(admin, {
+    const updated = await changeProjectStatusForUser(adminCtx, {
       projectId: id,
       toStatus: "baru",
     });
@@ -256,7 +270,7 @@ describe("assignSurveyorForUser", () => {
   it("rejects assigning a user whose role is not `surveyor`", async () => {
     const id = await insertFixtureProject("baru");
     await expect(
-      assignSurveyorForUser(admin, { projectId: id, surveyorId: clientUser.id }),
+      assignSurveyorForUser(adminCtx, { projectId: id, surveyorId: clientUser.id }),
     ).rejects.toThrow();
 
     const [row] = await db.select().from(projects).where(eq(projects.id, id));
@@ -265,7 +279,7 @@ describe("assignSurveyorForUser", () => {
 
   it("accepts assigning a valid surveyor", async () => {
     const id = await insertFixtureProject("baru");
-    const updated = await assignSurveyorForUser(admin, {
+    const updated = await assignSurveyorForUser(adminCtx, {
       projectId: id,
       surveyorId: surveyorOther.id,
     });

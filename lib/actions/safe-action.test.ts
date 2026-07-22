@@ -22,7 +22,9 @@ test("fail-closed: action tanpa metadata.permission tidak pernah sukses", async 
 });
 
 test("menjalankan action saat izin dimiliki", async () => {
-  const action = rbacActionClient.metadata({ permission: "client.create" }).action(async () => "ok");
+  const action = rbacActionClient
+    .metadata({ permission: "client.create" })
+    .action(async () => "ok");
   const res = await action();
   expect(res?.data).toBe("ok");
 });
