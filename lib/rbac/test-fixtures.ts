@@ -1,5 +1,7 @@
 import type { SessionUser } from "@/lib/auth-guards";
+import { getClientIdForUser } from "@/lib/auth-guards";
 import { projects } from "@/lib/db/schema";
+import { loadEffectivePermissions } from "./context";
 import { defineResource } from "./define-resource";
 import type { RbacContext, Scope } from "./types";
 
@@ -24,6 +26,22 @@ export function fakeContext(
     clientId: null,
     ...overrides,
   };
+}
+
+/**
+ * `RbacContext` untuk test yang memuat permission efektif SUNGGUHAN dari DB
+ * (`loadEffectivePermissions`) — bukan map buatan tangan seperti
+ * `fakeContext` — jadi test domain otomatis mewarisi parity dengan produksi.
+ * Pasangan test dari `getRbacContext()`, minus `requireUser()` yang butuh
+ * request scope. Prasyarat: role sudah di-seed & di-backfill (`seedSystemRoles`
+ * + `backfillUserRoles`) untuk user ini.
+ */
+export async function makeTestContextForUser(user: SessionUser): Promise<RbacContext> {
+  const [permissions, clientId] = await Promise.all([
+    loadEffectivePermissions(user.id),
+    getClientIdForUser(user.id),
+  ]);
+  return { user, permissions, clientId };
 }
 
 /**
