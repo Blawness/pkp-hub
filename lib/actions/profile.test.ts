@@ -4,10 +4,13 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { updateOwnNameSchema } from "@/lib/actions/profile-schemas";
-import { setUserName, userHasCredential } from "@/lib/actions/users-logic";
+import { updateOwnName, userHasCredential } from "@/lib/actions/users-logic";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { accounts, sessions, users } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 // `updateOwnNameAction` (via `authActionClient` -> `requireUser()`) calls
 // `headers()` from `next/headers`, which only works inside a real request
@@ -37,6 +40,7 @@ const { updateOwnNameAction } = await import("@/lib/actions/profile");
 const password = "correct-horse-battery-staple";
 let meId: string;
 let otherId: string;
+let meCtx: RbacContext;
 
 beforeAll(async () => {
   meId = randomUUID();
@@ -54,6 +58,15 @@ beforeAll(async () => {
       password: await hashPassword(password),
     });
   }
+
+  await seedSystemRoles();
+  await backfillUserRoles();
+  meCtx = await makeTestContextForUser({
+    id: meId,
+    name: "Saya",
+    email: `me-${meId}@fixture.test`,
+    role: "surveyor",
+  });
 });
 
 afterAll(async () => {
@@ -80,7 +93,7 @@ describe("updateOwnNameSchema", () => {
 
 describe("ganti nama sendiri", () => {
   it("mengubah nama sendiri tanpa menyentuh user lain", async () => {
-    await setUserName(meId, "Nama Saya Yang Baru");
+    await updateOwnName(meCtx, "Nama Saya Yang Baru");
 
     const [me] = await db.select().from(users).where(eq(users.id, meId));
     const [other] = await db.select().from(users).where(eq(users.id, otherId));
@@ -90,7 +103,7 @@ describe("ganti nama sendiri", () => {
   });
 
   it("tidak mengubah role maupun email", async () => {
-    await setUserName(meId, "Nama Lain Lagi");
+    await updateOwnName(meCtx, "Nama Lain Lagi");
     const [me] = await db.select().from(users).where(eq(users.id, meId));
     expect(me.role).toBe("surveyor");
     expect(me.email).toBe(`me-${meId}@fixture.test`);
