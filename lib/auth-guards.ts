@@ -1,18 +1,19 @@
-import { and, eq, exists, or, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { headers } from "next/headers";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
-import { clients, projectPhases, projects } from "@/lib/db/schema";
+import { clients } from "@/lib/db/schema";
 
 /**
- * THE SECURITY BOUNDARY (Phase 2 brief §4).
+ * THE SECURITY BOUNDARY (Phase 2 brief §4) — lapis SESI-nya.
  *
- * `proxy.ts` is only a coarse, cookie-presence gate. Every server
- * action / RSC / route handler that touches project or client data MUST go
- * through the helpers below — they are the only place row-level scoping is
- * enforced. Never bypass `assertProjectAccess` / `listProjectsForUser` by
- * querying `projects` directly from a route.
+ * `proxy.ts` is only a coarse, cookie-presence gate; `getSession`/
+ * `requireUser` di file ini yang benar-benar memverifikasi sesi ke DB.
+ * Otorisasi (izin & scoping baris) hidup di engine RBAC (`lib/rbac/`):
+ * action lewat `rbacActionClient`, daftar lewat `rbacFilter`, satu baris
+ * lewat `requireScopedRow`. Jangan query `projects`/`clients` mentah dari
+ * route untuk melewatinya.
  */
 
 export type Role = "admin" | "surveyor" | "client";
@@ -76,30 +77,6 @@ export async function requireUser(): Promise<SessionUser> {
   return session.user;
 }
 
-/**
- * Session user whose role is one of `roles`, else redirect to the area their
- * own role belongs to (never a 403 loop, never falls through).
- */
-export async function requireRole(...roles: Role[]): Promise<SessionUser> {
-  const user = await requireUser();
-  if (!roles.includes(user.role)) {
-    redirect(homeForRole(user.role));
-  }
-  return user;
-}
-
-export function requireAdmin() {
-  return requireRole("admin");
-}
-
-export function requireStaff() {
-  return requireRole("admin", "surveyor");
-}
-
-export function requireClient() {
-  return requireRole("client");
-}
-
 /** The `clients.id` row linked to this portal user, or null if unlinked. */
 export async function getClientIdForUser(userId: string): Promise<string | null> {
   const [row] = await db
@@ -108,91 +85,4 @@ export async function getClientIdForUser(userId: string): Promise<string | null>
     .where(eq(clients.userId, userId))
     .limit(1);
   return row?.id ?? null;
-}
-
-/**
- * Returns the project ONLY if `user` is allowed to see it:
- * - admin: any project
- * - surveyor: only if `assignedSurveyorId === user.id`
- * - client: only if the project's `clientId` matches the client row linked
- *   to `user.id` via `clients.userId`
- *
- * Otherwise calls `notFound()` — never leaks another tenant's row, and never
- * distinguishes "doesn't exist" from "not yours" in the response.
- */
-export async function assertProjectAccess(projectId: string, user: SessionUser) {
-  const [project] = await db.select().from(projects).where(eq(projects.id, projectId)).limit(1);
-  if (!project) notFound();
-
-  if (user.role === "admin") return project;
-
-  if (user.role === "surveyor") {
-    if (project.assignedSurveyorId === user.id) return project;
-    // Di-assign ke salah satu FASE proyek ini juga memberi akses (spec
-    // 2026-07-14). Tanpa ini, menugaskan surveyor ke sebuah fase tidak
-    // memberinya apa pun dan fiturnya cuma hiasan.
-    const [phase] = await db
-      .select({ id: projectPhases.id })
-      .from(projectPhases)
-      .where(
-        and(eq(projectPhases.projectId, project.id), eq(projectPhases.assignedSurveyorId, user.id)),
-      )
-      .limit(1);
-    if (phase) return project;
-    notFound();
-  }
-
-  if (user.role === "client") {
-    const clientId = await getClientIdForUser(user.id);
-    if (clientId && project.clientId === clientId) return project;
-    notFound();
-  }
-
-  // Exhaustive guard: unknown role must never fall through to "granted".
-  notFound();
-}
-
-/**
- * List projects scoped to `user`'s role, applying the same rules as
- * `assertProjectAccess`.
- */
-export async function listProjectsForUser(user: SessionUser) {
-  if (user.role === "admin") {
-    return db.select().from(projects);
-  }
-
-  if (user.role === "surveyor") {
-    // Aturan HARUS sama persis dengan `assertProjectAccess` di atas. Kalau
-    // hanya guard yang diperluas, proyeknya bisa dibuka lewat URL langsung tapi
-    // tidak muncul di daftar — dalam praktik, tidak bisa ditemukan.
-    // `exists` (bukan join) supaya proyek dengan dua fase milik orang yang sama
-    // tidak muncul dua kali.
-    return db
-      .select()
-      .from(projects)
-      .where(
-        or(
-          eq(projects.assignedSurveyorId, user.id),
-          exists(
-            db
-              .select({ one: sql`1` })
-              .from(projectPhases)
-              .where(
-                and(
-                  eq(projectPhases.projectId, projects.id),
-                  eq(projectPhases.assignedSurveyorId, user.id),
-                ),
-              ),
-          ),
-        ),
-      );
-  }
-
-  if (user.role === "client") {
-    const clientId = await getClientIdForUser(user.id);
-    if (!clientId) return [];
-    return db.select().from(projects).where(eq(projects.clientId, clientId));
-  }
-
-  return [];
 }

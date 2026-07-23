@@ -11,33 +11,37 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getClientById } from "@/lib/actions/clients-logic";
-import { listProjectsForUser, requireAdmin } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { projects, users } from "@/lib/db/schema";
 import { clientTypeLabel, statusLabel } from "@/lib/labels";
+import { can } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
+import { rbacFilter } from "@/lib/rbac/filter";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  // Defense in depth: this route is already admin-gated by `layout.tsx`,
-  // but `generateMetadata` runs independently, so re-check here rather than
-  // rely purely on rendering order before touching `getClientById`.
-  await requireAdmin();
+  // Defense in depth: this route is already gated by `layout.tsx`
+  // (`client.read`), but `generateMetadata` runs independently, so re-check
+  // here rather than rely purely on rendering order before `getClientById`.
+  const ctx = await getRbacContext();
+  if (!can(ctx, "client.read")) notFound();
   const client = await getClientById(id);
   return { title: client?.name ?? "Klien" };
 }
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireAdmin();
+  const ctx = await getRbacContext();
+  if (!can(ctx, "client.read")) notFound();
 
   const client = await getClientById(id);
   if (!client) notFound();
 
-  // Mandatory scoping rule: never query `projects` directly — go through
-  // `listProjectsForUser`, then filter to this client in-memory. As admin,
-  // `user` sees every project, so this is equivalent to (but never bypasses)
-  // the shared scoping helper.
-  const allProjects = await listProjectsForUser(user);
+  // Mandatory scoping rule: never query `projects` unscoped — selalu lewat
+  // `rbacFilter(ctx, "project.read")`, lalu filter ke klien ini. Sebagai
+  // admin ctx melihat semua proyek, jadi ini setara dengan (tapi tak pernah
+  // melewati) batas scoping bersama.
+  const allProjects = await db.select().from(projects).where(rbacFilter(ctx, "project.read"));
   const clientProjects = allProjects.filter((p) => p.clientId === client.id);
 
   const surveyorRows = await db

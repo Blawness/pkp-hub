@@ -3,7 +3,7 @@ import { CreateClientDialog } from "@/components/users/create-client-dialog";
 import { CreateStaffDialog } from "@/components/users/create-staff-dialog";
 import { UsersTable } from "@/components/users/users-table";
 import { listUsers } from "@/lib/actions/users-logic";
-import { requireAdmin } from "@/lib/auth-guards";
+import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Manajemen User" };
 
@@ -16,7 +16,9 @@ export const metadata = { title: "Manajemen User" };
  * undangan yang ada hanya membuat akun klien.
  */
 export default async function UsersPage() {
-  const user = await requireAdmin();
+  // Gerbang `user.read` hidup di `settings/layout.tsx`; di sini hanya butuh
+  // identitas pemanggil untuk menandai barisnya sendiri di tabel.
+  const { user } = await getRbacContext();
   const rows = await listUsers();
 
   const activeAdminCount = rows.filter((u) => u.role === "admin" && !u.archivedAt).length;

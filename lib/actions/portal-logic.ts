@@ -1,23 +1,25 @@
 import { asc, eq } from "drizzle-orm";
-import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess, listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { projectPhases } from "@/lib/db/schema";
+import { projectPhases, projects } from "@/lib/db/schema";
 import { calculateProgress, type PhaseStatus } from "@/lib/phases/derive";
+import { scopeOf } from "@/lib/rbac/can";
+import { rbacFilter } from "@/lib/rbac/filter";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Server-only business logic for the client portal's project list (PRD §3
- * Feature 6). The detail page (`app/portal/projects/[id]/page.tsx`) does
- * NOT go through a wrapper here — it calls `assertProjectAccess` directly
- * (same pattern as `app/dashboard/projects/[id]/page.tsx`) so a real
- * `notFound()` propagates for a project a client doesn't own, rather than
- * a translated 500. `listSharedDocumentsForProject` /
+ * Feature 6). Akses baris ditegakkan engine RBAC: daftar lewat
+ * `rbacFilter(ctx, "project.read")`, satu-proyek lewat `requireScopedRow` —
+ * aturan yang SAMA dengan daftar, jadi `notFound()` asli menjalar untuk
+ * proyek milik klien lain. `listSharedDocumentsForProject` /
  * `listMapLayersForProject` re-verify access themselves (defense in depth),
  * same as the staff project page.
  */
 
-function requireClientRole(user: SessionUser) {
-  if (user.role !== "client") {
+/** Portal = tampilan "proyek MILIKKU": butuh `project.read` ber-scope `own`. */
+function requireOwnScope(ctx: RbacContext) {
+  if (scopeOf(ctx, "project.read") !== "own") {
     throw new Error("Only a client can view the portal.");
   }
 }
@@ -33,23 +35,25 @@ export type PortalProjectSummary = {
 
 /**
  * The logged-in client's own projects, newest first. Sourced entirely via
- * `listProjectsForUser` — the row-level scoping boundary — which for a
- * `client` role already returns only rows whose `clientId` matches the
+ * `rbacFilter(ctx, "project.read")` — the row-level scoping boundary — which
+ * for scope `own` already returns only rows whose `clientId` matches the
  * `clients` row linked to this user (never another client's projects).
+ * Proyeksi eksplisit: kolom finance tidak pernah ikut ter-SELECT.
  */
-export async function listPortalProjects(user: SessionUser): Promise<PortalProjectSummary[]> {
-  requireClientRole(user);
-  const rows = await listProjectsForUser(user);
-  return rows
-    .map((p) => ({
-      id: p.id,
-      title: p.title,
-      status: p.status,
-      surveyType: p.surveyType,
-      locationLabel: p.locationLabel,
-      orderDate: p.orderDate,
-    }))
-    .sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
+export async function listPortalProjects(ctx: RbacContext): Promise<PortalProjectSummary[]> {
+  requireOwnScope(ctx);
+  const rows = await db
+    .select({
+      id: projects.id,
+      title: projects.title,
+      status: projects.status,
+      surveyType: projects.surveyType,
+      locationLabel: projects.locationLabel,
+      orderDate: projects.orderDate,
+    })
+    .from(projects)
+    .where(rbacFilter(ctx, "project.read"));
+  return rows.sort((a, b) => b.orderDate.getTime() - a.orderDate.getTime());
 }
 
 export type PortalPhase = {
@@ -69,10 +73,10 @@ export type PortalPhase = {
  * itu.
  */
 export async function listPortalPhases(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<PortalPhase[]> {
-  await assertProjectAccess(projectId, user);
+  await requireScopedRow(ctx, "project.read", projectId);
 
   return db
     .select({
@@ -94,10 +98,10 @@ export async function listPortalPhases(
  * sendiri tidak pernah sampai ke pemanggil.
  */
 export async function getPortalProgress(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<number | null> {
-  await assertProjectAccess(projectId, user);
+  await requireScopedRow(ctx, "project.read", projectId);
   const rows = await db
     .select({ status: projectPhases.status, weight: projectPhases.weight })
     .from(projectPhases)

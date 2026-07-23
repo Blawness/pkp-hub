@@ -4,14 +4,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listPortalProjects } from "@/lib/actions/portal-logic";
-import { requireClient } from "@/lib/auth-guards";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Proyek Saya" };
 
 export default async function PortalPage() {
-  const user = await requireClient();
-  const projectRows = await listPortalProjects(user);
+  // Gerbang area (staf → /dashboard) hidup di `layout.tsx`; scoping datanya
+  // milik `ctx` (listPortalProjects menuntut scope `own`).
+  const ctx = await getRbacContext();
+  const user = ctx.user;
+  const projectRows = await listPortalProjects(ctx);
 
   return (
     <main className="flex flex-col gap-6 p-8">

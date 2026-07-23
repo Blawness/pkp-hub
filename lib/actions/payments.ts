@@ -11,37 +11,39 @@ import {
   regenerateReceiptInputSchema,
   voidPaymentInputSchema,
 } from "@/lib/actions/payments-schemas";
-import { adminActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server action ledger pembayaran. Logika + guard ada di `payments-logic.ts`
- * (diuji langsung); `adminActionClient` di sini adalah penegakan utama aturan
- * admin-only yang terikat request — bukan penggantinya, melainkan lapis
- * pertamanya.
+ * (diuji langsung); `rbacActionClient` + `.metadata` di sini adalah gerbang
+ * aksi (semua admin-only: `payment.record/void/regenerateReceipt`).
  */
 
-export const recordPayment = adminActionClient
+export const recordPayment = rbacActionClient
+  .metadata({ permission: "payment.record" })
   .inputSchema(recordPaymentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const payment = await recordPaymentForUser(ctx.user, parsedInput);
+    const payment = await recordPaymentForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${payment.projectId}`);
     revalidatePath("/dashboard");
     return { success: true as const, payment };
   });
 
-export const voidPayment = adminActionClient
+export const voidPayment = rbacActionClient
+  .metadata({ permission: "payment.void" })
   .inputSchema(voidPaymentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const payment = await voidPaymentForUser(ctx.user, parsedInput);
+    const payment = await voidPaymentForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${payment.projectId}`);
     revalidatePath("/dashboard");
     return { success: true as const, payment };
   });
 
-export const regenerateReceipt = adminActionClient
+export const regenerateReceipt = rbacActionClient
+  .metadata({ permission: "payment.regenerateReceipt" })
   .inputSchema(regenerateReceiptInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const payment = await regenerateReceiptForUser(ctx.user, parsedInput);
+    const payment = await regenerateReceiptForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${payment.projectId}`);
     return { success: true as const, payment };
   });

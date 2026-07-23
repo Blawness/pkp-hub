@@ -13,37 +13,40 @@ import {
   projectInputSchema,
   updateProjectInputSchema,
 } from "@/lib/actions/projects-schemas";
-import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server actions for project CRUD + status pipeline (PRD §3 Feature 2).
- * Business logic + role/scoping checks live in `projects-logic.ts` (directly
- * unit tested in `projects.test.ts`); the safe-action clients here are the
- * primary, request-bound enforcement of the same rules.
+ * Business logic + scoping live in `projects-logic.ts` (directly unit tested
+ * in `projects.test.ts`); `rbacActionClient` menegakkan gerbang aksi lewat
+ * `.metadata({ permission })`, dan logic-nya menegakkan scope baris.
  */
 
-export const createProject = adminActionClient
+export const createProject = rbacActionClient
+  .metadata({ permission: "project.create" })
   .inputSchema(projectInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const project = await createProjectForUser(ctx.user, parsedInput);
+    const project = await createProjectForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/projects");
     return { success: true as const, project };
   });
 
-export const updateProject = adminActionClient
+export const updateProject = rbacActionClient
+  .metadata({ permission: "project.update" })
   .inputSchema(updateProjectInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const project = await updateProjectForUser(ctx.user, parsedInput);
+    const project = await updateProjectForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/projects");
     revalidatePath(`/dashboard/projects/${project.id}`);
     return { success: true as const, project };
   });
 
 /** Admin-only: (re)assign, or unassign (empty string), the surveyor on a project. */
-export const assignSurveyor = adminActionClient
+export const assignSurveyor = rbacActionClient
+  .metadata({ permission: "project.assignSurveyor" })
   .inputSchema(assignSurveyorInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const project = await assignSurveyorForUser(ctx.user, parsedInput);
+    const project = await assignSurveyorForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/projects");
     revalidatePath(`/dashboard/projects/${project.id}`);
     return { success: true as const, project };
@@ -54,10 +57,11 @@ export const assignSurveyor = adminActionClient
  * `projectStatusLogs` row in the same transaction as the status update —
  * see `changeProjectStatusForUser`.
  */
-export const changeProjectStatus = staffActionClient
+export const changeProjectStatus = rbacActionClient
+  .metadata({ permission: "project.changeStatus" })
   .inputSchema(changeProjectStatusInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const project = await changeProjectStatusForUser(ctx.user, parsedInput);
+    const project = await changeProjectStatusForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${project.id}`);
     return { success: true as const, project };
   });

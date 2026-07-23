@@ -28,11 +28,12 @@ import {
   type ProjectStatus,
 } from "@/lib/actions/projects-logic";
 import type { projectInputSchema } from "@/lib/actions/projects-schemas";
-import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { todayString } from "@/lib/phases/derive";
+import { can, scopeOf } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
 import { downloadUrlFor } from "@/lib/storage";
 
 type ProjectFormValues = z.infer<typeof projectInputSchema>;
@@ -42,23 +43,26 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   // Defense in depth: re-run the same scoped lookup `generateMetadata` will
   // otherwise skip if it ran before the page body — `getProjectDetailForUser`
   // 404s a surveyor who isn't assigned rather than leaking the title.
-  const user = await requireStaff();
-  const project = await getProjectDetailForUser(user, id);
+  const ctx = await getRbacContext();
+  const project = await getProjectDetailForUser(ctx, id);
   return { title: project.title };
 }
 
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
+  // Domain-domain lain di halaman ini belum bermigrasi ke `ctx`; sampai
+  // pass-nya tiba mereka tetap menerima `user`. Area-gate staf tetap ditegakkan
+  // oleh `app/dashboard/layout.tsx`.
+  const user = ctx.user;
 
-  // Mandatory scoping rule: `getProjectDetailForUser` (which internally
-  // calls `assertProjectAccess`) is the only entry point for reading a
-  // single project here — it 404s a surveyor who isn't assigned to this
-  // project rather than leaking it, AND it strips `projectValue` /
-  // `paymentStatus` / `paymentNotes` from the returned object entirely for
-  // any non-admin caller (Phase 6+7 review fix — CRITICAL). `project` below
-  // never contains those keys unless `user.role === "admin"`.
-  const project = await getProjectDetailForUser(user, id);
+  // Mandatory scoping rule: `getProjectDetailForUser` (lewat `requireScopedRow`)
+  // adalah satu-satunya pintu baca satu proyek di sini — ia 404 surveyor yang
+  // tak ditugaskan ke proyek ini, DAN `redact` membuang `projectValue` /
+  // `paymentStatus` / `paymentNotes` dari objek untuk pemanggil tanpa
+  // `project.readFinance` (regresi Phase 6+7 — CRITICAL). `project` di bawah tak
+  // pernah punya key itu kecuali `ctx` boleh membaca finance.
+  const project = await getProjectDetailForUser(ctx, id);
 
   // Empat pembacaan ini hanya bergantung pada `project`/`user` dan tidak saling
   // membutuhkan — dijalankan paralel supaya waktu buka halaman detail (yang
@@ -66,16 +70,19 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const [client, statusLogs, projectDocuments, mapLayerRows] = await Promise.all([
     getClientById(project.clientId),
     getStatusLogsForProject(project.id),
-    listDocumentsForProject(user, project.id),
-    listMapLayersForProject(user, project.id),
+    listDocumentsForProject(ctx, project.id),
+    listMapLayersForProject(ctx, project.id),
   ]);
 
-  // Ledger pembayaran HANYA untuk admin. Memanggilnya untuk surveyor akan
-  // ditolak server-side — tapi jangan bergantung pada itu: jangan panggil sama
-  // sekali, supaya tidak ada apa pun yang bisa masuk ke payload non-admin.
-  const isAdmin = user.role === "admin";
-  const paymentRows = isAdmin ? await listPaymentsForProject(user, project.id) : [];
-  const paymentSummary = isAdmin ? await getPaymentSummary(user, project.id) : null;
+  // Ledger pembayaran HANYA untuk pemegang `payment.read` (surveyor tidak
+  // punya sama sekali). Memanggilnya tanpa izin akan ditolak server-side —
+  // tapi jangan bergantung pada itu: jangan panggil sama sekali, supaya tidak
+  // ada apa pun yang bisa masuk ke payload-nya. `project.update` (admin-only)
+  // menggerbangi aksi kelola proyek di bawah.
+  const isAdmin = can(ctx, "project.update");
+  const canReadPayments = can(ctx, "payment.read");
+  const paymentRows = canReadPayments ? await listPaymentsForProject(ctx, project.id) : [];
+  const paymentSummary = canReadPayments ? await getPaymentSummary(ctx, project.id) : null;
   const paymentPanelRows = await Promise.all(
     paymentRows.map(async (p) => ({
       id: p.id,
@@ -113,8 +120,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     .from(clients)
     .where(or(isNull(clients.archivedAt), eq(clients.id, project.clientId)));
 
-  const phases = await listPhasesForProject(user, project.id);
-  const progress = await getProjectProgress(user, project.id);
+  const phases = await listPhasesForProject(ctx, project.id);
+  const progress = await getProjectProgress(ctx, project.id);
   const phasesDone = phases.filter((p) => p.status === "selesai").length;
   const phasesTotal = phases.length;
   // Daftar surveyor untuk dropdown penanggung jawab fase — hanya admin yang
@@ -129,11 +136,11 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     : [];
 
   // Tab "Alat": riwayat pakai alat di proyek ini + daftar alat yang bisa
-  // dipinjam. `listUsageForProject` sudah lewat `assertProjectAccess` (di
-  // dalam `equipment-logic.ts`), jadi surveyor cuma melihat riwayat proyeknya
+  // dipinjam. `listUsageForProject` sudah lewat `requireScopedRow` (di dalam
+  // `equipment-logic.ts`), jadi surveyor cuma melihat riwayat proyeknya
   // sendiri — konsisten dengan pola di seluruh halaman ini.
-  const projectEquipmentUsages = await listUsageForProject(user, project.id);
-  const allEquipment = await listEquipmentForUser(user);
+  const projectEquipmentUsages = await listUsageForProject(ctx, project.id);
+  const allEquipment = await listEquipmentForUser(ctx);
   // "${itemName} (${code})" — beberapa unit sejenis kini mungkin ada (spec
   // 2026-07-16), jadi nama alat saja tidak lagi cukup membedakan unit mana.
   const equipmentNameById = new Map(allEquipment.map((e) => [e.id, `${e.itemName} (${e.code})`]));
@@ -189,11 +196,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     })),
   );
 
-  const canChangeStatus = user.role === "admin" || project.assignedSurveyorId === user.id;
+  // Scope `all` (admin) selalu boleh; scope `assigned` hanya kalau DITUGASKAN
+  // LANGSUNG — cermin tombol lama, meski server juga meloloskan surveyor yang
+  // ditugaskan lewat fase (requireScopedRow memakai aturan `assigned` penuh).
+  const changeStatusScope = scopeOf(ctx, "project.changeStatus");
+  const canChangeStatus =
+    changeStatusScope === "all" ||
+    (changeStatusScope === "assigned" && project.assignedSurveyorId === user.id);
   const allowedNextStatuses = canChangeStatus
     ? getAllowedNextStatuses(
         project.status as ProjectStatus,
-        user.role === "admin" ? "admin" : "surveyor",
+        changeStatusScope === "all" ? "admin" : "surveyor",
       )
     : [];
   const assignedSurveyorName = project.assignedSurveyorId
@@ -229,7 +242,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           description: project.description ?? null,
         }}
         isAdmin={isAdmin}
-        canEdit={user.role === "admin"}
+        canEdit={can(ctx, "project.update")}
         status={project.status}
         allowedNextStatuses={allowedNextStatuses}
         logs={statusLogs.map((log) => ({
@@ -264,8 +277,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             phases={phases}
             progress={progress}
             today={todayString(new Date())}
-            canEditPlan={isAdmin}
-            canReportWork={user.role === "admin" || user.role === "surveyor"}
+            canEditPlan={can(ctx, "phase.update")}
+            canReportWork={can(ctx, "phase.setStatus")}
             surveyors={phaseSurveyors}
           />
         </TabsContent>
@@ -288,7 +301,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <DocumentUpload projectId={project.id} />
           <DocumentsTable
             rows={documentRows}
-            isAdmin={user.role === "admin"}
+            isAdmin={can(ctx, "document.share")}
             emptyMessage={
               <EmptyState
                 icon={FileIcon}
@@ -345,8 +358,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               <CardContent>
                 <PaymentForm
                   projectId={project.id}
-                  projectValue={project.projectValue}
-                  paymentNotes={project.paymentNotes}
+                  projectValue={project.projectValue ?? null}
+                  paymentNotes={project.paymentNotes ?? null}
                 />
               </CardContent>
             </Card>

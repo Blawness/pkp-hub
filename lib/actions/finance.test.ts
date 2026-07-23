@@ -15,6 +15,9 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -25,6 +28,8 @@ import {
 
 let admin: SessionUser;
 let surveyor: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
 let projectId: string;
 
 beforeAll(async () => {
@@ -72,6 +77,12 @@ beforeAll(async () => {
     .values([{ name: "Finance Fixture Client", type: "individual" }])
     .returning();
 
+  // Wipe `users` menghapus penugasan role (FK cascade); seed + backfill lagi.
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorCtx = await makeTestContextForUser(surveyor);
+
   const [project] = await db
     .insert(projects)
     .values({
@@ -94,7 +105,7 @@ afterAll(() => {
 describe("updatePaymentForUser", () => {
   it("a surveyor CANNOT update payment info, even for their own assigned project", async () => {
     await expect(
-      updatePaymentForUser(surveyor, {
+      updatePaymentForUser(surveyorCtx, {
         projectId,
         projectValue: 999_999_999,
         paymentNotes: "should not apply",
@@ -107,7 +118,7 @@ describe("updatePaymentForUser", () => {
   });
 
   it("the admin CAN update payment info — dan status TIDAK bisa lagi diketik", async () => {
-    const updated = await updatePaymentForUser(admin, {
+    const updated = await updatePaymentForUser(adminCtx, {
       projectId,
       projectValue: 5_000_000,
       paymentNotes: "Menunggu transfer.",
@@ -121,17 +132,19 @@ describe("updatePaymentForUser", () => {
 
   it("nilai proyek tidak bisa dikosongkan kalau sudah ada pembayaran", async () => {
     await recordPaymentForUser(
-      admin,
+      adminCtx,
       { projectId, amount: 1_000_000, paidAt: "2026-07-14", method: "tunai" },
       { put: async (key: string) => `/api/storage/${key}` },
     );
 
-    await expect(updatePaymentForUser(admin, { projectId, projectValue: null })).rejects.toThrow();
+    await expect(
+      updatePaymentForUser(adminCtx, { projectId, projectValue: null }),
+    ).rejects.toThrow();
   });
 
   it("an admin updating a project that does not exist is rejected", async () => {
     await expect(
-      updatePaymentForUser(admin, {
+      updatePaymentForUser(adminCtx, {
         projectId: randomUUID(),
         projectValue: 1,
       }),

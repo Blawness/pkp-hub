@@ -1,8 +1,11 @@
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
-import { requireAdmin } from "@/lib/auth-guards";
+import { can } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
 
 /**
- * Gerbang sesungguhnya untuk seluruh area Pengaturan: admin saja.
+ * Gerbang sesungguhnya untuk seluruh area Pengaturan: `user.read`
+ * (admin-only di matrix).
  *
  * Menyembunyikan tautan "Pengaturan" dari sidebar surveyor BUKAN pengamanan —
  * surveyor tetap bisa mengetik URL-nya. Inilah yang menolaknya, dan ia menolak
@@ -10,6 +13,7 @@ import { requireAdmin } from "@/lib/auth-guards";
  * ditambahkan nanti terlindungi sejak lahir tanpa perlu ingat memasang guard.
  */
 export default async function SettingsLayout({ children }: { children: ReactNode }) {
-  await requireAdmin();
+  const ctx = await getRbacContext();
+  if (!can(ctx, "user.read")) redirect("/dashboard");
   return <>{children}</>;
 }

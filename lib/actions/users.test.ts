@@ -25,6 +25,9 @@ import {
   sessions,
   users,
 } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Berjalan di atas database dev sungguhan, sama seperti `auth-guards.test.ts`,
@@ -40,6 +43,9 @@ import {
 let adminA: SessionUser;
 let adminB: SessionUser;
 let surveyor: SessionUser;
+let adminACtx: RbacContext;
+let adminBCtx: RbacContext;
+let surveyorCtx: RbacContext;
 
 async function seedFixture() {
   await db.delete(documents);
@@ -64,6 +70,12 @@ async function seedFixture() {
   adminA = { id: adminAId, name: "Admin A", email: "admin-a@fixture.test", role: "admin" };
   adminB = { id: adminBId, name: "Admin B", email: "admin-b@fixture.test", role: "admin" };
   surveyor = { id: surveyorId, name: "Surveyor", email: "surveyor@fixture.test", role: "surveyor" };
+
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminACtx = await makeTestContextForUser(adminA);
+  adminBCtx = await makeTestContextForUser(adminB);
+  surveyorCtx = await makeTestContextForUser(surveyor);
 }
 
 beforeAll(seedFixture);
@@ -72,9 +84,26 @@ afterAll(() => {
   execSync("pnpm db:seed:reset", { stdio: "inherit" });
 });
 
+describe("penegakan izin di logic", () => {
+  it("surveyor ditolak mengelola user (bukan cuma di action wrapper)", async () => {
+    await expect(
+      createStaffUser(surveyorCtx, {
+        name: "Tidak Boleh",
+        email: "tidak-boleh@fixture.test",
+        role: "surveyor",
+        password: "rahasia-kuat-123",
+      }),
+    ).rejects.toThrow(/tidak punya izin/i);
+    await expect(setUserRole(surveyorCtx, adminB.id, "surveyor")).rejects.toThrow(
+      /tidak punya izin/i,
+    );
+    await expect(archiveUser(surveyorCtx, adminB.id)).rejects.toThrow(/tidak punya izin/i);
+  });
+});
+
 describe("createStaffUser", () => {
   it("membuat password yang BENAR-BENAR bisa dipakai login (hash Better Auth, bukan buatan sendiri)", async () => {
-    const { id } = await createStaffUser({
+    const { id } = await createStaffUser(adminACtx, {
       name: "Staf Baru",
       email: "staf-baru@fixture.test",
       role: "surveyor",
@@ -95,7 +124,7 @@ describe("createStaffUser", () => {
   });
 
   it("tidak pernah menyimpan password dalam bentuk mentah", async () => {
-    const { id } = await createStaffUser({
+    const { id } = await createStaffUser(adminACtx, {
       name: "Staf Dua",
       email: "staf-dua@fixture.test",
       role: "surveyor",
@@ -112,7 +141,7 @@ describe("createStaffUser", () => {
 
   it("menolak email yang sudah dipakai", async () => {
     await expect(
-      createStaffUser({
+      createStaffUser(adminACtx, {
         name: "Kembar",
         email: "admin-a@fixture.test",
         role: "surveyor",
@@ -124,7 +153,7 @@ describe("createStaffUser", () => {
 
 describe("createClientUser", () => {
   it("membuat clients + user(client) + credential, dan menautkannya (bukan akun yatim)", async () => {
-    const { id, clientId } = await createClientUser({
+    const { id, clientId } = await createClientUser(adminACtx, {
       name: "Klien Baru",
       email: "klien-baru@fixture.test",
       password: "rahasia-kuat-123",
@@ -157,7 +186,7 @@ describe("createClientUser", () => {
 
   it("menolak email yang sudah dipakai", async () => {
     await expect(
-      createClientUser({
+      createClientUser(adminACtx, {
         name: "Klien Kembar",
         email: "admin-a@fixture.test",
         password: "rahasia-kuat-123",
@@ -169,41 +198,43 @@ describe("createClientUser", () => {
 describe("invarian admin terakhir", () => {
   it("MENOLAK mengarsipkan admin aktif terakhir", async () => {
     // Sisakan satu admin: arsipkan B lebih dulu (sah, karena A masih ada).
-    await archiveUser(adminA, adminB.id);
+    await archiveUser(adminACtx, adminB.id);
 
     // Sekarang A adalah admin terakhir. B (terarsip) mencoba mengarsipkan A.
-    await expect(archiveUser(adminB, adminA.id)).rejects.toThrow(/admin aktif terakhir/i);
+    await expect(archiveUser(adminBCtx, adminA.id)).rejects.toThrow(/admin aktif terakhir/i);
 
-    await restoreUser(adminB.id);
+    await restoreUser(adminACtx, adminB.id);
   });
 
   it("MENOLAK menurunkan admin aktif terakhir jadi surveyor", async () => {
-    await archiveUser(adminA, adminB.id);
+    await archiveUser(adminACtx, adminB.id);
 
-    await expect(setUserRole(adminB, adminA.id, "surveyor")).rejects.toThrow(
+    await expect(setUserRole(adminBCtx, adminA.id, "surveyor")).rejects.toThrow(
       /admin aktif terakhir/i,
     );
 
-    await restoreUser(adminB.id);
+    await restoreUser(adminACtx, adminB.id);
   });
 
   it("MENGIZINKAN menurunkan seorang admin selama masih ada admin aktif lain", async () => {
-    await setUserRole(adminA, adminB.id, "surveyor");
+    await setUserRole(adminACtx, adminB.id, "surveyor");
 
     const rows = await listUsers();
     expect(rows.find((u) => u.id === adminB.id)?.role).toBe("surveyor");
 
-    await setUserRole(adminA, adminB.id, "admin");
+    await setUserRole(adminACtx, adminB.id, "admin");
   });
 });
 
 describe("tidak boleh menyentuh diri sendiri", () => {
   it("admin tidak bisa mengarsipkan akunnya sendiri", async () => {
-    await expect(archiveUser(adminA, adminA.id)).rejects.toThrow(/akun Anda sendiri/i);
+    await expect(archiveUser(adminACtx, adminA.id)).rejects.toThrow(/akun Anda sendiri/i);
   });
 
   it("admin tidak bisa mengubah role akunnya sendiri", async () => {
-    await expect(setUserRole(adminA, adminA.id, "surveyor")).rejects.toThrow(/akun Anda sendiri/i);
+    await expect(setUserRole(adminACtx, adminA.id, "surveyor")).rejects.toThrow(
+      /akun Anda sendiri/i,
+    );
   });
 });
 
@@ -216,7 +247,7 @@ describe("archiveUser", () => {
       expiresAt: new Date(Date.now() + 86_400_000),
     });
 
-    await archiveUser(adminA, surveyor.id);
+    await archiveUser(adminACtx, surveyor.id);
 
     const rows = await listUsers();
     const target = rows.find((u) => u.id === surveyor.id);
@@ -229,38 +260,40 @@ describe("archiveUser", () => {
     const live = await db.select().from(sessions).where(eq(sessions.userId, surveyor.id));
     expect(live).toHaveLength(0);
 
-    await restoreUser(surveyor.id);
+    await restoreUser(adminACtx, surveyor.id);
   });
 });
 
 describe("setUserName", () => {
   it("mengganti nama user lain", async () => {
-    await setUserName(surveyor.id, "Surveyor Baru");
+    await setUserName(adminACtx, surveyor.id, "Surveyor Baru");
     const [row] = await db.select().from(users).where(eq(users.id, surveyor.id));
     expect(row.name).toBe("Surveyor Baru");
   });
 
   it("membolehkan admin mengganti namanya SENDIRI (tidak seperti setUserRole)", async () => {
-    await setUserName(adminA.id, "Admin A Baru");
+    await setUserName(adminACtx, adminA.id, "Admin A Baru");
     const [row] = await db.select().from(users).where(eq(users.id, adminA.id));
     expect(row.name).toBe("Admin A Baru");
   });
 
   it("memangkas spasi di ujung", async () => {
-    await setUserName(adminB.id, "  Admin B  ");
+    await setUserName(adminACtx, adminB.id, "  Admin B  ");
     const [row] = await db.select().from(users).where(eq(users.id, adminB.id));
     expect(row.name).toBe("Admin B");
   });
 
   it("tidak menyentuh role atau email", async () => {
-    await setUserName(surveyor.id, "Nama Lain");
+    await setUserName(adminACtx, surveyor.id, "Nama Lain");
     const [row] = await db.select().from(users).where(eq(users.id, surveyor.id));
     expect(row.role).toBe("surveyor");
     expect(row.email).toBe("surveyor@fixture.test");
   });
 
   it("menolak user yang tidak ada", async () => {
-    await expect(setUserName(randomUUID(), "Hantu")).rejects.toThrow("User tidak ditemukan.");
+    await expect(setUserName(adminACtx, randomUUID(), "Hantu")).rejects.toThrow(
+      "User tidak ditemukan.",
+    );
   });
 });
 
@@ -273,7 +306,7 @@ describe("setUserPassword", () => {
       expiresAt: new Date(Date.now() + 86_400_000),
     });
 
-    await setUserPassword(surveyor.id, "password-baru-456");
+    await setUserPassword(adminACtx, surveyor.id, "password-baru-456");
 
     const [credential] = await db
       .select({ password: accounts.password })

@@ -18,6 +18,7 @@ const EXPECTED_SURVEYOR: Record<string, Scope> = {
   "phase.read": "assigned",
   "phase.setStatus": "assigned",
   "phase.updateNote": "assigned",
+  "phase.readInternal": "assigned",
   "map.read": "assigned",
   "map.write": "assigned",
   "document.read": "assigned",
@@ -30,6 +31,7 @@ const EXPECTED_SURVEYOR: Record<string, Scope> = {
 
 const EXPECTED_CLIENT: Record<string, Scope> = {
   "project.read": "own",
+  "project.readFinance": "own",
   "phase.read": "own",
   "map.read": "own",
   "document.read": "own",

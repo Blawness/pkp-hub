@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { assertProjectAccess, listProjectsForUser, type SessionUser } from "@/lib/auth-guards";
+import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import {
   clients,
@@ -22,15 +22,17 @@ import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
 import type { RbacContext } from "@/lib/rbac/types";
 
 /**
- * BUKTI PARITY — inti sub-proyek 1.
+ * SNAPSHOT SCOPE per role — pengganti bukti parity sub-proyek 1.
  *
- * Pada data yang sama, `rbacFilter` harus menghasilkan himpunan yang IDENTIK
- * dengan `listProjectsForUser` lama, dan `requireScopedRow` harus menolak di
- * kasus yang sama persis dengan `assertProjectAccess`. Kalau file ini gagal,
- * RBAC mengubah perilaku — dan sub-proyek 1 melarang itu.
+ * Dulu file ini membandingkan `rbacFilter`/`requireScopedRow` dengan
+ * `listProjectsForUser`/`assertProjectAccess` lama sebagai oracle. Helper
+ * lama sudah dihapus (pass terakhir migrasi call site), jadi ekspektasinya
+ * kini snapshot id-set eksplisit dari fixture deterministik — himpunan yang
+ * SAMA dengan yang dihasilkan oracle dulu. Kalau file ini gagal, aturan
+ * scope berubah perilaku.
  *
- * Mengikuti pola `lib/auth-guards.test.ts`: menghapus tabel app, memasang
- * fixture deterministik, lalu memulihkan seed dev kanonik di akhir.
+ * Mengikuti pola lama: menghapus tabel app, memasang fixture deterministik,
+ * lalu memulihkan seed dev kanonik di akhir.
  */
 
 let admin: SessionUser;
@@ -196,25 +198,21 @@ async function scopedProjectIds(ctx: RbacContext): Promise<string[]> {
   return rows.map((r) => r.id).sort();
 }
 
-describe("rbacFilter setara listProjectsForUser", () => {
-  it("admin melihat himpunan yang sama", async () => {
-    const lama = (await listProjectsForUser(admin)).map((p) => p.id).sort();
-    expect(await scopedProjectIds(adminCtx)).toEqual(lama);
+describe("snapshot scope proyek per role", () => {
+  it("admin melihat SEMUA proyek", async () => {
+    expect(await scopedProjectIds(adminCtx)).toEqual(
+      [projA1, projA2, projB1, projB2, projA3].sort(),
+    );
   });
 
-  it("surveyor melihat himpunan yang sama, termasuk akses lewat fase", async () => {
-    const lama = (await listProjectsForUser(surveyorA)).map((p) => p.id).sort();
-    const baru = await scopedProjectIds(surveyorCtx);
-    expect(baru).toEqual(lama);
-    expect(baru).toContain(projA3);
-    expect(baru).not.toContain(projA2);
+  it("surveyor melihat penugasan langsung + lewat fase, tidak lebih", async () => {
+    // projA1 & projB1 langsung; projA3 hanya lewat fase — kasus yang paling
+    // gampang terlewat. projA2/projB2 bukan miliknya.
+    expect(await scopedProjectIds(surveyorCtx)).toEqual([projA1, projB1, projA3].sort());
   });
 
-  it("client melihat himpunan yang sama", async () => {
-    const lama = (await listProjectsForUser(clientUserA)).map((p) => p.id).sort();
-    const baru = await scopedProjectIds(clientCtx);
-    expect(baru).toEqual(lama);
-    expect(baru).not.toContain(projB1);
+  it("client hanya melihat proyek klien-nya sendiri", async () => {
+    expect(await scopedProjectIds(clientCtx)).toEqual([projA1, projA2, projA3].sort());
   });
 
   it("user tanpa role sama sekali tidak melihat apa pun", async () => {
@@ -223,24 +221,20 @@ describe("rbacFilter setara listProjectsForUser", () => {
   });
 });
 
-describe("requireScopedRow setara assertProjectAccess", () => {
+describe("requireScopedRow menegakkan aturan yang sama dengan daftar", () => {
   it("admin bisa membuka proyek mana pun", async () => {
-    await expect(assertProjectAccess(projB2, admin)).resolves.toBeTruthy();
     await expect(requireScopedRow(adminCtx, "project.read", projB2)).resolves.toBeTruthy();
   });
 
-  it("surveyor ditolak pada proyek yang bukan miliknya — di kedua sistem", async () => {
-    await expect(assertProjectAccess(projA2, surveyorA)).rejects.toThrow();
+  it("surveyor ditolak pada proyek yang bukan miliknya", async () => {
     await expect(requireScopedRow(surveyorCtx, "project.read", projA2)).rejects.toThrow();
   });
 
-  it("surveyor diterima lewat penugasan fase — di kedua sistem", async () => {
-    await expect(assertProjectAccess(projA3, surveyorA)).resolves.toBeTruthy();
+  it("surveyor diterima lewat penugasan fase", async () => {
     await expect(requireScopedRow(surveyorCtx, "project.read", projA3)).resolves.toBeTruthy();
   });
 
-  it("client ditolak pada proyek klien lain — di kedua sistem", async () => {
-    await expect(assertProjectAccess(projB1, clientUserA)).rejects.toThrow();
+  it("client ditolak pada proyek klien lain", async () => {
     await expect(requireScopedRow(clientCtx, "project.read", projB1)).rejects.toThrow();
   });
 
@@ -276,6 +270,21 @@ describe("scope dokumen menghormati sharedWithClient", () => {
 
   it("dokumen internal tidak bisa dibuka client lewat id langsung", async () => {
     await expect(requireScopedRow(clientCtx, "document.read", privateDocId)).rejects.toThrow();
+  });
+});
+
+describe("anti baris kembar (exists, bukan join)", () => {
+  it("daftar surveyor tidak memuat baris kembar saat di-assign ke proyek DAN dua fasenya", async () => {
+    // projA1 sudah di-assign langsung ke surveyor A; tambahkan dua fase yang
+    // juga miliknya. Kalau scope memakai join alih-alih exists, proyeknya
+    // muncul tiga kali. (Dipindah dari auth-guards.test.ts lama.)
+    await db.insert(projectPhases).values([
+      { projectId: projA1, name: "F1", sortOrder: 1, assignedSurveyorId: surveyorA.id },
+      { projectId: projA1, name: "F2", sortOrder: 2, assignedSurveyorId: surveyorA.id },
+    ]);
+
+    const ids = await scopedProjectIds(surveyorCtx);
+    expect(ids.filter((id) => id === projA1)).toHaveLength(1);
   });
 });
 

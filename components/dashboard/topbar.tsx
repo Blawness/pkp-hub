@@ -6,11 +6,13 @@ import { useSelectedLayoutSegments } from "next/navigation";
 import { Fragment } from "react";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { buildCrumbs } from "@/components/dashboard/nav-config";
+import { usePermissions } from "@/components/rbac/permissions-provider";
 import type { SessionUser } from "@/lib/auth-guards";
 
 export function Topbar({ user }: { user: SessionUser }) {
   const segments = useSelectedLayoutSegments();
-  const crumbs = buildCrumbs(segments, user);
+  const { can } = usePermissions();
+  const crumbs = buildCrumbs(segments, can);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm sm:px-6">

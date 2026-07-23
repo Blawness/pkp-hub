@@ -8,8 +8,9 @@ import { Reveal, Stagger } from "@/components/motion/reveal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
-import { requireStaff } from "@/lib/auth-guards";
 import { formatIDR } from "@/lib/format";
+import { scopeOf } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Dashboard" };
 
@@ -24,10 +25,15 @@ export const metadata = { title: "Dashboard" };
  * client-side hiding.
  */
 export default async function DashboardPage() {
-  const user = await requireStaff();
+  // Gerbang area (klien → /portal) hidup di `layout.tsx`; di sini `ctx` yang
+  // menyetir varian dan scoping datanya.
+  const ctx = await getRbacContext();
 
-  if (user.role === "admin") {
-    const data = await getAdminDashboardData(user);
+  // Varian dashboard dipilih dari SCOPE — cermin gerbang di dashboard-logic:
+  // pemegang agregat finance studio melihat varian admin, sisanya varian
+  // antrean kerja surveyor.
+  if (scopeOf(ctx, "project.readFinance") === "all") {
+    const data = await getAdminDashboardData(ctx);
     const activeCount = data.latestProjects.length;
 
     return (
@@ -110,7 +116,7 @@ export default async function DashboardPage() {
   }
 
   // Surveyor: struktur sama, tanpa satu pun angka uang.
-  const data = await getSurveyorDashboardData(user);
+  const data = await getSurveyorDashboardData(ctx);
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">

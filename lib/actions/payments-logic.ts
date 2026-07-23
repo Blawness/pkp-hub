@@ -8,13 +8,15 @@ import type {
   RegenerateReceiptInput,
   VoidPaymentInput,
 } from "@/lib/actions/payments-schemas";
-import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import type * as schema from "@/lib/db/schema";
 import { clients, payments, projects } from "@/lib/db/schema";
 import { surveyTypeLabel } from "@/lib/labels";
 import { buildReceiptNumber, derivePaymentStatus } from "@/lib/payments/derive";
+import { assertCan, scopeOf } from "@/lib/rbac/can";
+import type { ScopedPermission } from "@/lib/rbac/resources";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
+import type { RbacContext } from "@/lib/rbac/types";
 import { generateAndStoreReceipt, type ReceiptStorage } from "@/lib/receipts";
 import type { ReceiptData } from "@/lib/receipts/template";
 import { storage } from "@/lib/storage";
@@ -28,8 +30,8 @@ import { storage } from "@/lib/storage";
  * proyek yang di-assign ke dia. Kwitansi memuat nilai proyek, jadi kebocoran
  * di modul ini meruntuhkan jaminan "surveyor tidak lihat keuangan" yang sudah
  * ditegakkan (dan diuji) di `dashboard-logic.ts` / `projects-logic.ts`.
- * Perhatikan: `assertProjectAccess` MELOLOSKAN surveyor yang di-assign — jadi
- * ia BUKAN guard yang cukup di sini. `requireAdmin` harus mendahuluinya.
+ * Perhatikan: scope proyek MELOLOSKAN surveyor yang di-assign — jadi cek
+ * proyek BUKAN guard yang cukup di sini. `assertCan(payment.*)` harus mendahuluinya.
  */
 
 export type DbOrTx =
@@ -75,10 +77,14 @@ export type ReceiptArchiveRow = {
  * proyek, untuk tab "Kwitansi" di Arsip Dokumen. Sengaja dipisah dari tabel
  * `documents` — lihat catatan di atas: kwitansi memuat nilai proyek, jadi tidak
  * boleh masuk ke Arsip yang terlihat surveyor. Surveyor memanggil ini akan
- * ditolak oleh `requireAdmin`.
+ * ditolak (tidak punya `payment.read` sama sekali).
  */
-export async function listReceiptsForAdmin(user: SessionUser): Promise<ReceiptArchiveRow[]> {
-  requireAdmin(user);
+export async function listReceiptsForAdmin(ctx: RbacContext): Promise<ReceiptArchiveRow[]> {
+  // Tampilan lintas-proyek: butuh `payment.read` ber-scope `all`. `can()`
+  // (level-aksi) tidak cukup — klien punya `payment.read:own` juga.
+  if (scopeOf(ctx, "payment.read") !== "all") {
+    throw new Error("Only the admin can view all receipts.");
+  }
 
   const rows = await db
     .select({
@@ -114,12 +120,6 @@ export async function listReceiptsForAdmin(user: SessionUser): Promise<ReceiptAr
   }));
 }
 
-function requireAdmin(user: SessionUser) {
-  if (user.role !== "admin") {
-    throw new Error("Only the admin can manage payments.");
-  }
-}
-
 /** Sama seperti `finance-logic.ts`: ubah sinyal 404 `notFound()` jadi penolakan biasa. */
 function isNotFoundDigest(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -127,13 +127,31 @@ function isNotFoundDigest(error: unknown): boolean {
   return typeof digest === "string" && digest.startsWith("NEXT_HTTP_ERROR_FALLBACK;404");
 }
 
-async function assertProjectAccessOrReject(projectId: string, user: SessionUser) {
+/** Verifikasi `ctx` boleh mengakses proyek ini (baca), kembalikan barisnya; 404 → penolakan. */
+async function requireProjectReadOrReject(
+  ctx: RbacContext,
+  projectId: string,
+): Promise<typeof projects.$inferSelect> {
   try {
-    return await assertProjectAccess(projectId, user);
+    return (await requireScopedRow(ctx, "project.read", projectId)) as typeof projects.$inferSelect;
   } catch (error) {
     if (isNotFoundDigest(error)) {
       throw new Error("Project not found or you do not have access to it.");
     }
+    throw error;
+  }
+}
+
+/** Ambil satu pembayaran yang boleh disentuh `ctx` untuk `permission`; 404 → penolakan. */
+async function requireScopedPaymentOrReject(
+  ctx: RbacContext,
+  permission: ScopedPermission,
+  id: string,
+): Promise<typeof payments.$inferSelect> {
+  try {
+    return (await requireScopedRow(ctx, permission, id)) as typeof payments.$inferSelect;
+  } catch (error) {
+    if (isNotFoundDigest(error)) throw new Error("Payment not found.");
     throw error;
   }
 }
@@ -185,16 +203,16 @@ async function nextReceiptSeq(handle: DbOrTx): Promise<number> {
 
 /** Admin: semua baris. Klien: hanya proyeknya sendiri, dan hanya baris yang TIDAK dibatalkan. */
 export async function listPaymentsForProject(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<PaymentRow[]> {
-  if (user.role === "surveyor") {
-    throw new Error("Surveyors cannot view payments.");
-  }
-  await assertProjectAccessOrReject(projectId, user);
+  // Surveyor tidak punya `payment.read` sama sekali → `assertCan` menolak.
+  assertCan(ctx, "payment.read");
+  await requireProjectReadOrReject(ctx, projectId);
 
+  // Pembaca ber-scope `own` (klien) hanya melihat baris yang TIDAK dibatalkan.
   const where =
-    user.role === "client"
+    scopeOf(ctx, "payment.read") === "own"
       ? and(eq(payments.projectId, projectId), isNull(payments.voidedAt))
       : eq(payments.projectId, projectId);
 
@@ -202,13 +220,11 @@ export async function listPaymentsForProject(
 }
 
 export async function getPaymentSummary(
-  user: SessionUser,
+  ctx: RbacContext,
   projectId: string,
 ): Promise<PaymentSummary> {
-  if (user.role === "surveyor") {
-    throw new Error("Surveyors cannot view payments.");
-  }
-  const project = await assertProjectAccessOrReject(projectId, user);
+  assertCan(ctx, "payment.read");
+  const project = await requireProjectReadOrReject(ctx, projectId);
 
   const totalPaid = await totalPaidFor(db, projectId);
   const projectValue = project.projectValue ?? null;
@@ -269,12 +285,12 @@ async function issueReceiptQuietly(
 
 /** Admin-only. Catat satu pembayaran; status proyek ikut dihitung ulang. */
 export async function recordPaymentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: RecordPaymentInput,
   store: ReceiptStorage = storage,
 ): Promise<PaymentRow> {
-  requireAdmin(user);
-  const project = await assertProjectAccessOrReject(input.projectId, user);
+  assertCan(ctx, "payment.record");
+  const project = await requireProjectReadOrReject(ctx, input.projectId);
 
   if (project.projectValue == null || project.projectValue <= 0) {
     throw new Error("Isi nilai proyek dulu sebelum mencatat pembayaran.");
@@ -291,7 +307,7 @@ export async function recordPaymentForUser(
         method: input.method,
         note: input.note && input.note.length > 0 ? input.note : null,
         receiptNumber: buildReceiptNumber(seq, input.paidAt),
-        recordedById: user.id,
+        recordedById: ctx.user.id,
       })
       .returning();
     await recomputePaymentStatus(tx, input.projectId);
@@ -308,21 +324,18 @@ export async function recordPaymentForUser(
  * kunci yang sama, sehingga unduhan berikutnya jujur.
  */
 export async function voidPaymentForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: VoidPaymentInput,
   store: ReceiptStorage = storage,
 ): Promise<PaymentRow> {
-  requireAdmin(user);
-
-  const [existing] = await db.select().from(payments).where(eq(payments.id, input.paymentId));
-  if (!existing) throw new Error("Payment not found.");
-  await assertProjectAccessOrReject(existing.projectId, user);
+  assertCan(ctx, "payment.void");
+  const existing = await requireScopedPaymentOrReject(ctx, "payment.void", input.paymentId);
   if (existing.voidedAt) throw new Error("Pembayaran ini sudah dibatalkan.");
 
   const payment = await db.transaction(async (tx) => {
     const [row] = await tx
       .update(payments)
-      .set({ voidedAt: new Date(), voidedReason: input.reason, voidedById: user.id })
+      .set({ voidedAt: new Date(), voidedReason: input.reason, voidedById: ctx.user.id })
       .where(eq(payments.id, input.paymentId))
       .returning();
     await recomputePaymentStatus(tx, row.projectId);
@@ -335,15 +348,16 @@ export async function voidPaymentForUser(
 
 /** Admin-only. Buat ulang kwitansi yang sebelumnya gagal terbit (`receiptFileUrl` null). */
 export async function regenerateReceiptForUser(
-  user: SessionUser,
+  ctx: RbacContext,
   input: RegenerateReceiptInput,
   store: ReceiptStorage = storage,
 ): Promise<PaymentRow> {
-  requireAdmin(user);
-
-  const [existing] = await db.select().from(payments).where(eq(payments.id, input.paymentId));
-  if (!existing) throw new Error("Payment not found.");
-  await assertProjectAccessOrReject(existing.projectId, user);
+  assertCan(ctx, "payment.regenerateReceipt");
+  const existing = await requireScopedPaymentOrReject(
+    ctx,
+    "payment.regenerateReceipt",
+    input.paymentId,
+  );
 
   const fileUrl = await issueReceiptQuietly(existing, store);
   if (!fileUrl) throw new Error("Kwitansi gagal dibuat. Coba lagi.");

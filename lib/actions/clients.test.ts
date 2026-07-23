@@ -10,15 +10,20 @@ import {
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database: wipes the app tables, inserts a
- * deterministic fixture, exercises `clients-logic.ts`'s role checks + soft
+ * deterministic fixture, exercises `clients-logic.ts`'s izin checks + soft
  * delete, then restores the canonical dev seed.
  */
 
 let admin: SessionUser;
 let surveyor: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
 
 beforeAll(async () => {
   await db.delete(documents);
@@ -53,6 +58,11 @@ beforeAll(async () => {
     email: "test-surveyor-clients@fixture.test",
     role: "surveyor",
   };
+
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorCtx = await makeTestContextForUser(surveyor);
 });
 
 afterAll(() => {
@@ -62,7 +72,7 @@ afterAll(() => {
 
 describe("createClientForUser", () => {
   it("admin can create a client", async () => {
-    const client = await createClientForUser(admin, {
+    const client = await createClientForUser(adminCtx, {
       name: "Fixture Client",
       type: "individual",
     });
@@ -72,7 +82,7 @@ describe("createClientForUser", () => {
 
   it("a surveyor calling createClient is rejected", async () => {
     await expect(
-      createClientForUser(surveyor, { name: "Should Not Exist", type: "individual" }),
+      createClientForUser(surveyorCtx, { name: "Should Not Exist", type: "individual" }),
     ).rejects.toThrow();
 
     const rows = await db.select().from(clients);
@@ -82,12 +92,12 @@ describe("createClientForUser", () => {
 
 describe("archiveClientForUser", () => {
   it("sets archivedAt, hides from the default list, but the row still exists", async () => {
-    const created = await createClientForUser(admin, {
+    const created = await createClientForUser(adminCtx, {
       name: "To Be Archived",
       type: "company",
     });
 
-    const archived = await archiveClientForUser(admin, { id: created.id });
+    const archived = await archiveClientForUser(adminCtx, { id: created.id });
     expect(archived.archivedAt).not.toBeNull();
 
     const defaultList = await listClients();

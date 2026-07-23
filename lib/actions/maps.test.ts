@@ -12,6 +12,9 @@ import {
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, documents, mapLayers, projectStatusLogs, projects, users } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -22,6 +25,8 @@ import { clients, documents, mapLayers, projectStatusLogs, projects, users } fro
 
 let admin: SessionUser;
 let surveyorAssigned: SessionUser;
+let adminCtx: RbacContext;
+let surveyorAssignedCtx: RbacContext;
 let clientA: { id: string };
 let clientB: { id: string };
 let projectAssigned: string;
@@ -79,6 +84,12 @@ beforeAll(async () => {
     role: "surveyor",
   };
 
+  // Wipe `users` menghapus penugasan role (FK cascade); seed + backfill lagi.
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorAssignedCtx = await makeTestContextForUser(surveyorAssigned);
+
   const [ca, cb] = await db
     .insert(clients)
     .values([
@@ -119,7 +130,7 @@ afterAll(() => {
 describe("saveMapLayerForUser", () => {
   it("a surveyor CANNOT save a map layer to a project they are not assigned to", async () => {
     await expect(
-      saveMapLayerForUser(surveyorAssigned, {
+      saveMapLayerForUser(surveyorAssignedCtx, {
         projectId: projectOther,
         name: "Batas lahan v1",
         geojson: validGeojson,
@@ -132,7 +143,7 @@ describe("saveMapLayerForUser", () => {
   });
 
   it("the assigned surveyor CAN save a map layer to their own project", async () => {
-    const layer = await saveMapLayerForUser(surveyorAssigned, {
+    const layer = await saveMapLayerForUser(surveyorAssignedCtx, {
       projectId: projectAssigned,
       name: "Batas lahan v1",
       geojson: validGeojson,
@@ -157,8 +168,10 @@ describe("saveMapLayerForUser", () => {
       email: "client-maps@fixture.test",
       role: "client",
     };
+    await backfillUserRoles();
+    const clientCtx = await makeTestContextForUser(clientUser);
     await expect(
-      saveMapLayerForUser(clientUser, {
+      saveMapLayerForUser(clientCtx, {
         projectId: projectAssigned,
         name: "Illicit layer",
         geojson: validGeojson,
@@ -177,7 +190,7 @@ describe("importMapCsvForUser: lat/long CSV", () => {
       "C,-6.201000,106.801000",
     ].join("\n");
 
-    const result = await importMapCsvForUser(surveyorAssigned, {
+    const result = await importMapCsvForUser(surveyorAssignedCtx, {
       projectId: projectAssigned,
       name: "Import CSV v1",
       csvText,
@@ -194,7 +207,7 @@ describe("importMapCsvForUser: lat/long CSV", () => {
 
   it("a surveyor CANNOT import a CSV into a project they are not assigned to", async () => {
     await expect(
-      importMapCsvForUser(surveyorAssigned, {
+      importMapCsvForUser(surveyorAssignedCtx, {
         projectId: projectOther,
         name: "Import CSV",
         csvText: "id,lat,long\n1,-6.2,106.8\n",
@@ -214,7 +227,7 @@ describe("importMapCsvForUser: UTM CSV", () => {
       "3,700100,9314100",
     ].join("\n");
 
-    const result = await importMapCsvForUser(admin, {
+    const result = await importMapCsvForUser(adminCtx, {
       projectId: projectAssigned,
       name: "Import UTM v1",
       csvText,
@@ -229,11 +242,11 @@ describe("importMapCsvForUser: UTM CSV", () => {
 
 describe("listMapLayersForProject", () => {
   it("this test fails if the guard is removed: a surveyor listing a project they don't own is rejected", async () => {
-    await expect(listMapLayersForProject(surveyorAssigned, projectOther)).rejects.toThrow();
+    await expect(listMapLayersForProject(surveyorAssignedCtx, projectOther)).rejects.toThrow();
   });
 
   it("returns layers for a project the caller can access, newest first", async () => {
-    const layers = await listMapLayersForProject(surveyorAssigned, projectAssigned);
+    const layers = await listMapLayersForProject(surveyorAssignedCtx, projectAssigned);
     expect(layers.length).toBeGreaterThan(0);
     expect(layers.every((l) => l.projectId === projectAssigned)).toBe(true);
   });
@@ -252,7 +265,7 @@ describe("deleteMapLayerForUser", () => {
       })
       .returning();
 
-    await expect(deleteMapLayerForUser(surveyorAssigned, otherLayer.id)).rejects.toThrow();
+    await expect(deleteMapLayerForUser(surveyorAssignedCtx, otherLayer.id)).rejects.toThrow();
 
     const [stillThere] = await db.select().from(mapLayers).where(eq(mapLayers.id, otherLayer.id));
     expect(stillThere).toBeDefined();
@@ -270,7 +283,7 @@ describe("deleteMapLayerForUser", () => {
       })
       .returning();
 
-    await deleteMapLayerForUser(admin, layer.id);
+    await deleteMapLayerForUser(adminCtx, layer.id);
     const [gone] = await db.select().from(mapLayers).where(eq(mapLayers.id, layer.id));
     expect(gone).toBeUndefined();
   });

@@ -10,9 +10,10 @@ import { listClients } from "@/lib/actions/clients-logic";
 import { searchDocumentsForUser } from "@/lib/actions/documents-logic";
 import { documentCategorySchema } from "@/lib/actions/documents-schemas";
 import { listReceiptsForAdmin } from "@/lib/actions/payments-logic";
-import { requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { can, scopeOf } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
 import { downloadUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Arsip Dokumen" };
@@ -20,7 +21,7 @@ export const metadata = { title: "Arsip Dokumen" };
 /**
  * Cross-project document search (PRD §3 Feature 4). All filtering happens
  * server-side via `searchDocumentsForUser`, which is scoped through
- * `listProjectsForUser` — a surveyor only ever sees documents belonging to
+ * `rbacFilter(ctx, "document.read")` — a surveyor only ever sees documents belonging to
  * projects assigned to them, never the whole table.
  *
  * Tab "Kwitansi" HANYA untuk admin: daftar semua kwitansi lintas proyek. Ini
@@ -39,11 +40,15 @@ export default async function DocumentsSearchPage({
   }>;
 }) {
   const filters = await searchParams;
-  const user = await requireStaff();
-  const isAdmin = user.role === "admin";
+  const ctx = await getRbacContext();
+  // Arsip kwitansi lintas-proyek butuh `payment.read` ber-scope `all` —
+  // cermin gerbang `listReceiptsForAdmin`. Kolom bagikan/hapus digating
+  // `document.share` (admin-only di matrix, sepaket dengan delete).
+  const canViewReceiptArchive = scopeOf(ctx, "payment.read") === "all";
+  const canManageDocuments = can(ctx, "document.share");
 
   const parsedCategory = documentCategorySchema.safeParse(filters.category);
-  const results = await searchDocumentsForUser(user, {
+  const results = await searchDocumentsForUser(ctx, {
     q: filters.q,
     category: parsedCategory.success ? parsedCategory.data : undefined,
     clientId: filters.clientId,
@@ -85,7 +90,7 @@ export default async function DocumentsSearchPage({
   // `listReceiptsForAdmin` mengembalikan `receiptFileUrl` mentah; presigned
   // URL dibuat di sini (sama seperti baris dokumen) agar layer logika tetap
   // bebas dari driver storage. Lihat catatan di `downloadUrlFor`.
-  const receiptSource = isAdmin ? await listReceiptsForAdmin(user) : [];
+  const receiptSource = canViewReceiptArchive ? await listReceiptsForAdmin(ctx) : [];
   const receiptRows = await Promise.all(
     receiptSource.map(async (r) => ({
       ...r,
@@ -98,7 +103,7 @@ export default async function DocumentsSearchPage({
       <PageHeader
         title="Arsip Dokumen"
         description={
-          user.role === "surveyor"
+          scopeOf(ctx, "document.read") === "assigned"
             ? "Dokumen dari proyek yang ditugaskan kepada Anda."
             : "Semua dokumen lintas proyek."
         }
@@ -107,7 +112,7 @@ export default async function DocumentsSearchPage({
       <Tabs defaultValue="dokumen">
         <TabsList>
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
-          {isAdmin ? <TabsTrigger value="kwitansi">Kwitansi</TabsTrigger> : null}
+          {canViewReceiptArchive ? <TabsTrigger value="kwitansi">Kwitansi</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="dokumen" className="flex flex-col gap-4 pt-4">
@@ -115,7 +120,7 @@ export default async function DocumentsSearchPage({
 
           <DocumentsTable
             rows={rows}
-            isAdmin={isAdmin}
+            isAdmin={canManageDocuments}
             showProject
             emptyMessage={
               <EmptyState
@@ -127,7 +132,7 @@ export default async function DocumentsSearchPage({
           />
         </TabsContent>
 
-        {isAdmin ? (
+        {canViewReceiptArchive ? (
           <TabsContent value="kwitansi" className="pt-4">
             <ReceiptsArchive rows={receiptRows} />
           </TabsContent>

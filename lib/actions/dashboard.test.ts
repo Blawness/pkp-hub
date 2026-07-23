@@ -13,6 +13,9 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
@@ -30,6 +33,10 @@ let admin: SessionUser;
 let surveyor: SessionUser;
 let otherSurveyor: SessionUser;
 let clientUser: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
+let otherSurveyorCtx: RbacContext;
+let clientCtx: RbacContext;
 let fixtureClientId: string;
 
 beforeAll(async () => {
@@ -103,6 +110,13 @@ beforeAll(async () => {
     .values([{ name: "Dashboard Fixture Client", type: "individual" }])
     .returning();
   fixtureClientId = client.id;
+
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorCtx = await makeTestContextForUser(surveyor);
+  otherSurveyorCtx = await makeTestContextForUser(otherSurveyor);
+  clientCtx = await makeTestContextForUser(clientUser);
 
   // Known fixture, deterministic aggregates:
   //  - active (not selesai/dibatalkan): baru 10M + diproses 20M + dijadwalkan 15M = 45_000_000
@@ -184,7 +198,7 @@ afterAll(() => {
 
 describe("getAdminDashboardData", () => {
   it("computes exact total active value and total unpaid from the fixture", async () => {
-    const data = await getAdminDashboardData(admin);
+    const data = await getAdminDashboardData(adminCtx);
     // active (not selesai/dibatalkan): 10M + 20M + 15M = 45M
     expect(data.totalActiveValue).toBe(45_000_000);
     // unpaid (belum|sebagian), excluding dibatalkan: 10M + 20M + 5M = 35M
@@ -193,7 +207,7 @@ describe("getAdminDashboardData", () => {
   });
 
   it("counts projects per status", async () => {
-    const data = await getAdminDashboardData(admin);
+    const data = await getAdminDashboardData(adminCtx);
     expect(data.countsByStatus.baru).toBe(1);
     expect(data.countsByStatus.diproses).toBe(1);
     expect(data.countsByStatus.selesai).toBe(1);
@@ -204,7 +218,7 @@ describe("getAdminDashboardData", () => {
   it("totalUnpaid memotong uang yang sudah masuk, bukan menghitung nilai proyek penuh", async () => {
     // Proyek 10jt, DP 4jt sudah masuk. Piutangnya 6jt — bukan 10jt. Karena fixture
     // di atas sudah punya piutang sendiri, kita ukur SELISIH-nya: +6.000.000.
-    const before = (await getAdminDashboardData(admin)).totalUnpaid;
+    const before = (await getAdminDashboardData(adminCtx)).totalUnpaid;
 
     const [project] = await db
       .insert(projects)
@@ -227,7 +241,7 @@ describe("getAdminDashboardData", () => {
       recordedById: admin.id,
     });
 
-    const after = (await getAdminDashboardData(admin)).totalUnpaid;
+    const after = (await getAdminDashboardData(adminCtx)).totalUnpaid;
     expect(after - before).toBe(6_000_000);
   });
 
@@ -256,29 +270,29 @@ describe("getAdminDashboardData", () => {
       voidedById: admin.id,
     });
 
-    const data = await getAdminDashboardData(admin);
+    const data = await getAdminDashboardData(adminCtx);
     // Uangnya dibatalkan, jadi piutangnya utuh 3jt — bukan 0.
     expect(data.totalUnpaid).toBeGreaterThanOrEqual(3_000_000);
   });
 
   it("a surveyor CANNOT read the admin dashboard", async () => {
-    await expect(getAdminDashboardData(surveyor)).rejects.toThrow();
+    await expect(getAdminDashboardData(surveyorCtx)).rejects.toThrow();
   });
 
   it("a client CANNOT read the admin dashboard", async () => {
-    await expect(getAdminDashboardData(clientUser)).rejects.toThrow();
+    await expect(getAdminDashboardData(clientCtx)).rejects.toThrow();
   });
 });
 
 describe("getSurveyorDashboardData", () => {
   it("only returns projects assigned to the calling surveyor", async () => {
-    const data = await getSurveyorDashboardData(surveyor);
+    const data = await getSurveyorDashboardData(surveyorCtx);
     expect(data.projects).toHaveLength(3);
     expect(data.projects.every((p) => p.title.includes("assigned to surveyor"))).toBe(true);
   });
 
   it("marks baru/dijadwalkan/data_diambil as needing action", async () => {
-    const data = await getSurveyorDashboardData(surveyor);
+    const data = await getSurveyorDashboardData(surveyorCtx);
     const baru = data.projects.find((p) => p.status === "baru");
     const dijadwalkan = data.projects.find((p) => p.status === "dijadwalkan");
     const diproses = data.projects.find((p) => p.status === "diproses");
@@ -289,7 +303,7 @@ describe("getSurveyorDashboardData", () => {
   });
 
   it("CRITICAL: the surveyor's project payload contains NO finance keys at all", async () => {
-    const data = await getSurveyorDashboardData(surveyor);
+    const data = await getSurveyorDashboardData(surveyorCtx);
     expect(data.projects.length).toBeGreaterThan(0);
     for (const project of data.projects) {
       expect(Object.keys(project)).not.toContain("projectValue");
@@ -302,15 +316,15 @@ describe("getSurveyorDashboardData", () => {
   });
 
   it("an admin CANNOT read the surveyor dashboard function", async () => {
-    await expect(getSurveyorDashboardData(admin)).rejects.toThrow();
+    await expect(getSurveyorDashboardData(adminCtx)).rejects.toThrow();
   });
 
   it("a client CANNOT read the surveyor dashboard function", async () => {
-    await expect(getSurveyorDashboardData(clientUser)).rejects.toThrow();
+    await expect(getSurveyorDashboardData(clientCtx)).rejects.toThrow();
   });
 
   it("surveyor B (unassigned to the fixtures above) sees only their own project", async () => {
-    const data = await getSurveyorDashboardData(otherSurveyor);
+    const data = await getSurveyorDashboardData(otherSurveyorCtx);
     expect(data.projects).toHaveLength(1);
     expect(data.projects[0]?.title).toContain("selesai, sebagian");
   });

@@ -44,7 +44,23 @@ export const projectScopes: Record<"all" | "assigned" | "own", ScopeFn> = {
 
 export const projectResource = defineResource({
   name: "project",
-  actions: ["read", "create", "update", "assignSurveyor", "changeStatus", "updateFinance"],
+  actions: [
+    "read",
+    "create",
+    "update",
+    "assignSurveyor",
+    "changeStatus",
+    "updateFinance",
+    "readFinance",
+  ],
   table: { table: projects, id: projects.id },
   scopes: projectScopes,
+  // Kolom Keuangan Ringan hanya terlihat oleh pemegang `project.readFinance`
+  // (admin: all; client: own; surveyor: tidak sama sekali). `scopedColumns`
+  // membuangnya dari SELECT, bukan menyembunyikannya di UI.
+  fields: {
+    projectValue: "project.readFinance",
+    paymentStatus: "project.readFinance",
+    paymentNotes: "project.readFinance",
+  },
 });

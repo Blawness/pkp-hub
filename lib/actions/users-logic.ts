@@ -1,13 +1,17 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, isNull, ne } from "drizzle-orm";
-import type { Role, SessionUser } from "@/lib/auth-guards";
+import type { Role } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { accounts, clients, sessions, users } from "@/lib/db/schema";
+import { assertCan } from "@/lib/rbac/can";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
- * Server-only business logic manajemen user (admin-only), diuji langsung di
- * `users.test.ts`.
+ * Server-only business logic manajemen user, diuji langsung di
+ * `users.test.ts`. Izin ditegakkan lewat engine RBAC (`user.create/setRole/
+ * update/archive/restore` — admin-only di matrix); kalau cek dicabut, test
+ * "penegakan izin di logic" gagal.
  *
  * Dua invarian di file ini yang menjaga sistem dari terkunci selamanya:
  *
@@ -88,12 +92,16 @@ async function getUserOrThrow(userId: string): Promise<ManagedUser> {
  * tabel `account` yang memang miliknya — bukan hash bikinan sendiri, dan tidak
  * pernah disimpan dalam bentuk mentah di mana pun.
  */
-export async function createStaffUser(input: {
-  name: string;
-  email: string;
-  role: StaffRole;
-  password: string;
-}): Promise<{ id: string }> {
+export async function createStaffUser(
+  ctx: RbacContext,
+  input: {
+    name: string;
+    email: string;
+    role: StaffRole;
+    password: string;
+  },
+): Promise<{ id: string }> {
+  assertCan(ctx, "user.create");
   const email = input.email.trim().toLowerCase();
 
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
@@ -126,14 +134,18 @@ export async function createStaffUser(input: {
  * di-hash. Ini jalan bagi admin membuat akun klien tanpa mengandalkan email
  * undangan. `clients.userId` selalu diisi agar tidak jadi akun yatim.
  */
-export async function createClientUser(input: {
-  name: string;
-  email: string;
-  password: string;
-  type?: "individual" | "company";
-  phone?: string | null;
-  address?: string | null;
-}): Promise<{ id: string; clientId: string }> {
+export async function createClientUser(
+  ctx: RbacContext,
+  input: {
+    name: string;
+    email: string;
+    password: string;
+    type?: "individual" | "company";
+    phone?: string | null;
+    address?: string | null;
+  },
+): Promise<{ id: string; clientId: string }> {
+  assertCan(ctx, "user.create");
   const email = input.email.trim().toLowerCase();
 
   const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
@@ -175,11 +187,12 @@ export async function createClientUser(input: {
 
 /** Ganti role seorang user. Tidak bisa dipakai untuk membuat/mengubah client. */
 export async function setUserRole(
-  actor: SessionUser,
+  ctx: RbacContext,
   userId: string,
   role: StaffRole,
 ): Promise<void> {
-  if (actor.id === userId) {
+  assertCan(ctx, "user.setRole");
+  if (ctx.user.id === userId) {
     throw new Error("Anda tidak bisa mengubah role akun Anda sendiri.");
   }
 
@@ -206,12 +219,27 @@ export async function setUserRole(
  * admin dari halaman yang baru ia buka. Mengganti nama tidak memindahkan akses
  * siapa pun, jadi mengubah nama sendiri justru jalur yang paling sering dipakai.
  */
-export async function setUserName(userId: string, name: string): Promise<void> {
+export async function setUserName(ctx: RbacContext, userId: string, name: string): Promise<void> {
+  assertCan(ctx, "user.update");
   await getUserOrThrow(userId);
   await db
     .update(users)
     .set({ name: name.trim(), updatedAt: new Date() })
     .where(eq(users.id, userId));
+}
+
+/**
+ * Ganti nama AKUN SENDIRI (halaman profil). Izin `profile.updateOwn` dimiliki
+ * SEMUA role — beda dari `setUserName` (`user.update`, admin-only) yang bisa
+ * menyasar user lain. `userId` selalu `ctx.user.id`, tidak pernah dari input:
+ * itulah yang membuat fungsi ini tak bisa dipakai menyentuh akun orang lain.
+ */
+export async function updateOwnName(ctx: RbacContext, name: string): Promise<void> {
+  assertCan(ctx, "profile.updateOwn");
+  await db
+    .update(users)
+    .set({ name: name.trim(), updatedAt: new Date() })
+    .where(eq(users.id, ctx.user.id));
 }
 
 /**
@@ -234,7 +262,12 @@ export async function userHasCredential(userId: string): Promise<boolean> {
 }
 
 /** Setel ulang password seorang user. Sesi lamanya diputus. */
-export async function setUserPassword(userId: string, password: string): Promise<void> {
+export async function setUserPassword(
+  ctx: RbacContext,
+  userId: string,
+  password: string,
+): Promise<void> {
+  assertCan(ctx, "user.update");
   await getUserOrThrow(userId);
   const hashed = await hashPassword(password);
 
@@ -263,8 +296,9 @@ export async function setUserPassword(userId: string, password: string): Promise
 }
 
 /** Arsipkan user: aksesnya dicabut, riwayatnya utuh. */
-export async function archiveUser(actor: SessionUser, userId: string): Promise<void> {
-  if (actor.id === userId) {
+export async function archiveUser(ctx: RbacContext, userId: string): Promise<void> {
+  assertCan(ctx, "user.archive");
+  if (ctx.user.id === userId) {
     throw new Error("Anda tidak bisa mengarsipkan akun Anda sendiri.");
   }
 
@@ -290,7 +324,8 @@ export async function archiveUser(actor: SessionUser, userId: string): Promise<v
 }
 
 /** Pulihkan user yang terarsip. Ia harus set/diberi password lagi untuk masuk. */
-export async function restoreUser(userId: string): Promise<void> {
+export async function restoreUser(ctx: RbacContext, userId: string): Promise<void> {
+  assertCan(ctx, "user.restore");
   await getUserOrThrow(userId);
   await db
     .update(users)

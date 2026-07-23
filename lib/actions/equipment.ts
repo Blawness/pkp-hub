@@ -17,66 +17,71 @@ import {
   returnEquipmentInputSchema,
   updateEquipmentInputSchema,
 } from "@/lib/actions/equipment-schemas";
-import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server action inventaris alat — UNIT FISIK. Logika + guard ada di
- * `equipment-logic.ts` (diuji langsung); `adminActionClient`/`staffActionClient`
- * di sini adalah penegakan pertama yang terikat request — bukan penggantinya,
- * melainkan lapis pertamanya. `borrowEquipment`/`returnEquipment` memakai
- * `staffActionClient` karena surveyor perlu memanggilnya; sisanya admin-only.
+ * `equipment-logic.ts` (diuji langsung); `rbacActionClient` + `.metadata` di
+ * sini adalah gerbang aksi. `equipment.borrow`/`.return` juga dimiliki surveyor
+ * (scope `all` — inventaris tidak per-proyek); sisanya admin-only.
  */
 
-export const createEquipment = adminActionClient
+export const createEquipment = rbacActionClient
+  .metadata({ permission: "equipment.create" })
   .inputSchema(createEquipmentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const item = await createEquipmentForUser(ctx.user, parsedInput);
+    const item = await createEquipmentForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/equipment");
     return { success: true as const, item };
   });
 
-export const updateEquipment = adminActionClient
+export const updateEquipment = rbacActionClient
+  .metadata({ permission: "equipment.update" })
   .inputSchema(updateEquipmentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const item = await updateEquipmentForUser(ctx.user, parsedInput);
+    const item = await updateEquipmentForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/equipment");
     revalidatePath(`/dashboard/equipment/unit/${item.id}`);
     return { success: true as const, item };
   });
 
-export const archiveEquipment = adminActionClient
+export const archiveEquipment = rbacActionClient
+  .metadata({ permission: "equipment.archive" })
   .inputSchema(archiveEquipmentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const item = await archiveEquipmentForUser(ctx.user, parsedInput);
+    const item = await archiveEquipmentForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/equipment");
     revalidatePath(`/dashboard/equipment/unit/${item.id}`);
     return { success: true as const, item };
   });
 
-export const borrowEquipment = staffActionClient
+export const borrowEquipment = rbacActionClient
+  .metadata({ permission: "equipment.borrow" })
   .inputSchema(borrowEquipmentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const usage = await borrowEquipmentForUser(ctx.user, parsedInput);
+    const usage = await borrowEquipmentForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/equipment");
     revalidatePath(`/dashboard/equipment/unit/${usage.equipmentId}`);
     revalidatePath(`/dashboard/projects/${usage.projectId}`);
     return { success: true as const, usage };
   });
 
-export const returnEquipment = staffActionClient
+export const returnEquipment = rbacActionClient
+  .metadata({ permission: "equipment.return" })
   .inputSchema(returnEquipmentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const usage = await returnEquipmentForUser(ctx.user, parsedInput);
+    const usage = await returnEquipmentForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/equipment");
     revalidatePath(`/dashboard/equipment/unit/${usage.equipmentId}`);
     revalidatePath(`/dashboard/projects/${usage.projectId}`);
     return { success: true as const, usage };
   });
 
-export const correctUsage = adminActionClient
+export const correctUsage = rbacActionClient
+  .metadata({ permission: "equipment.correctUsage" })
   .inputSchema(correctUsageInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const usage = await correctUsageForUser(ctx.user, parsedInput);
+    const usage = await correctUsageForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/equipment");
     revalidatePath(`/dashboard/equipment/unit/${usage.equipmentId}`);
     revalidatePath(`/dashboard/projects/${usage.projectId}`);

@@ -10,6 +10,9 @@ import {
   buildStatusChangeEmail,
   notifyClientOfStatusChange,
 } from "@/lib/notifications/project-status";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Notifikasi status ke klien (PRD §9).
@@ -25,6 +28,7 @@ import {
  */
 
 let admin: SessionUser;
+let adminCtx: RbacContext;
 let projectWithPortalId: string;
 let clientWithPortalId: string;
 let clientNoEmailId: string;
@@ -56,6 +60,12 @@ beforeAll(async () => {
     email: "test-admin-notif@fixture.test",
     role: "admin",
   };
+
+  // Wipe `users` menghapus penugasan role (FK cascade); seed + backfill lagi
+  // sebelum membangun `ctx`.
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
 
   const [withPortal] = await db
     .insert(clients)
@@ -177,7 +187,7 @@ describe("changeProjectStatusForUser + notifikasi", () => {
     const sent: EmailMessage[] = [];
 
     await changeProjectStatusForUser(
-      admin,
+      adminCtx,
       { projectId: projectWithPortalId, toStatus: "dijadwalkan" },
       async (input) =>
         notifyClientOfStatusChange(input, async (message) => {
@@ -194,7 +204,7 @@ describe("changeProjectStatusForUser + notifikasi", () => {
     // Positive control: transisi ini memang sah, jadi kalau assertion di bawah
     // gagal itu karena notifikasinya, bukan karena transisinya ditolak.
     const updated = await changeProjectStatusForUser(
-      admin,
+      adminCtx,
       { projectId: projectWithPortalId, toStatus: "data_diambil" },
       async () => {
         throw new Error("Resend sedang down");

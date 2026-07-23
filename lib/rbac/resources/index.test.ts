@@ -1,3 +1,4 @@
+import { getTableColumns } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import {
   isPermission,
@@ -64,10 +65,19 @@ describe("registry resource", () => {
     }
   });
 
-  it("belum ada resource nyata yang memakai guards atau fields (sub-proyek 2)", () => {
+  it("setiap fields resource menggating kolom nyata dengan permission resource yang sama", () => {
     for (const resource of Object.values(RESOURCES)) {
-      expect(resource.guards, `${resource.name}.guards`).toBeUndefined();
-      expect(resource.fields, `${resource.name}.fields`).toBeUndefined();
+      if (!resource.fields) continue;
+      const columns = resource.table ? Object.keys(getTableColumns(resource.table.table)) : [];
+      for (const [column, permission] of Object.entries(resource.fields)) {
+        // Kolom yang digating harus benar-benar ada di tabel.
+        expect(columns, `${resource.name}.fields.${column}`).toContain(column);
+        // Gate harus permission milik resource yang sama (batas tipe engine).
+        expect(permission, `${resource.name}.fields.${column}`).toMatch(
+          new RegExp(`^${resource.name}\\.`),
+        );
+        expect(resource.permissions as readonly string[], permission).toContain(permission);
+      }
     }
   });
 });

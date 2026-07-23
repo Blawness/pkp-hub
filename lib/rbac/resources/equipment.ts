@@ -9,7 +9,13 @@ import { defineResource } from "../define-resource";
  */
 export const equipmentResource = defineResource({
   name: "equipment",
-  actions: ["read", "create", "update", "archive", "borrow", "return", "correctUsage"],
+  actions: ["read", "create", "update", "archive", "borrow", "return", "correctUsage", "readCost"],
   table: { table: equipment, id: equipment.id },
   scopes: { all: () => sql`true` },
+  // Harga & tanggal beli hanya untuk admin (`equipment.readCost`), dipangkas
+  // dari SELECT untuk surveyor.
+  fields: {
+    purchasePrice: "equipment.readCost",
+    purchaseDate: "equipment.readCost",
+  },
 });

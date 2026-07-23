@@ -7,6 +7,7 @@ import { GridTexture } from "@/components/brand/grid-texture";
 import { buildLinks, SIDEBAR_COOKIE } from "@/components/dashboard/nav-config";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { UserMenu } from "@/components/dashboard/user-menu";
+import { usePermissions } from "@/components/rbac/permissions-provider";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { SessionUser } from "@/lib/auth-guards";
@@ -28,7 +29,8 @@ export function DashboardSidebar({
   defaultCollapsed: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
-  const links = buildLinks(user.role);
+  const { can } = usePermissions();
+  const links = buildLinks(can);
 
   function toggle() {
     const next = !collapsed;

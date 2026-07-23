@@ -1,8 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { assertProjectAccess, requireAdmin, requireStaff, requireUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { documents, payments } from "@/lib/db/schema";
+import { can, scopeOf } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
+import { rbacFilter } from "@/lib/rbac/filter";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
 import { storage } from "@/lib/storage";
 import { parseStorageKey } from "@/lib/storage/keys";
 import { readLocalFile } from "@/lib/storage/local-driver";
@@ -18,10 +21,10 @@ import { readLocalFile } from "@/lib/storage/local-driver";
  * - `documents/<projectId>/...` — staf (admin + surveyor yang di-assign) dan,
  *   kalau `sharedWithClient`, klien pemiliknya.
  * - `receipts/<projectId>/...`  — admin dan klien pemiliknya. SURVEYOR TIDAK,
- *   meski proyeknya di-assign ke dia: kwitansi memuat nilai proyek, dan surveyor
- *   tidak boleh melihat keuangan. `assertProjectAccess` di bawah MELOLOSKAN
- *   surveyor yang di-assign, jadi penolakan surveyor harus berdiri sendiri,
- *   SEBELUM guard itu.
+ *   meski proyeknya di-assign ke dia: kwitansi memuat nilai proyek, dan
+ *   surveyor tidak punya `payment.read` sama sekali. `requireScopedRow` proyek
+ *   di bawah MELOLOSKAN surveyor yang di-assign, jadi penolakan itu harus
+ *   berdiri sendiri, SEBELUM guard proyek.
  */
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -57,10 +60,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  // Gambar alat TIDAK terikat project — modul equipment staff-only, jadi
-  // gerbangnya cukup `requireStaff` (tanpa `assertProjectAccess`).
+  const ctx = await getRbacContext();
+
+  // Gambar alat TIDAK terikat project — gerbangnya cukup `equipment.read`
+  // (admin + surveyor; klien tidak), tanpa scoping baris.
   if (parsed.kind === "equipment") {
-    await requireStaff();
+    if (!can(ctx, "equipment.read")) {
+      return NextResponse.json({ error: "Not found." }, { status: 404 });
+    }
     try {
       const buffer = await readLocalFile(key);
       return new NextResponse(new Uint8Array(buffer), {
@@ -74,33 +81,34 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
     }
   }
 
-  const user = await requireUser();
-
-  // Kwitansi memuat nilai proyek. Surveyor TIDAK boleh melihat keuangan —
-  // dan `assertProjectAccess` di bawah MELOLOSKAN surveyor yang di-assign,
+  // Kwitansi memuat nilai proyek. Surveyor tidak punya `payment.read` sama
+  // sekali — dan guard proyek di bawah MELOLOSKAN surveyor yang di-assign,
   // jadi penolakan ini harus berdiri sendiri, sebelum guard itu.
-  if (parsed.kind === "receipt" && user.role === "surveyor") {
+  if (parsed.kind === "receipt" && !can(ctx, "payment.read")) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
   try {
-    await assertProjectAccess(parsed.projectId, user);
+    await requireScopedRow(ctx, "project.read", parsed.projectId);
   } catch {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  if (parsed.kind === "document" && user.role === "client") {
+  // Pembaca ber-scope `own` (klien) hanya boleh dokumen yang SUDAH dibagikan.
+  // Scope `own` resource document sudah memuat syarat `sharedWithClient` —
+  // satu query ter-scope menggantikan cek role manual.
+  if (parsed.kind === "document" && scopeOf(ctx, "document.read") === "own") {
     const [doc] = await db
-      .select({ sharedWithClient: documents.sharedWithClient })
+      .select({ id: documents.id })
       .from(documents)
-      .where(eq(documents.fileUrl, `/api/storage/${key}`));
-    if (!doc?.sharedWithClient) {
+      .where(and(eq(documents.fileUrl, `/api/storage/${key}`), rbacFilter(ctx, "document.read")));
+    if (!doc) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
   }
 
   if (parsed.kind === "receipt") {
-    // Klien boleh mengunduh kwitansi proyeknya sendiri — `assertProjectAccess`
+    // Klien boleh mengunduh kwitansi proyeknya sendiri — guard proyek di atas
     // sudah memastikan proyek ini miliknya — TAPI bukan kwitansi yang sudah
     // dibatalkan: baris batal bukan bagian dari catatan uangnya.
     const [row] = await db
@@ -110,7 +118,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ key
     if (!row) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
-    if (user.role === "client" && row.voidedAt !== null) {
+    if (scopeOf(ctx, "payment.read") === "own" && row.voidedAt !== null) {
       return NextResponse.json({ error: "Not found." }, { status: 404 });
     }
   }
@@ -136,17 +144,25 @@ export async function PUT(request: Request, { params }: { params: Promise<{ key:
   const key = keyParts.join("/");
 
   const parsed = parseStorageKey(key);
+  const ctx = await getRbacContext();
 
-  // Gambar alat: PUT hanya admin, tanpa scoping project.
+  // Gambar alat: PUT butuh `equipment.update` (admin-only), tanpa scoping baris
+  // — izin yang sama dengan `/api/equipment/upload-init`.
   if (parsed?.kind === "equipment") {
-    await requireAdmin();
+    if (!can(ctx, "equipment.update")) {
+      return NextResponse.json({ error: "Anda tidak punya izin." }, { status: 403 });
+    }
     const contentType = request.headers.get("content-type") ?? "application/octet-stream";
     const bytes = Buffer.from(await request.arrayBuffer());
     const url = await storage.put(key, bytes, contentType);
     return NextResponse.json({ url });
   }
 
-  const user = await requireStaff();
+  // `document.upload` + scope proyek — pasangan cek yang sama dengan
+  // `/api/documents/upload-init` dan `uploadDocumentForUser`.
+  if (!can(ctx, "document.upload")) {
+    return NextResponse.json({ error: "Anda tidak punya izin." }, { status: 403 });
+  }
   // Kwitansi TIDAK PERNAH diunggah lewat HTTP — ia ditulis server-side lewat
   // `storage.put`. Menerima PUT ke `receipts/` berarti membiarkan siapa pun
   // yang berstatus staf menimpa kwitansi dengan berkas karangannya sendiri.
@@ -155,7 +171,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ key:
   }
 
   try {
-    await assertProjectAccess(parsed.projectId, user);
+    await requireScopedRow(ctx, "project.read", parsed.projectId);
   } catch {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }

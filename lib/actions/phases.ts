@@ -17,15 +17,15 @@ import {
   updatePhaseInputSchema,
   updatePhaseNoteInputSchema,
 } from "@/lib/actions/phases-schemas";
-import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server action timeline fase. Logika + guard ada di `phases-logic.ts` (diuji
- * langsung); klien di sini adalah lapis PERTAMA penegakan, bukan penggantinya.
+ * langsung); `rbacActionClient` + `.metadata` adalah lapis PERTAMA penegakan.
  *
- * `adminActionClient` untuk yang mengubah RENCANA; `staffActionClient` untuk
- * yang melaporkan PEKERJAAN (guard row-level-nya tetap di logic layer, yang
- * memastikan surveyor cuma menyentuh proyek yang boleh ia sentuh).
+ * `phase.create/update/delete/reorder` (admin-only) mengubah RENCANA;
+ * `phase.setStatus`/`.updateNote` (juga surveyor ber-akses) melaporkan
+ * PEKERJAAN. Scope row-level tetap di logic layer.
  */
 
 function revalidateProject(projectId: string) {
@@ -33,50 +33,56 @@ function revalidateProject(projectId: string) {
   revalidatePath(`/portal/projects/${projectId}`);
 }
 
-export const createPhase = adminActionClient
+export const createPhase = rbacActionClient
+  .metadata({ permission: "phase.create" })
   .inputSchema(createPhaseInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const phase = await createPhaseForUser(ctx.user, parsedInput);
+    const phase = await createPhaseForUser(ctx.rbac, parsedInput);
     revalidateProject(phase.projectId);
     return { success: true as const, phase };
   });
 
-export const updatePhase = adminActionClient
+export const updatePhase = rbacActionClient
+  .metadata({ permission: "phase.update" })
   .inputSchema(updatePhaseInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const phase = await updatePhaseForUser(ctx.user, parsedInput);
+    const phase = await updatePhaseForUser(ctx.rbac, parsedInput);
     revalidateProject(phase.projectId);
     return { success: true as const, phase };
   });
 
-export const deletePhase = adminActionClient
+export const deletePhase = rbacActionClient
+  .metadata({ permission: "phase.delete" })
   .inputSchema(deletePhaseInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const { projectId } = await deletePhaseForUser(ctx.user, parsedInput);
+    const { projectId } = await deletePhaseForUser(ctx.rbac, parsedInput);
     revalidateProject(projectId);
     return { success: true as const };
   });
 
-export const reorderPhases = adminActionClient
+export const reorderPhases = rbacActionClient
+  .metadata({ permission: "phase.reorder" })
   .inputSchema(reorderPhasesInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const phases = await reorderPhasesForUser(ctx.user, parsedInput);
+    const phases = await reorderPhasesForUser(ctx.rbac, parsedInput);
     revalidateProject(parsedInput.projectId);
     return { success: true as const, phases };
   });
 
-export const setPhaseStatus = staffActionClient
+export const setPhaseStatus = rbacActionClient
+  .metadata({ permission: "phase.setStatus" })
   .inputSchema(setPhaseStatusInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const phase = await setPhaseStatusForUser(ctx.user, parsedInput);
+    const phase = await setPhaseStatusForUser(ctx.rbac, parsedInput);
     revalidateProject(phase.projectId);
     return { success: true as const, phase };
   });
 
-export const updatePhaseNote = staffActionClient
+export const updatePhaseNote = rbacActionClient
+  .metadata({ permission: "phase.updateNote" })
   .inputSchema(updatePhaseNoteInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const phase = await updatePhaseNoteForUser(ctx.user, parsedInput);
+    const phase = await updatePhaseNoteForUser(ctx.rbac, parsedInput);
     revalidateProject(phase.projectId);
     return { success: true as const, phase };
   });

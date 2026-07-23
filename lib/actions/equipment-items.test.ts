@@ -22,10 +22,16 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 let admin: SessionUser;
 let surveyor: SessionUser;
 let clientUser: SessionUser;
+let adminCtx: RbacContext;
+let surveyorCtx: RbacContext;
+let clientUserCtx: RbacContext;
 let projectId: string;
 
 beforeAll(async () => {
@@ -70,6 +76,13 @@ beforeAll(async () => {
     .values([{ name: "Klien Item", type: "individual", userId: clientUserId }])
     .returning();
 
+  // Seed + backfill role SETELAH clients dibuat (ctx.clientId dari clients.userId).
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  surveyorCtx = await makeTestContextForUser(surveyor);
+  clientUserCtx = await makeTestContextForUser(clientUser);
+
   const [project] = await db
     .insert(projects)
     .values({
@@ -92,25 +105,29 @@ afterAll(() => {
 describe("batas akses", () => {
   it("surveyor tidak bisa menambah jenis alat", async () => {
     await expect(
-      createEquipmentItemForUser(surveyor, { name: "Curang", category: "drone" }),
-    ).rejects.toThrow(/admin/i);
+      createEquipmentItemForUser(surveyorCtx, { name: "Curang", category: "drone" }),
+    ).rejects.toThrow();
   });
 
   it("surveyor tidak bisa mengubah jenis alat", async () => {
-    const item = await createEquipmentItemForUser(admin, { name: "Item-1", category: "drone" });
+    const item = await createEquipmentItemForUser(adminCtx, { name: "Item-1", category: "drone" });
     await expect(
-      updateEquipmentItemForUser(surveyor, { itemId: item.id, name: "Item-1", category: "drone" }),
-    ).rejects.toThrow(/admin/i);
+      updateEquipmentItemForUser(surveyorCtx, {
+        itemId: item.id,
+        name: "Item-1",
+        category: "drone",
+      }),
+    ).rejects.toThrow();
   });
 
   it("klien tidak bisa melihat daftar jenis alat", async () => {
-    await expect(listEquipmentItemsForUser(clientUser)).rejects.toThrow();
+    await expect(listEquipmentItemsForUser(clientUserCtx)).rejects.toThrow();
   });
 });
 
 describe("gambar jenis alat", () => {
   it("menyimpan URL gambar saat create", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Item-Gambar",
       category: "drone",
       image: "/api/storage/equipment/aaa.webp",
@@ -119,13 +136,13 @@ describe("gambar jenis alat", () => {
   });
 
   it("mengganti gambar saat update (dan tidak melempar walau objek lama tak ada)", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Item-GantiGambar",
       category: "drone",
       image: "/api/storage/equipment/lama.webp",
     });
 
-    const updated = await updateEquipmentItemForUser(admin, {
+    const updated = await updateEquipmentItemForUser(adminCtx, {
       itemId: item.id,
       name: "Item-GantiGambar",
       category: "drone",
@@ -135,13 +152,13 @@ describe("gambar jenis alat", () => {
   });
 
   it("menghapus gambar saat image di-set null", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Item-HapusGambar",
       category: "drone",
       image: "/api/storage/equipment/ada.webp",
     });
 
-    const updated = await updateEquipmentItemForUser(admin, {
+    const updated = await updateEquipmentItemForUser(adminCtx, {
       itemId: item.id,
       name: "Item-HapusGambar",
       category: "drone",
@@ -153,43 +170,43 @@ describe("gambar jenis alat", () => {
 
 describe("listEquipmentItemsForUser", () => {
   it("item tanpa unit tampil dengan summary nol", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Item-Kosong",
       category: "laptop",
     });
-    const rows = await listEquipmentItemsForUser(admin);
+    const rows = await listEquipmentItemsForUser(adminCtx);
     const row = rows.find((r) => r.item.id === item.id);
     expect(row).toBeDefined();
     expect(row?.summary).toEqual({ total: 0, tersedia: 0, terpinjam: 0, perawatan: 0, rusak: 0 });
   });
 
   it("mengelompokkan unit per item dan menghitung agregat tersedia/dipinjam dengan benar", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Item-Grup",
       category: "gps_rtk",
     });
-    const unit1 = await createEquipmentForUser(admin, {
+    const unit1 = await createEquipmentForUser(adminCtx, {
       itemId: item.id,
       code: "GRP-01",
       condition: "tersedia",
     });
-    const unit2 = await createEquipmentForUser(admin, {
+    const unit2 = await createEquipmentForUser(adminCtx, {
       itemId: item.id,
       code: "GRP-02",
       condition: "tersedia",
     });
-    await createEquipmentForUser(admin, {
+    await createEquipmentForUser(adminCtx, {
       itemId: item.id,
       code: "GRP-03",
       condition: "perawatan",
     });
-    await borrowEquipmentForUser(admin, {
+    await borrowEquipmentForUser(adminCtx, {
       equipmentId: unit1.id,
       projectId,
       startedAt: new Date(),
     });
 
-    const rows = await listEquipmentItemsForUser(admin);
+    const rows = await listEquipmentItemsForUser(adminCtx);
     const row = rows.find((r) => r.item.id === item.id);
     expect(row?.units).toHaveLength(3);
     expect(row?.units.map((u) => u.id)).toContain(unit2.id);
@@ -199,71 +216,77 @@ describe("listEquipmentItemsForUser", () => {
 
 describe("archiveEquipmentItemForUser", () => {
   it("surveyor tidak bisa mengarsipkan jenis alat", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Arsip-Surveyor",
       category: "drone",
     });
-    await expect(archiveEquipmentItemForUser(surveyor, { itemId: item.id })).rejects.toThrow(
-      /admin/i,
-    );
+    await expect(archiveEquipmentItemForUser(surveyorCtx, { itemId: item.id })).rejects.toThrow();
   });
 
   it("admin bisa mengarsipkan jenis alat yang tidak punya unit", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Arsip-Kosong",
       category: "laptop",
     });
 
-    const archived = await archiveEquipmentItemForUser(admin, { itemId: item.id });
+    const archived = await archiveEquipmentItemForUser(adminCtx, { itemId: item.id });
     expect(archived.archivedAt).toBeInstanceOf(Date);
   });
 
   it("jenis alat terarsip hilang dari daftar", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Arsip-Hilang",
       category: "laptop",
     });
-    await archiveEquipmentItemForUser(admin, { itemId: item.id });
+    await archiveEquipmentItemForUser(adminCtx, { itemId: item.id });
 
-    const rows = await listEquipmentItemsForUser(admin);
+    const rows = await listEquipmentItemsForUser(adminCtx);
     expect(rows.find((r) => r.item.id === item.id)).toBeUndefined();
   });
 
   it("menolak mengarsipkan jenis alat yang masih punya unit aktif, dan menyebut jumlahnya", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Arsip-MasihAdaUnit",
       category: "gps_rtk",
     });
-    await createEquipmentForUser(admin, { itemId: item.id, code: "ARS-01", condition: "tersedia" });
-    await createEquipmentForUser(admin, { itemId: item.id, code: "ARS-02", condition: "tersedia" });
+    await createEquipmentForUser(adminCtx, {
+      itemId: item.id,
+      code: "ARS-01",
+      condition: "tersedia",
+    });
+    await createEquipmentForUser(adminCtx, {
+      itemId: item.id,
+      code: "ARS-02",
+      condition: "tersedia",
+    });
 
-    await expect(archiveEquipmentItemForUser(admin, { itemId: item.id })).rejects.toThrow(
+    await expect(archiveEquipmentItemForUser(adminCtx, { itemId: item.id })).rejects.toThrow(
       /masih ada 2 unit/i,
     );
 
     // Ditolak berarti TIDAK tersentuh — jenisnya harus masih ada di daftar.
-    const rows = await listEquipmentItemsForUser(admin);
+    const rows = await listEquipmentItemsForUser(adminCtx);
     expect(rows.find((r) => r.item.id === item.id)).toBeDefined();
   });
 
   it("unit yang sudah diarsipkan tidak lagi menghalangi — jenisnya bisa diarsipkan", async () => {
-    const item = await createEquipmentItemForUser(admin, {
+    const item = await createEquipmentItemForUser(adminCtx, {
       name: "Arsip-UnitSudahDiarsip",
       category: "gps_rtk",
     });
-    const unit = await createEquipmentForUser(admin, {
+    const unit = await createEquipmentForUser(adminCtx, {
       itemId: item.id,
       code: "ARS-03",
       condition: "tersedia",
     });
-    await archiveEquipmentForUser(admin, { equipmentId: unit.id });
+    await archiveEquipmentForUser(adminCtx, { equipmentId: unit.id });
 
-    const archived = await archiveEquipmentItemForUser(admin, { itemId: item.id });
+    const archived = await archiveEquipmentItemForUser(adminCtx, { itemId: item.id });
     expect(archived.archivedAt).toBeInstanceOf(Date);
   });
 
   it("melempar kalau jenis alatnya tidak ada", async () => {
-    await expect(archiveEquipmentItemForUser(admin, { itemId: randomUUID() })).rejects.toThrow(
+    await expect(archiveEquipmentItemForUser(adminCtx, { itemId: randomUUID() })).rejects.toThrow(
       /tidak ditemukan/i,
     );
   });

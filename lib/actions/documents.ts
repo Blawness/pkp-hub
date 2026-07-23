@@ -11,7 +11,7 @@ import {
   toggleDocumentShareInputSchema,
   uploadDocumentInputSchema,
 } from "@/lib/actions/documents-schemas";
-import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server actions for the document archive (PRD §3 Feature 4). Business
@@ -26,30 +26,33 @@ import { adminActionClient, staffActionClient } from "@/lib/actions/safe-action"
  * after the bytes have already landed.
  */
 
-export const uploadDocument = staffActionClient
+export const uploadDocument = rbacActionClient
+  .metadata({ permission: "document.upload" })
   .inputSchema(uploadDocumentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const document = await uploadDocumentForUser(ctx.user, parsedInput);
+    const document = await uploadDocumentForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${parsedInput.projectId}`);
     revalidatePath("/dashboard/documents");
     return { success: true as const, document };
   });
 
 /** Admin-only: set/unset `sharedWithClient`. */
-export const toggleDocumentShare = adminActionClient
+export const toggleDocumentShare = rbacActionClient
+  .metadata({ permission: "document.share" })
   .inputSchema(toggleDocumentShareInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const document = await toggleDocumentShareForUser(ctx.user, parsedInput);
+    const document = await toggleDocumentShareForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${document.projectId}`);
     revalidatePath("/dashboard/documents");
     return { success: true as const, document };
   });
 
 /** Admin-only: deletes the metadata row AND the object in storage. */
-export const deleteDocument = adminActionClient
+export const deleteDocument = rbacActionClient
+  .metadata({ permission: "document.delete" })
   .inputSchema(deleteDocumentInputSchema)
   .action(async ({ parsedInput, ctx }) => {
-    const document = await deleteDocumentForUser(ctx.user, parsedInput);
+    const document = await deleteDocumentForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${document.projectId}`);
     revalidatePath("/dashboard/documents");
     return { success: true as const };

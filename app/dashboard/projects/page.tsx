@@ -9,9 +9,11 @@ import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
-import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { clients, users } from "@/lib/db/schema";
+import { clients, projects, users } from "@/lib/db/schema";
+import { can, scopeOf } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
+import { rbacFilter } from "@/lib/rbac/filter";
 
 export const metadata = { title: "Proyek" };
 
@@ -26,13 +28,25 @@ export default async function ProjectsPage({
   }>;
 }) {
   const filters = await searchParams;
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
 
-  // Mandatory scoping rule: `listProjectsForUser` is the only entry point
-  // for reading `projects` here — surveyors get only their assigned rows
-  // back already, and filters below are then applied server-side (RSC) on
-  // top of that pre-scoped set, never widening it.
-  const scopedProjects = await listProjectsForUser(user);
+  // Mandatory scoping rule: `rbacFilter(ctx, "project.read")` is the only
+  // entry point for reading `projects` here — surveyors get only their
+  // assigned rows back already (scope `assigned`), and filters below are then
+  // applied server-side (RSC) on top of that pre-scoped set, never widening
+  // it. Kolom finance sengaja TIDAK di-SELECT di daftar ini.
+  const scopedProjects = await db
+    .select({
+      id: projects.id,
+      title: projects.title,
+      status: projects.status,
+      surveyType: projects.surveyType,
+      clientId: projects.clientId,
+      assignedSurveyorId: projects.assignedSurveyorId,
+      orderDate: projects.orderDate,
+    })
+    .from(projects)
+    .where(rbacFilter(ctx, "project.read"));
   const filtered = scopedProjects.filter((p) => {
     if (filters.status && p.status !== filters.status) return false;
     if (filters.clientId && p.clientId !== filters.clientId) return false;
@@ -65,10 +79,12 @@ export default async function ProjectsPage({
       <PageHeader
         title="Proyek"
         description={
-          user.role === "surveyor" ? "Proyek yang ditugaskan kepada Anda." : "Semua proyek studio."
+          scopeOf(ctx, "project.read") === "assigned"
+            ? "Proyek yang ditugaskan kepada Anda."
+            : "Semua proyek studio."
         }
         action={
-          user.role === "admin" ? (
+          can(ctx, "project.create") ? (
             <ProjectFormDialog clients={activeClients} surveyors={surveyorRows} />
           ) : undefined
         }
@@ -97,12 +113,12 @@ export default async function ProjectsPage({
             description={
               filters.status || filters.clientId || filters.surveyorId || filters.surveyType
                 ? "Coba ubah atau hapus filter yang aktif."
-                : user.role === "admin"
+                : can(ctx, "project.create")
                   ? "Buat proyek pertama untuk mulai melacak pekerjaan survey."
                   : "Belum ada proyek yang ditugaskan kepada Anda."
             }
             action={
-              user.role === "admin" ? (
+              can(ctx, "project.create") ? (
                 <ProjectFormDialog
                   clients={activeClients}
                   surveyors={surveyorRows}

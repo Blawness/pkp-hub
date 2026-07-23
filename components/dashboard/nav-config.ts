@@ -7,7 +7,7 @@ import {
   UsersIcon,
   WrenchIcon,
 } from "lucide-react";
-import type { Role } from "@/lib/auth-guards";
+import type { Permission } from "@/lib/rbac/resources";
 
 /**
  * Nama cookie penyimpan kondisi ciut sidebar.
@@ -27,36 +27,63 @@ export type NavLink = {
   href: string;
   label: string;
   icon: LucideIcon;
+  /** Izin yang mensyaratkan tautan ini tampil; tanpa izin = selalu tampil. */
+  permission?: Permission;
 };
+
+/** Predikat izin — di klien datang dari `usePermissions().can`. */
+export type CanFn = (permission: Permission) => boolean;
 
 /**
  * Sumber tunggal navigasi staf, dipakai bersama oleh sidebar (desktop), laci
  * mobile, dan breadcrumb topbar — supaya ketiganya tidak bisa saling melenceng.
  *
- * Aturan role di sini adalah cermin UI dari batas yang sebenarnya: "Klien"
- * disembunyikan dari surveyor, tapi yang benar-benar menjaga adalah guard di
- * server (`requireAdmin` pada route klien). Menyembunyikan tautan bukan
- * pengamanan; ini hanya supaya surveyor tidak ditawari pintu yang terkunci.
+ * Tiap entri disaring `permission`-nya, bukan role: cermin UI dari batas yang
+ * sebenarnya. Yang benar-benar menjaga adalah server (`rbacActionClient`,
+ * `rbacFilter`). Menyembunyikan tautan bukan pengamanan; ini hanya supaya
+ * surveyor tidak ditawari pintu yang terkunci.
  */
-export function buildLinks(role: Role): NavLink[] {
+export function buildLinks(can: CanFn): NavLink[] {
   const links: NavLink[] = [
     { segment: null, href: "/dashboard", label: "Dashboard", icon: LayoutDashboardIcon },
-    { segment: "projects", href: "/dashboard/projects", label: "Proyek", icon: FolderKanbanIcon },
-    { segment: "documents", href: "/dashboard/documents", label: "Dokumen", icon: FileTextIcon },
-    { segment: "equipment", href: "/dashboard/equipment", label: "Inventaris", icon: WrenchIcon },
-  ];
-
-  if (role === "admin") {
-    links.push({ segment: "clients", href: "/dashboard/clients", label: "Klien", icon: UsersIcon });
-    links.push({
+    {
+      segment: "projects",
+      href: "/dashboard/projects",
+      label: "Proyek",
+      icon: FolderKanbanIcon,
+      permission: "project.read",
+    },
+    {
+      segment: "documents",
+      href: "/dashboard/documents",
+      label: "Dokumen",
+      icon: FileTextIcon,
+      permission: "document.read",
+    },
+    {
+      segment: "equipment",
+      href: "/dashboard/equipment",
+      label: "Inventaris",
+      icon: WrenchIcon,
+      permission: "equipment.read",
+    },
+    {
+      segment: "clients",
+      href: "/dashboard/clients",
+      label: "Klien",
+      icon: UsersIcon,
+      permission: "client.read",
+    },
+    {
       segment: "settings",
       href: "/dashboard/settings/users",
       label: "Pengaturan",
       icon: SettingsIcon,
-    });
-  }
+      permission: "user.read",
+    },
+  ];
 
-  return links;
+  return links.filter((link) => !link.permission || can(link.permission));
 }
 
 /** Segmen aksi yang punya nama sendiri; sisanya dianggap id. */
@@ -93,13 +120,13 @@ export type Crumb = { key: string; label: string; href?: string };
  * Client Component untuk membaca segmen — jadi id dipetakan ke "Detail", dan
  * judul asli tetap tampil sebagai <h1> di halamannya sendiri.
  */
-export function buildCrumbs(segments: string[], user: { role: Role }): Crumb[] {
+export function buildCrumbs(segments: string[], can: CanFn): Crumb[] {
   const crumbs: Crumb[] = [{ key: "/dashboard", label: "Dashboard", href: "/dashboard" }];
   if (segments.length === 0) return crumbs;
 
   const [section, ...rest] = segments;
   const sectionPath = `/dashboard/${section}`;
-  const link = buildLinks(user.role).find((l) => l.segment === section);
+  const link = buildLinks(can).find((l) => l.segment === section);
   crumbs.push({
     key: sectionPath,
     // `profile` sengaja bukan item nav (ia dijangkau lewat menu pengguna), jadi

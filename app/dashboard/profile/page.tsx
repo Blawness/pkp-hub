@@ -7,9 +7,9 @@ export const metadata = { title: "Profil Saya" };
 
 /**
  * Profil staf. Sengaja TIDAK di bawah /dashboard/settings — layout di sana
- * `requireAdmin()`, yang akan menolak surveyor dari halaman profilnya sendiri.
+ * digerbangi `user.read` (admin-only), yang akan menolak surveyor dari halaman profilnya sendiri.
  *
- * Guard-nya sudah dipasang layout /dashboard (`requireStaff`); `requireUser` di
+ * Gerbang areanya sudah dipasang layout /dashboard; `requireUser` di
  * sini hanya untuk mengambil user-nya.
  */
 export default async function DashboardProfilePage() {

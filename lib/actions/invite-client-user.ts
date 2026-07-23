@@ -3,7 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
-import { adminActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
@@ -20,7 +20,8 @@ const inviteClientUserSchema = z.object({
  * `sendResetPassword` logs the invite URL to the server console instead of
  * emailing it — the invite still succeeds, it never crashes or no-ops.
  */
-export const inviteClientUser = adminActionClient
+export const inviteClientUser = rbacActionClient
+  .metadata({ permission: "user.create" })
   .inputSchema(inviteClientUserSchema)
   .action(async ({ parsedInput }) => {
     const [client] = await db.select().from(clients).where(eq(clients.id, parsedInput.clientId));

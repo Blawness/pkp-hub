@@ -4,7 +4,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listPortalPhases, listPortalProjects } from "@/lib/actions/portal-logic";
 import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import {
   clients,
@@ -15,21 +14,29 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
+import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
+import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import type { RbacContext } from "@/lib/rbac/types";
 
 /**
  * Runs against the real (Neon) dev database, same convention as
  * `documents.test.ts` / `auth-guards.test.ts`. Exercises the phase-6/7
  * brief's REQUIRED tests for the client portal:
- *  - a client CANNOT read another client's project (assertProjectAccess
+ *  - a client CANNOT read another client's project (requireScopedRow
  *    rejects), and the portal project list never includes it either
  *  - the portal document query returns ONLY documents with
  *    `sharedWithClient = true` — an internal (unshared) document seeded on
  *    the same project must never appear
  */
 
+let admin: SessionUser;
 let clientUserA: SessionUser;
 let clientUserB: SessionUser;
 let surveyor: SessionUser;
+let adminCtx: RbacContext;
+let clientUserACtx: RbacContext;
+let clientUserBCtx: RbacContext;
 let projectA: string;
 let projectB: string;
 
@@ -74,6 +81,12 @@ beforeAll(async () => {
     },
   ]);
 
+  admin = {
+    id: adminId,
+    name: "Portal Test Admin",
+    email: "test-admin-portal@fixture.test",
+    role: "admin",
+  };
   clientUserA = {
     id: clientUserAId,
     name: "Portal Test Client A",
@@ -100,6 +113,14 @@ beforeAll(async () => {
       { name: "Portal Fixture Client B", type: "individual", userId: clientUserBId },
     ])
     .returning();
+
+  // Seed + backfill role SETELAH clients dibuat: `ctx.clientId` (scope `own`)
+  // diturunkan dari `clients.userId`, jadi baris client harus sudah ada.
+  await seedSystemRoles();
+  await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
+  clientUserACtx = await makeTestContextForUser(clientUserA);
+  clientUserBCtx = await makeTestContextForUser(clientUserB);
 
   const [pA, pB] = await db
     .insert(projects)
@@ -140,34 +161,30 @@ afterAll(() => {
 });
 
 describe("client cross-tenant access", () => {
-  it("client A CANNOT access client B's project via assertProjectAccess", async () => {
-    await expect(assertProjectAccess(projectB, clientUserA)).rejects.toThrow();
+  it("client A CANNOT access client B's project via requireScopedRow", async () => {
+    await expect(requireScopedRow(clientUserACtx, "project.read", projectB)).rejects.toThrow();
   });
 
   it("client A's portal project list contains only their own project", async () => {
-    const rows = await listPortalProjects(clientUserA);
+    const rows = await listPortalProjects(clientUserACtx);
     expect(rows.map((p) => p.id)).toEqual([projectA]);
   });
 
   it("client B's portal project list contains only their own project", async () => {
-    const rows = await listPortalProjects(clientUserB);
+    const rows = await listPortalProjects(clientUserBCtx);
     expect(rows.map((p) => p.id)).toEqual([projectB]);
   });
 
   it("a non-client role is rejected by listPortalProjects", async () => {
-    const admin: SessionUser = {
-      id: randomUUID(),
-      name: "x",
-      email: "x@fixture.test",
-      role: "admin",
-    };
-    await expect(listPortalProjects(admin)).rejects.toThrow();
+    // Admin memegang `project.read:all` — bukan `own` — jadi tampilan portal
+    // menolaknya, sama seperti cek role lama.
+    await expect(listPortalProjects(adminCtx)).rejects.toThrow();
   });
 });
 
 describe("listSharedDocumentsForProject: shared-only filter", () => {
   it("CRITICAL: returns ONLY the document with sharedWithClient=true; the internal document is absent", async () => {
-    const rows = await listSharedDocumentsForProject(clientUserA, projectA);
+    const rows = await listSharedDocumentsForProject(clientUserACtx, projectA);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.name).toBe("shared-report.pdf");
     expect(rows.some((r) => r.name === "internal-only.pdf")).toBe(false);
@@ -175,7 +192,7 @@ describe("listSharedDocumentsForProject: shared-only filter", () => {
   });
 
   it("client B cannot list client A's project documents at all", async () => {
-    await expect(listSharedDocumentsForProject(clientUserB, projectA)).rejects.toThrow();
+    await expect(listSharedDocumentsForProject(clientUserBCtx, projectA)).rejects.toThrow();
   });
 });
 
@@ -190,7 +207,7 @@ describe("listPortalPhases: pemangkasan field internal", () => {
       assignedSurveyorId: surveyor.id,
     });
 
-    const rows = await listPortalPhases(clientUserA, projectA);
+    const rows = await listPortalPhases(clientUserACtx, projectA);
 
     expect(rows).toHaveLength(1);
     expect(rows[0].name).toBe("Olah data");
@@ -202,6 +219,6 @@ describe("listPortalPhases: pemangkasan field internal", () => {
   });
 
   it("klien tidak bisa membaca fase proyek klien lain", async () => {
-    await expect(listPortalPhases(clientUserB, projectA)).rejects.toThrow();
+    await expect(listPortalPhases(clientUserBCtx, projectA)).rejects.toThrow();
   });
 });

@@ -1,7 +1,7 @@
 import { type EquipmentListItem, listEquipmentForUser } from "@/lib/actions/equipment-logic";
-import type { SessionUser } from "@/lib/auth-guards";
 import type { Column, ReportDefinition } from "@/lib/export/types";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
+import { can } from "@/lib/rbac/can";
 
 /**
  * Satu baris per UNIT FISIK (bukan per jenis) — bentuk yang langsung bisa
@@ -16,8 +16,11 @@ import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
 export const equipmentReport: ReportDefinition<EquipmentListItem> = {
   title: "Laporan Inventaris Alat",
   filename: "inventaris-alat",
+  // Boleh diekspor oleh siapa pun yang boleh membaca inventaris (admin +
+  // surveyor). Harga beli tetap dipangkas untuk surveyor lewat `columns`.
+  permission: "equipment.read",
 
-  columns: (user: SessionUser): Column<EquipmentListItem>[] => {
+  columns: (ctx): Column<EquipmentListItem>[] => {
     const base: Column<EquipmentListItem>[] = [
       { header: "Kode", get: (u) => u.code, width: 90, format: "text" },
       { header: "Jenis", get: (u) => u.itemName, width: 150, format: "text" },
@@ -51,7 +54,7 @@ export const equipmentReport: ReportDefinition<EquipmentListItem> = {
     ];
 
     // ADMIN-ONLY: kolom harga beli tidak pernah ada untuk surveyor.
-    if (user.role === "admin") {
+    if (can(ctx, "equipment.readCost")) {
       base.push({
         header: "Harga beli",
         get: (u) => ("purchasePrice" in u ? u.purchasePrice : null),
@@ -63,11 +66,11 @@ export const equipmentReport: ReportDefinition<EquipmentListItem> = {
     return base;
   },
 
-  fetch: async (user: SessionUser, params: URLSearchParams) => {
+  fetch: async (ctx, params: URLSearchParams) => {
     const category = params.get("category") ?? "";
     const status = params.get("status") ?? "";
 
-    const all = await listEquipmentForUser(user);
+    const all = await listEquipmentForUser(ctx);
 
     // Filter SAMA persis dengan app/dashboard/equipment/page.tsx.
     const rows = all.filter((u) => {

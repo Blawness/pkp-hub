@@ -12,10 +12,12 @@ import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
 import { getPortalProgress, listPortalPhases } from "@/lib/actions/portal-logic";
 import { getStatusLogsForProject } from "@/lib/actions/projects-logic";
-import { assertProjectAccess, requireClient } from "@/lib/auth-guards";
+import type { projects } from "@/lib/db/schema";
 import { formatArea } from "@/lib/geo/area";
 import { surveyTypeLabel } from "@/lib/labels";
 import { todayString } from "@/lib/phases/derive";
+import { getRbacContext } from "@/lib/rbac/context";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
 import { downloadUrlFor } from "@/lib/storage";
 
 /**
@@ -23,17 +25,17 @@ import { downloadUrlFor } from "@/lib/storage";
  * READ-ONLY map, documents where `sharedWithClient = true` ONLY, computed
  * area, and project value + payment status (also read-only — no form here).
  *
- * `assertProjectAccess` is called directly (not through a translated
- * wrapper) so a client requesting another tenant's project id gets a real
- * `notFound()` — same pattern as the staff project detail page. The two
+ * `requireScopedRow` is called directly (not through a translated wrapper)
+ * so a client requesting another tenant's project id gets a real
+ * `notFound()` — same pattern as the staff project detail page. The
  * helpers below independently re-verify access (defense in depth) and
  * `listSharedDocumentsForProject` additionally enforces the
  * shared-documents-only filter unconditionally.
  */
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const user = await requireClient();
-  const project = await assertProjectAccess(id, user);
+  const ctx = await getRbacContext();
+  const project = (await requireScopedRow(ctx, "project.read", id)) as typeof projects.$inferSelect;
   return { title: project.title };
 }
 
@@ -43,16 +45,18 @@ export default async function PortalProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const user = await requireClient();
+  const ctx = await getRbacContext();
 
-  const project = await assertProjectAccess(id, user);
+  // `requireScopedRow` memakai aturan scope yang SAMA dengan daftar portal —
+  // proyek klien lain berujung `notFound()` asli, bukan 500 terjemahan.
+  const project = (await requireScopedRow(ctx, "project.read", id)) as typeof projects.$inferSelect;
   const statusLogs = await getStatusLogsForProject(project.id);
-  const phases = await listPortalPhases(user, project.id);
-  const phaseProgress = await getPortalProgress(user, project.id);
-  const mapLayerRows = await listMapLayersForProject(user, project.id);
-  const documentRows = await listSharedDocumentsForProject(user, project.id);
-  const paymentRows = await listPaymentsForProject(user, project.id);
-  const paymentSummary = await getPaymentSummary(user, project.id);
+  const phases = await listPortalPhases(ctx, project.id);
+  const phaseProgress = await getPortalProgress(ctx, project.id);
+  const mapLayerRows = await listMapLayersForProject(ctx, project.id);
+  const documentRows = await listSharedDocumentsForProject(ctx, project.id);
+  const paymentRows = await listPaymentsForProject(ctx, project.id);
+  const paymentSummary = await getPaymentSummary(ctx, project.id);
   const paymentTableRows = await Promise.all(
     paymentRows.map(async (p) => ({
       id: p.id,

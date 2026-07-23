@@ -4,7 +4,7 @@ import { z } from "zod";
  * Shared zod schemas for client CRUD. Not a "use server" module — plain
  * schema/type definitions consumed by both `clients-logic.ts` (server-only
  * business logic, directly unit-testable) and `clients.ts` (the "use
- * server" action wrappers built on `adminActionClient`).
+ * server" action wrappers built on `rbacActionClient`).
  */
 export const clientInputSchema = z.object({
   name: z.string().trim().min(1, "Nama wajib diisi."),

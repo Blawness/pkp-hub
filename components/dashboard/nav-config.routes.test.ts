@@ -56,7 +56,7 @@ describe("breadcrumb vs route nyata", () => {
   )("%s: semua remah yang bisa diklik menuju halaman yang ada", (_label, route) => {
     // Id asli tidak penting di sini; yang diuji adalah bentuk path-nya.
     const segments = route.map((seg) => (seg.startsWith("[") ? "sample-id" : seg));
-    const clickable = buildCrumbs(segments, { role: "admin" }).filter((c) => c.href);
+    const clickable = buildCrumbs(segments, () => true).filter((c) => c.href);
 
     for (const crumb of clickable) {
       expect(hasPage(crumb.href as string), `remah "${crumb.label}" → ${crumb.href}`).toBe(true);

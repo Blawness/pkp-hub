@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { adminActionClient } from "@/lib/actions/safe-action";
+import { rbacActionClient } from "@/lib/actions/safe-action";
 import {
   archiveUser,
   createClientUser,
@@ -21,8 +21,9 @@ import {
 } from "@/lib/actions/users-schemas";
 
 /**
- * Server actions manajemen user. Semuanya lewat `adminActionClient` — surveyor
- * dan klien ditolak di sini, sebelum satu baris logic pun berjalan.
+ * Server actions manajemen user. Semuanya lewat `rbacActionClient` dengan
+ * permission `user.*` — surveyor dan klien ditolak di sini, sebelum satu
+ * baris logic pun berjalan.
  *
  * Aturan siapa-boleh-apa (admin terakhir, tidak boleh menyentuh diri sendiri)
  * TIDAK tinggal di sini melainkan di `users-logic.ts`, supaya bisa diuji tanpa
@@ -32,35 +33,39 @@ import {
 
 const USERS_PATH = "/dashboard/settings/users";
 
-export const createStaffUserAction = adminActionClient
+export const createStaffUserAction = rbacActionClient
+  .metadata({ permission: "user.create" })
   .inputSchema(createStaffUserSchema)
-  .action(async ({ parsedInput }) => {
-    const { id } = await createStaffUser(parsedInput);
+  .action(async ({ parsedInput, ctx }) => {
+    const { id } = await createStaffUser(ctx.rbac, parsedInput);
     revalidatePath(USERS_PATH);
     return { success: true as const, id };
   });
 
-export const createClientUserAction = adminActionClient
+export const createClientUserAction = rbacActionClient
+  .metadata({ permission: "user.create" })
   .inputSchema(createClientUserSchema)
-  .action(async ({ parsedInput }) => {
-    const { id, clientId } = await createClientUser(parsedInput);
+  .action(async ({ parsedInput, ctx }) => {
+    const { id, clientId } = await createClientUser(ctx.rbac, parsedInput);
     revalidatePath(USERS_PATH);
     revalidatePath("/dashboard/clients");
     return { success: true as const, id, clientId };
   });
 
-export const setUserRoleAction = adminActionClient
+export const setUserRoleAction = rbacActionClient
+  .metadata({ permission: "user.setRole" })
   .inputSchema(setUserRoleSchema)
   .action(async ({ parsedInput, ctx }) => {
-    await setUserRole(ctx.user, parsedInput.userId, parsedInput.role);
+    await setUserRole(ctx.rbac, parsedInput.userId, parsedInput.role);
     revalidatePath(USERS_PATH);
     return { success: true as const };
   });
 
-export const setUserNameAction = adminActionClient
+export const setUserNameAction = rbacActionClient
+  .metadata({ permission: "user.update" })
   .inputSchema(setUserNameSchema)
-  .action(async ({ parsedInput }) => {
-    await setUserName(parsedInput.userId, parsedInput.name);
+  .action(async ({ parsedInput, ctx }) => {
+    await setUserName(ctx.rbac, parsedInput.userId, parsedInput.name);
     // Bukan `revalidatePath(USERS_PATH)`: nama user juga dirender oleh sidebar
     // di layout /dashboard. Kalau admin mengganti namanya sendiri dan kita cuma
     // membuang cache halaman user, tabelnya berubah tapi namanya di sidebar
@@ -69,26 +74,29 @@ export const setUserNameAction = adminActionClient
     return { success: true as const };
   });
 
-export const setUserPasswordAction = adminActionClient
+export const setUserPasswordAction = rbacActionClient
+  .metadata({ permission: "user.update" })
   .inputSchema(setUserPasswordSchema)
-  .action(async ({ parsedInput }) => {
-    await setUserPassword(parsedInput.userId, parsedInput.password);
+  .action(async ({ parsedInput, ctx }) => {
+    await setUserPassword(ctx.rbac, parsedInput.userId, parsedInput.password);
     revalidatePath(USERS_PATH);
     return { success: true as const };
   });
 
-export const archiveUserAction = adminActionClient
+export const archiveUserAction = rbacActionClient
+  .metadata({ permission: "user.archive" })
   .inputSchema(userIdSchema)
   .action(async ({ parsedInput, ctx }) => {
-    await archiveUser(ctx.user, parsedInput.userId);
+    await archiveUser(ctx.rbac, parsedInput.userId);
     revalidatePath(USERS_PATH);
     return { success: true as const };
   });
 
-export const restoreUserAction = adminActionClient
+export const restoreUserAction = rbacActionClient
+  .metadata({ permission: "user.restore" })
   .inputSchema(userIdSchema)
-  .action(async ({ parsedInput }) => {
-    await restoreUser(parsedInput.userId);
+  .action(async ({ parsedInput, ctx }) => {
+    await restoreUser(ctx.rbac, parsedInput.userId);
     revalidatePath(USERS_PATH);
     return { success: true as const };
   });

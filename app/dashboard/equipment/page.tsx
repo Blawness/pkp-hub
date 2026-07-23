@@ -10,17 +10,19 @@ import { ExportButton } from "@/components/export/export-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentItemsForUser } from "@/lib/actions/equipment-items-logic";
-import { listProjectsForUser, requireStaff } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { projects, users } from "@/lib/db/schema";
 import { formatDuration, summarizeUnits, usageDurationMs } from "@/lib/equipment/derive";
+import { can } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
+import { rbacFilter } from "@/lib/rbac/filter";
 import { optionalDisplayUrlFor } from "@/lib/storage";
 
 export const metadata = { title: "Inventaris Alat" };
 
 /**
- * Daftar alat, dikelompokkan per JENIS (spec 2026-07-16). `requireStaff()`
- * adalah gerbangnya — klien tidak pernah sampai ke sini.
+ * Daftar alat, dikelompokkan per JENIS (spec 2026-07-16). Gerbang area layout
+ * /dashboard adalah gerbangnya — klien tidak pernah sampai ke sini.
  *
  * Kolom harga beli hanya masuk payload admin — `listEquipmentItemsForUser`
  * (lewat `listEquipmentForUser`) memangkasnya di level query untuk surveyor,
@@ -32,12 +34,19 @@ export default async function EquipmentPage({
   searchParams: Promise<{ category?: string; status?: string }>;
 }) {
   const filters = await searchParams;
-  const user = await requireStaff();
-  const isAdmin = user.role === "admin";
+  const ctx = await getRbacContext();
+  const user = ctx.user;
+  // `equipment.update` (admin-only di matrix) menggerbangi seluruh aksi
+  // kelola: tambah/ubah alat, pinjamkan atas nama orang lain, kembalikan
+  // pinjaman orang lain.
+  const isAdmin = can(ctx, "equipment.update");
 
-  const itemsWithUnits = await listEquipmentItemsForUser(user);
+  const itemsWithUnits = await listEquipmentItemsForUser(ctx);
 
-  const userProjects = await listProjectsForUser(user);
+  const userProjects = await db
+    .select({ id: projects.id, title: projects.title })
+    .from(projects)
+    .where(rbacFilter(ctx, "project.read"));
   const projectOptions = userProjects.map((p) => ({ id: p.id, title: p.title }));
 
   const surveyors = isAdmin
@@ -112,11 +121,7 @@ export default async function EquipmentPage({
           absen untuknya (lihat `equipmentReport.columns`). */}
       <PageHeader
         title="Inventaris Alat"
-        description={
-          user.role === "surveyor"
-            ? "Alat ukur yang bisa Anda pinjam."
-            : "Seluruh alat ukur studio."
-        }
+        description={isAdmin ? "Seluruh alat ukur studio." : "Alat ukur yang bisa Anda pinjam."}
         action={
           <div className="flex items-center gap-2">
             <ExportButton report="equipment" label="Ekspor" />
