@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
 import { requireStaff } from "@/lib/auth-guards";
 import { formatIDR } from "@/lib/format";
+import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Dashboard" };
 
@@ -24,10 +25,13 @@ export const metadata = { title: "Dashboard" };
  * client-side hiding.
  */
 export default async function DashboardPage() {
+  // `requireStaff` tetap dipakai untuk REDIRECT (klien dipantulkan ke /portal,
+  // bukan disuguhi error); `ctx` yang menyetir scoping datanya.
   const user = await requireStaff();
+  const ctx = await getRbacContext();
 
   if (user.role === "admin") {
-    const data = await getAdminDashboardData(user);
+    const data = await getAdminDashboardData(ctx);
     const activeCount = data.latestProjects.length;
 
     return (
@@ -110,7 +114,7 @@ export default async function DashboardPage() {
   }
 
   // Surveyor: struktur sama, tanpa satu pun angka uang.
-  const data = await getSurveyorDashboardData(user);
+  const data = await getSurveyorDashboardData(ctx);
 
   return (
     <main className="flex flex-1 flex-col gap-6 p-6 sm:p-8">
