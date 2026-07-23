@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/auth-guards";
+import { can } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
 import { storage } from "@/lib/storage";
 
 /**
@@ -10,15 +11,19 @@ import { storage } from "@/lib/storage";
  * untuk driver lokal) — TIDAK lewat server action.
  *
  * Beda dengan dokumen: gambar alat TIDAK terikat project, jadi tidak ada
- * `assertProjectAccess`. Gerbangnya `requireAdmin` — hanya admin yang mengelola
- * data alat. Byte-nya sudah dikonversi ke WebP di klien, jadi di sini kita
- * memaksa `image/webp` dan membatasi ukurannya.
+ * scoping baris. Gerbangnya `equipment.update` — izin yang sama dengan
+ * mengubah data alat (admin-only di matrix). Byte-nya sudah dikonversi ke
+ * WebP di klien, jadi di sini kita memaksa `image/webp` dan membatasi
+ * ukurannya.
  */
 
 const MAX_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export async function POST(request: Request) {
-  await requireAdmin();
+  const ctx = await getRbacContext();
+  if (!can(ctx, "equipment.update")) {
+    return NextResponse.json({ error: "Anda tidak punya izin." }, { status: 403 });
+  }
 
   const json = await request.json().catch(() => null);
   const contentType = json?.contentType;

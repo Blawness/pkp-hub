@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { uploadInitInputSchema } from "@/lib/actions/documents-schemas";
-import { assertProjectAccess, requireStaff } from "@/lib/auth-guards";
+import { can } from "@/lib/rbac/can";
+import { getRbacContext } from "@/lib/rbac/context";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
 import { storage } from "@/lib/storage";
 
 /**
@@ -13,12 +15,16 @@ import { storage } from "@/lib/storage";
  *  - local driver: returns this app's own `/api/storage/[...key]` route,
  *    which accepts the raw bytes via PUT.
  *
- * Same security boundary as everywhere else: `requireStaff` (admin +
- * surveyor) then `assertProjectAccess` — a surveyor cannot mint an upload
- * target for a project they aren't assigned to.
+ * Same security boundary as everywhere else: `document.upload` (admin +
+ * surveyor) lalu `requireScopedRow(ctx, "project.read", …)` — pasangan cek
+ * yang sama dengan `uploadDocumentForUser` di documents-logic; surveyor tak
+ * bisa mencetak target upload untuk proyek yang bukan tugasnya.
  */
 export async function POST(request: Request) {
-  const user = await requireStaff();
+  const ctx = await getRbacContext();
+  if (!can(ctx, "document.upload")) {
+    return NextResponse.json({ error: "Anda tidak punya izin." }, { status: 403 });
+  }
 
   const json = await request.json().catch(() => null);
   const parsed = uploadInitInputSchema.safeParse(json);
@@ -31,7 +37,7 @@ export async function POST(request: Request) {
   // digest isn't meaningful as an HTTP response body here, so translate any
   // thrown error into a plain 403/404 JSON response.
   try {
-    await assertProjectAccess(projectId, user);
+    await requireScopedRow(ctx, "project.read", projectId);
   } catch {
     return NextResponse.json(
       { error: "Project not found or you do not have access to it." },
