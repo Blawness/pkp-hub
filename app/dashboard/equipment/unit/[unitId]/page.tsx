@@ -10,13 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getEquipmentForUser, listUsageForEquipment } from "@/lib/actions/equipment-logic";
 import type { EquipmentConditionInput } from "@/lib/actions/equipment-schemas";
-import { listProjectsForUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { formatIDR } from "@/lib/format";
 import { equipmentCategoryLabel, equipmentConditionLabel } from "@/lib/labels";
+import { can } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
+import { rbacFilter } from "@/lib/rbac/filter";
 import { optionalDisplayUrlFor } from "@/lib/storage";
 
 export async function generateMetadata({ params }: { params: Promise<{ unitId: string }> }) {
@@ -44,13 +45,18 @@ export default async function EquipmentUnitDetailPage({
   const { unitId } = await params;
   const ctx = await getRbacContext();
   const user = ctx.user;
-  const isAdmin = user.role === "admin";
+  // `equipment.update` (admin-only) menggerbangi aksi kelola unit — sama
+  // dengan halaman daftar inventaris.
+  const isAdmin = can(ctx, "equipment.update");
 
   const item = await getEquipmentForUser(ctx, unitId);
   const usages = await listUsageForEquipment(ctx, unitId);
   const imageDisplayUrl = item.image ? await optionalDisplayUrlFor(item.image) : null;
 
-  const userProjects = await listProjectsForUser(user);
+  const userProjects = await db
+    .select({ id: projects.id, title: projects.title })
+    .from(projects)
+    .where(rbacFilter(ctx, "project.read"));
   const projectOptions = userProjects.map((p) => ({ id: p.id, title: p.title }));
   const surveyors = isAdmin
     ? await db

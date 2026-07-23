@@ -11,7 +11,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
 import { db } from "@/lib/db";
 import { clients, projects, users } from "@/lib/db/schema";
-import { can } from "@/lib/rbac/can";
+import { can, scopeOf } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 import { rbacFilter } from "@/lib/rbac/filter";
 
@@ -79,7 +79,7 @@ export default async function ProjectsPage({
       <PageHeader
         title="Proyek"
         description={
-          ctx.user.role === "surveyor"
+          scopeOf(ctx, "project.read") === "assigned"
             ? "Proyek yang ditugaskan kepada Anda."
             : "Semua proyek studio."
         }

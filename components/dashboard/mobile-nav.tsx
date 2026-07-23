@@ -6,6 +6,7 @@ import { useState } from "react";
 import { buildLinks } from "@/components/dashboard/nav-config";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { UserMenu } from "@/components/dashboard/user-menu";
+import { usePermissions } from "@/components/rbac/permissions-provider";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { SessionUser } from "@/lib/auth-guards";
@@ -19,7 +20,8 @@ import type { SessionUser } from "@/lib/auth-guards";
  */
 export function MobileNav({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState(false);
-  const links = buildLinks(user.role);
+  const { can } = usePermissions();
+  const links = buildLinks(can);
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

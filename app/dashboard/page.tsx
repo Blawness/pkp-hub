@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
 import { requireStaff } from "@/lib/auth-guards";
 import { formatIDR } from "@/lib/format";
+import { scopeOf } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Dashboard" };
@@ -27,10 +28,13 @@ export const metadata = { title: "Dashboard" };
 export default async function DashboardPage() {
   // `requireStaff` tetap dipakai untuk REDIRECT (klien dipantulkan ke /portal,
   // bukan disuguhi error); `ctx` yang menyetir scoping datanya.
-  const user = await requireStaff();
+  await requireStaff();
   const ctx = await getRbacContext();
 
-  if (user.role === "admin") {
+  // Varian dashboard dipilih dari SCOPE — cermin gerbang di dashboard-logic:
+  // pemegang agregat finance studio melihat varian admin, sisanya varian
+  // antrean kerja surveyor.
+  if (scopeOf(ctx, "project.readFinance") === "all") {
     const data = await getAdminDashboardData(ctx);
     const activeCount = data.latestProjects.length;
 

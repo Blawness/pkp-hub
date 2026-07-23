@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildCrumbs } from "@/components/dashboard/nav-config";
 
-const admin = { role: "admin" } as const;
+// Admin memegang seluruh katalog — predikat izin selalu true.
+const admin = () => true;
 
 describe("buildCrumbs", () => {
   it("hanya Dashboard di root", () => {

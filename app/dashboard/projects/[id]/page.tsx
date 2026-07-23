@@ -32,6 +32,7 @@ import { db } from "@/lib/db";
 import { clients, users } from "@/lib/db/schema";
 import { formatDuration, usageDurationMs } from "@/lib/equipment/derive";
 import { todayString } from "@/lib/phases/derive";
+import { can, scopeOf } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 import { downloadUrlFor } from "@/lib/storage";
 
@@ -73,12 +74,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     listMapLayersForProject(ctx, project.id),
   ]);
 
-  // Ledger pembayaran HANYA untuk admin. Memanggilnya untuk surveyor akan
-  // ditolak server-side — tapi jangan bergantung pada itu: jangan panggil sama
-  // sekali, supaya tidak ada apa pun yang bisa masuk ke payload non-admin.
-  const isAdmin = user.role === "admin";
-  const paymentRows = isAdmin ? await listPaymentsForProject(ctx, project.id) : [];
-  const paymentSummary = isAdmin ? await getPaymentSummary(ctx, project.id) : null;
+  // Ledger pembayaran HANYA untuk pemegang `payment.read` (surveyor tidak
+  // punya sama sekali). Memanggilnya tanpa izin akan ditolak server-side —
+  // tapi jangan bergantung pada itu: jangan panggil sama sekali, supaya tidak
+  // ada apa pun yang bisa masuk ke payload-nya. `project.update` (admin-only)
+  // menggerbangi aksi kelola proyek di bawah.
+  const isAdmin = can(ctx, "project.update");
+  const canReadPayments = can(ctx, "payment.read");
+  const paymentRows = canReadPayments ? await listPaymentsForProject(ctx, project.id) : [];
+  const paymentSummary = canReadPayments ? await getPaymentSummary(ctx, project.id) : null;
   const paymentPanelRows = await Promise.all(
     paymentRows.map(async (p) => ({
       id: p.id,
@@ -192,11 +196,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     })),
   );
 
-  const canChangeStatus = user.role === "admin" || project.assignedSurveyorId === user.id;
+  // Scope `all` (admin) selalu boleh; scope `assigned` hanya kalau DITUGASKAN
+  // LANGSUNG — cermin tombol lama, meski server juga meloloskan surveyor yang
+  // ditugaskan lewat fase (requireScopedRow memakai aturan `assigned` penuh).
+  const changeStatusScope = scopeOf(ctx, "project.changeStatus");
+  const canChangeStatus =
+    changeStatusScope === "all" ||
+    (changeStatusScope === "assigned" && project.assignedSurveyorId === user.id);
   const allowedNextStatuses = canChangeStatus
     ? getAllowedNextStatuses(
         project.status as ProjectStatus,
-        user.role === "admin" ? "admin" : "surveyor",
+        changeStatusScope === "all" ? "admin" : "surveyor",
       )
     : [];
   const assignedSurveyorName = project.assignedSurveyorId
@@ -232,7 +242,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           description: project.description ?? null,
         }}
         isAdmin={isAdmin}
-        canEdit={user.role === "admin"}
+        canEdit={can(ctx, "project.update")}
         status={project.status}
         allowedNextStatuses={allowedNextStatuses}
         logs={statusLogs.map((log) => ({
@@ -267,8 +277,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             phases={phases}
             progress={progress}
             today={todayString(new Date())}
-            canEditPlan={isAdmin}
-            canReportWork={user.role === "admin" || user.role === "surveyor"}
+            canEditPlan={can(ctx, "phase.update")}
+            canReportWork={can(ctx, "phase.setStatus")}
             surveyors={phaseSurveyors}
           />
         </TabsContent>
@@ -291,7 +301,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <DocumentUpload projectId={project.id} />
           <DocumentsTable
             rows={documentRows}
-            isAdmin={user.role === "admin"}
+            isAdmin={can(ctx, "document.share")}
             emptyMessage={
               <EmptyState
                 icon={FileIcon}
