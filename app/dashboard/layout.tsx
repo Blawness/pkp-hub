@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { SessionHeartbeat } from "@/components/auth/session-heartbeat";
 import { SIDEBAR_COOKIE } from "@/components/dashboard/nav-config";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { PermissionsProvider } from "@/components/rbac/permissions-provider";
-import { requireStaff } from "@/lib/auth-guards";
+import { homeForRole, requireUser } from "@/lib/auth-guards";
 import { getRbacContext } from "@/lib/rbac/context";
 import type { Permission } from "@/lib/rbac/resources";
 
@@ -17,13 +18,16 @@ export const metadata: Metadata = {
 /**
  * Authoritative role check for the staff area (admin + surveyor). The proxy
  * only does a coarse cookie-cache check; this is the real gate — it hits the
- * DB via `getSession`/`requireStaff`.
+ * DB via `getSession`/`requireUser` + pengecekan area.
  *
  * Kondisi ciut sidebar dibaca di sini, di server, supaya rail sudah tergambar
  * dengan lebar yang benar pada cat pertama (lihat `sidebar.tsx`).
  */
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
-  const user = await requireStaff();
+  // Gerbang AREA: user yang rumahnya bukan /dashboard (klien) dipantulkan ke
+  // areanya sendiri — bukan disuguhi error. Izin per-halaman/aksi milik ctx.
+  const user = await requireUser();
+  if (homeForRole(user.role) !== "/dashboard") redirect(homeForRole(user.role));
   const ctx = await getRbacContext();
   const cookieStore = await cookies();
   const collapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";

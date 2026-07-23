@@ -30,8 +30,8 @@ import { storage } from "@/lib/storage";
  * proyek yang di-assign ke dia. Kwitansi memuat nilai proyek, jadi kebocoran
  * di modul ini meruntuhkan jaminan "surveyor tidak lihat keuangan" yang sudah
  * ditegakkan (dan diuji) di `dashboard-logic.ts` / `projects-logic.ts`.
- * Perhatikan: `assertProjectAccess` MELOLOSKAN surveyor yang di-assign — jadi
- * ia BUKAN guard yang cukup di sini. `requireAdmin` harus mendahuluinya.
+ * Perhatikan: scope proyek MELOLOSKAN surveyor yang di-assign — jadi cek
+ * proyek BUKAN guard yang cukup di sini. `assertCan(payment.*)` harus mendahuluinya.
  */
 
 export type DbOrTx =
@@ -77,7 +77,7 @@ export type ReceiptArchiveRow = {
  * proyek, untuk tab "Kwitansi" di Arsip Dokumen. Sengaja dipisah dari tabel
  * `documents` — lihat catatan di atas: kwitansi memuat nilai proyek, jadi tidak
  * boleh masuk ke Arsip yang terlihat surveyor. Surveyor memanggil ini akan
- * ditolak oleh `requireAdmin`.
+ * ditolak (tidak punya `payment.read` sama sekali).
  */
 export async function listReceiptsForAdmin(ctx: RbacContext): Promise<ReceiptArchiveRow[]> {
   // Tampilan lintas-proyek: butuh `payment.read` ber-scope `all`. `can()`

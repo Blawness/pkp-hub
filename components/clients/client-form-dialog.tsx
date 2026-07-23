@@ -33,7 +33,7 @@ type ClientEditTarget = {
  * empty-state); tanpa itu, dipakai tombol bawaan sesuai mode.
  *
  * Penegakan admin tetap di server (`createClient`/`updateClient` =
- * `adminActionClient`); komponen ini tidak menambah/mengubah pemeriksaan itu.
+ * `rbacActionClient`); komponen ini tidak menambah/mengubah pemeriksaan itu.
  */
 export function ClientFormDialog({
   client,

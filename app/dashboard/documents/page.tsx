@@ -21,7 +21,7 @@ export const metadata = { title: "Arsip Dokumen" };
 /**
  * Cross-project document search (PRD §3 Feature 4). All filtering happens
  * server-side via `searchDocumentsForUser`, which is scoped through
- * `listProjectsForUser` — a surveyor only ever sees documents belonging to
+ * `rbacFilter(ctx, "document.read")` — a surveyor only ever sees documents belonging to
  * projects assigned to them, never the whole table.
  *
  * Tab "Kwitansi" HANYA untuk admin: daftar semua kwitansi lintas proyek. Ini

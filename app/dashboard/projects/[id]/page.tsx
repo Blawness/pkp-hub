@@ -136,8 +136,8 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
     : [];
 
   // Tab "Alat": riwayat pakai alat di proyek ini + daftar alat yang bisa
-  // dipinjam. `listUsageForProject` sudah lewat `assertProjectAccess` (di
-  // dalam `equipment-logic.ts`), jadi surveyor cuma melihat riwayat proyeknya
+  // dipinjam. `listUsageForProject` sudah lewat `requireScopedRow` (di dalam
+  // `equipment-logic.ts`), jadi surveyor cuma melihat riwayat proyeknya
   // sendiri — konsisten dengan pola di seluruh halaman ini.
   const projectEquipmentUsages = await listUsageForProject(ctx, project.id);
   const allEquipment = await listEquipmentForUser(ctx);

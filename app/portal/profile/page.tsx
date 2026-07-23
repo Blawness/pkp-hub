@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth-guards";
 
 export const metadata = { title: "Profil Saya" };
 
-/** Profil klien. Guard-nya sudah dipasang layout /portal (`requireClient`). */
+/** Profil klien. Gerbang areanya sudah dipasang layout /portal. */
 export default async function PortalProfilePage() {
   const user = await requireUser();
   const hasPassword = await userHasCredential(user.id);

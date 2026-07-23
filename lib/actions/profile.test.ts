@@ -12,7 +12,7 @@ import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
 import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
 import type { RbacContext } from "@/lib/rbac/types";
 
-// `updateOwnNameAction` (via `authActionClient` -> `requireUser()`) calls
+// `updateOwnNameAction` (via `rbacActionClient` -> `getRbacContext()`) calls
 // `headers()` from `next/headers`, which only works inside a real request
 // context. Outside of one it throws. We fake a request context by capturing
 // a `Headers` instance carrying a real session cookie (see the "smuggled

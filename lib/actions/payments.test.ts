@@ -34,7 +34,7 @@ import type { ReceiptStorage } from "@/lib/receipts";
  *    untuk proyek yang di-assign KE DIA. Ini bukan formalitas: kwitansi memuat
  *    nilai proyek, dan jaminan "surveyor tidak lihat keuangan" (yang sudah
  *    dikunci `dashboard.test.ts`) runtuh kalau ledger bocor. Test-test itu
- *    HARUS jeblok kalau `requireAdmin` di `payments-logic.ts` dicabut.
+ *    HARUS jeblok kalau `assertCan` di `payments-logic.ts` dicabut.
  *
  * 2. INVARIAN UANG. Status turunan cocok dengan uang yang masuk; pembatalan
  *    memundurkan status; dan — yang paling gampang salah — PEMBAYARAN TETAP

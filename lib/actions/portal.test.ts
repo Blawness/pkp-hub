@@ -4,7 +4,6 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listPortalPhases, listPortalProjects } from "@/lib/actions/portal-logic";
 import type { SessionUser } from "@/lib/auth-guards";
-import { assertProjectAccess } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import {
   clients,
@@ -15,6 +14,7 @@ import {
   projects,
   users,
 } from "@/lib/db/schema";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
 import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
 import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
 import type { RbacContext } from "@/lib/rbac/types";
@@ -23,7 +23,7 @@ import type { RbacContext } from "@/lib/rbac/types";
  * Runs against the real (Neon) dev database, same convention as
  * `documents.test.ts` / `auth-guards.test.ts`. Exercises the phase-6/7
  * brief's REQUIRED tests for the client portal:
- *  - a client CANNOT read another client's project (assertProjectAccess
+ *  - a client CANNOT read another client's project (requireScopedRow
  *    rejects), and the portal project list never includes it either
  *  - the portal document query returns ONLY documents with
  *    `sharedWithClient = true` — an internal (unshared) document seeded on
@@ -161,8 +161,8 @@ afterAll(() => {
 });
 
 describe("client cross-tenant access", () => {
-  it("client A CANNOT access client B's project via assertProjectAccess", async () => {
-    await expect(assertProjectAccess(projectB, clientUserA)).rejects.toThrow();
+  it("client A CANNOT access client B's project via requireScopedRow", async () => {
+    await expect(requireScopedRow(clientUserACtx, "project.read", projectB)).rejects.toThrow();
   });
 
   it("client A's portal project list contains only their own project", async () => {

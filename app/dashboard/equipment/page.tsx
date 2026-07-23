@@ -23,8 +23,8 @@ import { optionalDisplayUrlFor } from "@/lib/storage";
 export const metadata = { title: "Inventaris Alat" };
 
 /**
- * Daftar alat, dikelompokkan per JENIS (spec 2026-07-16). `requireStaff()`
- * adalah gerbangnya — klien tidak pernah sampai ke sini.
+ * Daftar alat, dikelompokkan per JENIS (spec 2026-07-16). Gerbang area layout
+ * /dashboard adalah gerbangnya — klien tidak pernah sampai ke sini.
  *
  * Kolom harga beli hanya masuk payload admin — `listEquipmentItemsForUser`
  * (lewat `listEquipmentForUser`) memangkasnya di level query untuk surveyor,

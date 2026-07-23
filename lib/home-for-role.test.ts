@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { homeForRole } from "@/lib/auth-guards";
 
 /**
- * Pemetaan role -> area ini dipakai di dua tempat: guard `requireRole()` dan
+ * Pemetaan role -> area ini dipakai di dua tempat: gerbang area di layout dan
  * redirect di `app/page.tsx`. Kalau pemetaannya berubah diam-diam, staf bisa
  * mendarat di portal klien (atau sebaliknya) — test ini yang menahannya.
  */

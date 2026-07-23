@@ -15,8 +15,8 @@ import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Admin-only server actions for client CRUD (PRD §3 Feature 1). Business
- * logic + the role check itself live in `clients-logic.ts` (directly unit
- * tested in `clients.test.ts`); `adminActionClient` here is the primary,
+ * logic + the izin check itself live in `clients-logic.ts` (directly unit
+ * tested in `clients.test.ts`); `rbacActionClient` here is the primary,
  * request-bound enforcement of the same rule.
  */
 

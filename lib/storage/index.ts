@@ -82,7 +82,7 @@ export const storage: StorageDriver = createDriver();
  *
  * - driver r2   : presigned GET, berlaku 1 jam.
  * - driver lokal: `/api/storage/<key>`, rute yang sudah menegakkan
- *   `assertProjectAccess` + aturan `sharedWithClient` untuk peran klien.
+ *   `requireScopedRow` + scope `own` dokumen (memuat `sharedWithClient`).
  *
  * Ini BUKAN batas keamanan: ia menandatangani apa pun yang diberikan padanya.
  * Pemanggil wajib sudah menyaring baris sesuai hak akses pengguna — dan itulah

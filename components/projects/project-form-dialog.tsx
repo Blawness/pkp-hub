@@ -46,7 +46,7 @@ type ProjectEditTarget = {
  * halaman `/new` yang dihapus.
  *
  * Penegakan admin tetap di server (`createProject`/`updateProject` =
- * `adminActionClient`); komponen ini tidak menambah/mengubah pemeriksaan itu.
+ * `rbacActionClient`); komponen ini tidak menambah/mengubah pemeriksaan itu.
  */
 export function ProjectFormDialog({
   clients,

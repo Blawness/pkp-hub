@@ -8,7 +8,6 @@ import { Reveal, Stagger } from "@/components/motion/reveal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
-import { requireStaff } from "@/lib/auth-guards";
 import { formatIDR } from "@/lib/format";
 import { scopeOf } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
@@ -26,9 +25,8 @@ export const metadata = { title: "Dashboard" };
  * client-side hiding.
  */
 export default async function DashboardPage() {
-  // `requireStaff` tetap dipakai untuk REDIRECT (klien dipantulkan ke /portal,
-  // bukan disuguhi error); `ctx` yang menyetir scoping datanya.
-  await requireStaff();
+  // Gerbang area (klien → /portal) hidup di `layout.tsx`; di sini `ctx` yang
+  // menyetir varian dan scoping datanya.
   const ctx = await getRbacContext();
 
   // Varian dashboard dipilih dari SCOPE — cermin gerbang di dashboard-logic:

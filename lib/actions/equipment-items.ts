@@ -15,7 +15,7 @@ import { rbacActionClient } from "@/lib/actions/safe-action";
 
 /**
  * Server action jenis alat. Logika + guard ada di `equipment-items-logic.ts`
- * (diuji langsung); `adminActionClient` di sini adalah lapis pertama yang
+ * (diuji langsung); `rbacActionClient` di sini adalah lapis pertama yang
  * terikat request — bukan penggantinya.
  */
 

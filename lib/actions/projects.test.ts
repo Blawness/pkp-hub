@@ -17,7 +17,7 @@ import type { RbacContext } from "@/lib/rbac/types";
  * one `projectStatusLogs` row per call (fromStatus/toStatus/actor correct),
  * in the same transaction as the project update, and only the admin or the
  * surveyor ASSIGNED to a project may call it — any other surveyor is
- * rejected via `assertProjectAccess`'s row-level scoping.
+ * rejected via `requireScopedRow`'s row-level scoping.
  */
 
 let admin: SessionUser;

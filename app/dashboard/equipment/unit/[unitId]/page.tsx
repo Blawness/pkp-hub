@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ unitId: s
 
 /**
  * Detail SATU UNIT fisik + riwayat pakai (spec 2026-07-16, evolusi dari
- * `[id]/page.tsx`). `requireStaff()` adalah gerbang halaman ini — klien tidak
+ * `[id]/page.tsx`). Gerbang area layout /dashboard menjaga halaman ini — klien tidak
  * pernah sampai kemari.
  *
  * Harga & tanggal beli hanya dirender kalau `"purchasePrice" in item` — yang
