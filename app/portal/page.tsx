@@ -6,12 +6,15 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { listPortalProjects } from "@/lib/actions/portal-logic";
 import { requireClient } from "@/lib/auth-guards";
 import { statusLabel, surveyTypeLabel } from "@/lib/labels";
+import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Proyek Saya" };
 
 export default async function PortalPage() {
+  // `requireClient` tetap dipakai untuk REDIRECT (staf dipantulkan ke
+  // /dashboard); scoping datanya milik `ctx`.
   const user = await requireClient();
-  const projectRows = await listPortalProjects(user);
+  const projectRows = await listPortalProjects(await getRbacContext());
 
   return (
     <main className="flex flex-col gap-6 p-8">

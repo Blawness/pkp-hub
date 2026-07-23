@@ -45,14 +45,12 @@ export default async function PortalProjectDetailPage({
 }) {
   const { id } = await params;
   const user = await requireClient();
-  // Dokumen, peta, & pembayaran sudah bermigrasi ke `ctx`; portal-logic (list
-  // proyek, fase, progres) masih menerima `user` sampai pass-nya tiba.
   const ctx = await getRbacContext();
 
   const project = await assertProjectAccess(id, user);
   const statusLogs = await getStatusLogsForProject(project.id);
-  const phases = await listPortalPhases(user, project.id);
-  const phaseProgress = await getPortalProgress(user, project.id);
+  const phases = await listPortalPhases(ctx, project.id);
+  const phaseProgress = await getPortalProgress(ctx, project.id);
   const mapLayerRows = await listMapLayersForProject(ctx, project.id);
   const documentRows = await listSharedDocumentsForProject(ctx, project.id);
   const paymentRows = await listPaymentsForProject(ctx, project.id);

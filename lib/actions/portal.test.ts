@@ -30,9 +30,11 @@ import type { RbacContext } from "@/lib/rbac/types";
  *    the same project must never appear
  */
 
+let admin: SessionUser;
 let clientUserA: SessionUser;
 let clientUserB: SessionUser;
 let surveyor: SessionUser;
+let adminCtx: RbacContext;
 let clientUserACtx: RbacContext;
 let clientUserBCtx: RbacContext;
 let projectA: string;
@@ -79,6 +81,12 @@ beforeAll(async () => {
     },
   ]);
 
+  admin = {
+    id: adminId,
+    name: "Portal Test Admin",
+    email: "test-admin-portal@fixture.test",
+    role: "admin",
+  };
   clientUserA = {
     id: clientUserAId,
     name: "Portal Test Client A",
@@ -110,6 +118,7 @@ beforeAll(async () => {
   // diturunkan dari `clients.userId`, jadi baris client harus sudah ada.
   await seedSystemRoles();
   await backfillUserRoles();
+  adminCtx = await makeTestContextForUser(admin);
   clientUserACtx = await makeTestContextForUser(clientUserA);
   clientUserBCtx = await makeTestContextForUser(clientUserB);
 
@@ -157,23 +166,19 @@ describe("client cross-tenant access", () => {
   });
 
   it("client A's portal project list contains only their own project", async () => {
-    const rows = await listPortalProjects(clientUserA);
+    const rows = await listPortalProjects(clientUserACtx);
     expect(rows.map((p) => p.id)).toEqual([projectA]);
   });
 
   it("client B's portal project list contains only their own project", async () => {
-    const rows = await listPortalProjects(clientUserB);
+    const rows = await listPortalProjects(clientUserBCtx);
     expect(rows.map((p) => p.id)).toEqual([projectB]);
   });
 
   it("a non-client role is rejected by listPortalProjects", async () => {
-    const admin: SessionUser = {
-      id: randomUUID(),
-      name: "x",
-      email: "x@fixture.test",
-      role: "admin",
-    };
-    await expect(listPortalProjects(admin)).rejects.toThrow();
+    // Admin memegang `project.read:all` — bukan `own` — jadi tampilan portal
+    // menolaknya, sama seperti cek role lama.
+    await expect(listPortalProjects(adminCtx)).rejects.toThrow();
   });
 });
 
@@ -202,7 +207,7 @@ describe("listPortalPhases: pemangkasan field internal", () => {
       assignedSurveyorId: surveyor.id,
     });
 
-    const rows = await listPortalPhases(clientUserA, projectA);
+    const rows = await listPortalPhases(clientUserACtx, projectA);
 
     expect(rows).toHaveLength(1);
     expect(rows[0].name).toBe("Olah data");
@@ -214,6 +219,6 @@ describe("listPortalPhases: pemangkasan field internal", () => {
   });
 
   it("klien tidak bisa membaca fase proyek klien lain", async () => {
-    await expect(listPortalPhases(clientUserB, projectA)).rejects.toThrow();
+    await expect(listPortalPhases(clientUserBCtx, projectA)).rejects.toThrow();
   });
 });
