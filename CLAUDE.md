@@ -67,9 +67,11 @@ projects, read-only, via the `/portal` area. Staff use `/dashboard`.
 - `*.ts` (`"use server"`) — thin next-safe-action wrappers that call the logic
   and `revalidatePath`.
 
-All actions build on the shared clients in **`lib/actions/safe-action.ts`**:
-`authActionClient`, `staffActionClient`, `adminActionClient`. Never construct a
-bare `createSafeActionClient()` elsewhere — that bypasses the auth middleware.
+All actions build on the single shared client in **`lib/actions/safe-action.ts`**:
+`rbacActionClient`. Every action must declare its permission via
+`.metadata({ permission })`; missing metadata is a hard failure (fail-closed),
+not a silent pass. Never construct a bare `createSafeActionClient()`
+elsewhere — that bypasses the auth middleware.
 
 **RBAC lives in `lib/rbac/`, one file per resource.** A grant is a pair —
 `(permission, scope)` — stored in `role_permission`; roles are DB rows
@@ -89,10 +91,17 @@ list and the guard from ever drifting apart), and `redact()` (field-level).
 `cache()` — never from the session cookie, for the same reason
 `auth-guards.ts` sets `disableCookieCache`.
 
-As of sub-project 1 the engine runs *alongside* the old `requireRole` /
-`adminActionClient` checks and is not yet wired into any call site; the three
-system roles are seeded to behave identically to the old hardcoded checks,
-proven by `lib/rbac/parity.test.ts`.
+The engine is fully wired: every domain (project, document, phase, map,
+payment, equipment, client, user, profile, portal, dashboard, storage,
+upload-init routes) goes through it, and the old hardcoded `requireRole` /
+`authActionClient` / `staffActionClient` / `adminActionClient` checks have
+been deleted — `lib/rbac/parity.test.ts` proved the three system roles
+(admin/surveyor/client, matrix in `lib/rbac/system-roles.ts`) behave
+identically to the old checks before the swap. Client-side gating
+(`components/rbac/permissions-provider.tsx` — `PermissionsProvider` /
+`usePermissions()` / `<Can permission="...">`) hides locked-out UI cosmetically;
+the server (`rbacActionClient`, `rbacFilter`, `requireScopedRow`) is the only
+real enforcement.
 
 **Derived state is never stored — it's computed from source rows.** Recurring
 lesson across the codebase: `paymentStatus`, phase progress %, equipment

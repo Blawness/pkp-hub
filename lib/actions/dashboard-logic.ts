@@ -1,7 +1,7 @@
 import { and, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { clients, payments, projects, users } from "@/lib/db/schema";
-import { scopeOf } from "@/lib/rbac/can";
+import { clients, equipment, payments, projects, users } from "@/lib/db/schema";
+import { can, scopeOf } from "@/lib/rbac/can";
 import { rbacFilter } from "@/lib/rbac/filter";
 import type { RbacContext } from "@/lib/rbac/types";
 
@@ -149,6 +149,26 @@ export async function getAdminDashboardData(ctx: RbacContext): Promise<AdminDash
   }));
 
   return { countsByStatus, totalActiveValue, totalUnpaid, latestProjects };
+}
+
+/**
+ * Total harga beli seluruh unit alat aktif — widget terpisah dari dashboard
+ * finance proyek di atas. Digerbangi `equipment.readCost`, BUKAN
+ * `project.readFinance`: keduanya kebetulan sama-sama admin-only di matrix
+ * saat ini, tapi menyamakannya di sini akan diam-diam salah kalau nanti ada
+ * role yang punya satu tanpa yang lain. `null` = tidak berizin; dibedakan
+ * dari `0` (berizin, tapi memang belum ada alat) supaya pemanggil tahu kapan
+ * harus menyembunyikan kartunya sama sekali.
+ */
+export async function getTotalEquipmentValue(ctx: RbacContext): Promise<number | null> {
+  if (!can(ctx, "equipment.readCost")) return null;
+
+  const [row] = await db
+    .select({ total: sql<number>`coalesce(sum(${equipment.purchasePrice}), 0)`.mapWith(Number) })
+    .from(equipment)
+    .where(isNull(equipment.archivedAt));
+
+  return row?.total ?? 0;
 }
 
 /**

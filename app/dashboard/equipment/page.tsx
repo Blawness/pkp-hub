@@ -1,6 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { WrenchIcon } from "lucide-react";
+import { CoinsIcon, WrenchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
+import { StatCard } from "@/components/dashboard/stat-card";
 import { EquipmentCatalog } from "@/components/equipment/equipment-catalog";
 import { EquipmentFilters } from "@/components/equipment/equipment-filters";
 import { EquipmentItemFormDialog } from "@/components/equipment/equipment-item-form-dialog";
@@ -12,7 +13,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentItemsForUser } from "@/lib/actions/equipment-items-logic";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
-import { formatDuration, summarizeUnits, usageDurationMs } from "@/lib/equipment/derive";
+import {
+  formatDuration,
+  summarizeUnits,
+  totalPurchaseValue,
+  usageDurationMs,
+} from "@/lib/equipment/derive";
+import { formatIDR } from "@/lib/format";
 import { can } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 import { rbacFilter } from "@/lib/rbac/filter";
@@ -40,6 +47,10 @@ export default async function EquipmentPage({
   // kelola: tambah/ubah alat, pinjamkan atas nama orang lain, kembalikan
   // pinjaman orang lain.
   const isAdmin = can(ctx, "equipment.update");
+  // Izin TERPISAH dari `isAdmin`: nilai aset memakai `equipment.readCost`,
+  // permission yang sama yang sudah menggerbangi `purchasePrice` per unit di
+  // bawah — bukan diam-diam ikut aturan `equipment.update`.
+  const canReadCost = can(ctx, "equipment.readCost");
 
   const itemsWithUnits = await listEquipmentItemsForUser(ctx);
 
@@ -59,6 +70,15 @@ export default async function EquipmentPage({
   // Ringkasan total dihitung SEBELUM filter diterapkan — kartunya sendiri
   // adalah quick-filter, jadi harus tetap menunjukkan total sesungguhnya.
   const overallSummary = summarizeUnits(itemsWithUnits.flatMap((it) => it.units));
+  // `totalPurchaseValue` cuma dipanggil kalau `canReadCost` — lihat komentar
+  // fungsinya soal absennya `purchasePrice` yang menjumlah jadi 0.
+  const totalAssetValue = canReadCost
+    ? totalPurchaseValue(
+        itemsWithUnits
+          .flatMap((it) => it.units)
+          .map((u) => ({ purchasePrice: "purchasePrice" in u ? u.purchasePrice : undefined })),
+      )
+    : null;
 
   // Filter di level item: item tampil kalau ADA unit yang cocok filter; unit
   // yang tidak cocok tersembunyi di dalam accordion-nya, bukan item-nya yang
@@ -129,6 +149,15 @@ export default async function EquipmentPage({
           </div>
         }
       />
+
+      {totalAssetValue !== null ? (
+        <StatCard
+          label="Total nilai aset"
+          value={formatIDR(totalAssetValue)}
+          hint="Harga beli seluruh unit aktif"
+          icon={CoinsIcon}
+        />
+      ) : null}
 
       <EquipmentSummary
         total={overallSummary.total}

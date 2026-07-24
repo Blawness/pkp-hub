@@ -1,4 +1,4 @@
-import { ClipboardCheckIcon, FolderKanbanIcon, WalletIcon } from "lucide-react";
+import { ClipboardCheckIcon, CoinsIcon, FolderKanbanIcon, WalletIcon } from "lucide-react";
 import Link from "next/link";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ProjectRow } from "@/components/dashboard/project-row";
@@ -7,7 +7,11 @@ import { StatusPipeline } from "@/components/dashboard/status-pipeline";
 import { Reveal, Stagger } from "@/components/motion/reveal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
+import {
+  getAdminDashboardData,
+  getSurveyorDashboardData,
+  getTotalEquipmentValue,
+} from "@/lib/actions/dashboard-logic";
 import { formatIDR } from "@/lib/format";
 import { scopeOf } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
@@ -33,7 +37,13 @@ export default async function DashboardPage() {
   // pemegang agregat finance studio melihat varian admin, sisanya varian
   // antrean kerja surveyor.
   if (scopeOf(ctx, "project.readFinance") === "all") {
-    const data = await getAdminDashboardData(ctx);
+    // Query terpisah, gerbang terpisah (`equipment.readCost`) — lihat komentar
+    // `getTotalEquipmentValue`. `null` berarti tidak berizin, kartunya
+    // disembunyikan; berbeda dari `0` (berizin, belum ada alat).
+    const [data, totalAssetValue] = await Promise.all([
+      getAdminDashboardData(ctx),
+      getTotalEquipmentValue(ctx),
+    ]);
     const activeCount = data.latestProjects.length;
 
     return (
@@ -45,7 +55,7 @@ export default async function DashboardPage() {
 
         <Stagger className="flex flex-col gap-6">
           <Reveal>
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <StatCard
                 label="Total nilai proyek aktif"
                 value={formatIDR(data.totalActiveValue)}
@@ -59,6 +69,14 @@ export default async function DashboardPage() {
                 icon={WalletIcon}
                 tone={data.totalUnpaid > 0 ? "warning" : "default"}
               />
+              {totalAssetValue !== null ? (
+                <StatCard
+                  label="Total nilai aset alat"
+                  value={formatIDR(totalAssetValue)}
+                  hint="Harga beli seluruh unit aktif"
+                  icon={CoinsIcon}
+                />
+              ) : null}
             </div>
           </Reveal>
 

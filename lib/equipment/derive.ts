@@ -89,6 +89,22 @@ export function summarizeUnits(units: { condition: EquipmentCondition; activeUsa
 }
 
 /**
+ * Total harga beli sekumpulan unit. `purchasePrice` bisa `undefined` (bukan
+ * cuma `null`) untuk unit yang sudah dipangkas `equipment.readCost` — absen
+ * ikut dihitung 0, jadi PANGGIL FUNGSI INI HANYA setelah `can(ctx,
+ * "equipment.readCost")` dicek; kalau tidak, hasilnya nol yang menyesatkan
+ * alih-alih ketiadaan izin.
+ *
+ * Field wajib-ada-tapi-boleh-`undefined` (bukan `purchasePrice?:`) supaya
+ * TypeScript tidak menganggapnya "weak type" saat dipanggil dengan union
+ * `EquipmentRow | EquipmentRowSafe` yang salah satu anggotanya sama sekali
+ * tidak punya properti ini.
+ */
+export function totalPurchaseValue(units: { purchasePrice: number | null | undefined }[]): number {
+  return units.reduce((sum, u) => sum + (u.purchasePrice ?? 0), 0);
+}
+
+/**
  * Satu badge status ringkas untuk kartu galeri (spec 2026-07-22). Diturunkan
  * dari agregat `summarizeUnits` — bukan kolom tersimpan. Prioritas: ada yang
  * bisa dipinjam dulu, lalu "semua dipinjam", lalu tidak tersedia (perawatan/
