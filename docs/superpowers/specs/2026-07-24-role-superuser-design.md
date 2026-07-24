@@ -45,6 +45,35 @@ menyusul setelah ini** — tidak masuk spec ini.
 
 ## Keputusan Desain
 
+### 0. Perbaikan prasyarat: `user_role_assignment` tidak pernah disinkronkan
+
+Ditemukan saat riset spec ini: `loadEffectivePermissions` (sumber kebenaran
+permission efektif) membaca murni dari `user_role_assignment`, tapi
+`backfillUserRoles()` — satu-satunya kode yang mengisi tabel itu dari
+`users.role` — **hanya dipanggil dari `lib/db/seed.ts`**. Tidak ada
+`createStaffUser`, `createClientUser`, maupun `setUserRole` di
+`lib/actions/users-logic.ts` yang menyentuh `user_role_assignment`.
+
+Akibatnya staf yang dibuat lewat UI *setelah* seed awal, atau yang role-nya
+diganti lewat "Ganti role", tidak punya baris `user_role_assignment` yang
+benar — `assertCan()` gagal untuk permission apa pun. Ini bug pre-existing,
+di luar lingkup awal spec ini, tapi jadi prasyarat: fitur assign-role di sini
+dibangun di atas tabel yang sama, jadi memperbaikinya masuk sub-proyek ini.
+
+**Perbaikan:** tambah `roleIdForKey(key: SystemRoleKey)` di
+`system-roles.ts` (lookup `roles.id` dari `roles.key`), lalu panggil dari
+`users-logic.ts`:
+- `createStaffUser` / `createClientUser` — insert satu baris
+  `user_role_assignment` untuk role dasarnya begitu user dibuat.
+- `setUserRole` — hapus HANYA baris assignment untuk role dasar LAMA (by
+  role id), lalu insert baris untuk role dasar BARU. Role tambahan yang
+  sudah dipunyai user (mis. `superuser`) tidak disentuh — ini yang
+  membedakannya dari `backfillUserRoles()`, yang menimpa dari nol.
+
+`archiveUser`/`restoreUser` sengaja tidak disentuh: user terarsip sudah
+diperlakukan logged-out di `auth-guards.ts` dan sesinya langsung diputus, jadi
+`getRbacContext()` tidak pernah dievaluasi untuknya sampai dipulihkan.
+
 ### 1. `superuser` adalah role tambahan, bukan pengganti kolom `users.role`
 
 `users.role` (pgEnum `admin | surveyor | client`) tetap seperti sekarang —
@@ -136,6 +165,13 @@ Cari user by email, cari role id `superuser` (hasil `seedSystemRoles()`),
 
 ## Rancangan
 
+### Perbaikan sinkronisasi (Keputusan Desain #0)
+
+- `lib/rbac/system-roles.ts` — ekspor `roleIdForKey(key: SystemRoleKey): Promise<string>`.
+- `lib/actions/users-logic.ts` — `createStaffUser`, `createClientUser`,
+  `setUserRole` memanggilnya untuk menjaga `user_role_assignment` tetap
+  sinkron dengan `users.role`, seperti dijelaskan di atas.
+
 ### RBAC catalog
 
 - `lib/rbac/resources/role.ts` — resource baru, didaftarkan di
@@ -159,9 +195,14 @@ Cari user by email, cari role id `superuser` (hasil `seedSystemRoles()`),
 
 - `app/dashboard/settings/roles/page.tsx` — daftar role (badge "Sistem" untuk
   `isSystem`), tabel grant per role (read-only untuk role sistem, editable
-  untuk kustom), form buat role baru, panel assign/unassign per user.
-- Entri nav di settings, digating `<Can permission="role.read">` — praktis
-  hanya tampil untuk superuser karena admin tidak punya `role.*`.
+  untuk kustom lewat dialog), form buat role baru, dan panel terpisah berisi
+  daftar assignment role (user + role) dengan form tambah assignment baru dan
+  tombol cabut per baris.
+- `app/dashboard/settings/layout.tsx` diperluas jadi tab "User" / "Peran" —
+  tab "Peran" hanya dirender kalau `can(ctx, "role.read")`, jadi tidak
+  terlihat oleh admin biasa. Tidak menyentuh nav sidebar (`nav-config.ts`)
+  karena satu-satunya entri "Pengaturan" di sana sudah menuju area ini;
+  navigasi user/peran adalah tab internal di dalam halaman Pengaturan.
 
 ### Bootstrap
 
@@ -181,7 +222,8 @@ Cari user by email, cari role id `superuser` (hasil `seedSystemRoles()`),
 
 ## Urutan Implementasi
 
-1. Resource `role` + restrukturisasi grant di `system-roles.ts` + testnya.
-2. Domain actions `roles-*` + testnya.
-3. Script bootstrap `grant-superuser.ts`.
-4. UI `Settings → Roles`.
+1. Perbaikan sinkronisasi `user_role_assignment` (Keputusan Desain #0) + test.
+2. Resource `role` + restrukturisasi grant di `system-roles.ts` + testnya.
+3. Domain actions `roles-*` + testnya.
+4. Script bootstrap `grant-superuser.ts`.
+5. UI `Settings → Roles` (tab layout + halaman + dialog role + panel assignment).
