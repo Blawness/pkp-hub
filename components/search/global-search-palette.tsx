@@ -4,6 +4,7 @@ import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { usePermissions } from "@/components/rbac/permissions-provider";
 import {
   Command,
   CommandDialog,
@@ -49,11 +50,13 @@ export function useGlobalSearch(): GlobalSearchContextValue {
 }
 
 export function GlobalSearchProvider({ children }: { children: ReactNode }) {
+  const { can } = usePermissions();
+  const allowed = can("search.use");
   const [open, setOpen] = useState(false);
   return (
     <GlobalSearchContext.Provider value={{ open, setOpen }}>
       {children}
-      <GlobalSearchPalette />
+      {allowed ? <GlobalSearchPalette /> : null}
     </GlobalSearchContext.Provider>
   );
 }
@@ -119,6 +122,11 @@ function GlobalSearchPalette() {
       if (cancelled) return;
       if (res?.serverError) {
         setFetchError(res.serverError);
+        setResults([]);
+        return;
+      }
+      if (res?.validationErrors) {
+        setFetchError("Periksa kembali kata kunci pencarian.");
         setResults([]);
         return;
       }

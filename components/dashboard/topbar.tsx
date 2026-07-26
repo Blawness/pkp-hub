@@ -14,10 +14,10 @@ export function Topbar({ user }: { user: SessionUser }) {
   const segments = useSelectedLayoutSegments();
   const { can } = usePermissions();
   const crumbs = buildCrumbs(segments, can);
-  // Tombol cmd-K hanya untuk role yang `search.use`. Sembunyikan agar UI
-  // tidak menggoda user membuka palette yang akan ditolak server; pintasan
-  // keyboard ⌘K tetap tidak terpasang karena listener ada di dalam provider
-  // yang tidak pernah di-mount di sini.
+  // Tombol cmd-K hanya untuk role yang `search.use`. Palette global (termasuk
+  // listener ⌘K) di-gate oleh izin yang sama di `GlobalSearchProvider`, jadi
+  // user tanpa izin tidak melihat pemicu maupun mendengar pintasan keyboard —
+  // pagar akhir tetap di server lewat `rbacActionClient`.
   const showSearch = can("search.use");
 
   return (
