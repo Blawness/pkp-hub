@@ -7,6 +7,7 @@ import { SIDEBAR_COOKIE } from "@/components/dashboard/nav-config";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { PermissionsProvider } from "@/components/rbac/permissions-provider";
+import { GlobalSearchProvider } from "@/components/search/global-search-palette";
 import { homeForRole, requireUser } from "@/lib/auth-guards";
 import { getRbacContext } from "@/lib/rbac/context";
 import type { Permission } from "@/lib/rbac/resources";
@@ -37,18 +38,25 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     // kosmetik: sidebar, tombol) — bukan scope, bukan data. Cast aman:
     // `loadEffectivePermissions` sudah menyaring grant lewat `isPermission`.
     <PermissionsProvider permissions={[...ctx.permissions.keys()] as Permission[]}>
-      <div className="flex min-h-svh">
-        <SessionHeartbeat />
-        <DashboardSidebar user={user} defaultCollapsed={collapsed} />
+      {/* Provider pencarian global HARUS di dalam PermissionsProvider — tombol
+          pemicu di topbar membaca `can("search.use")` untuk memutuskan apakah
+          dirinya perlu ditampilkan. Dialog itu sendiri dipasang oleh provider
+          sehingga hidupnya tidak bergantung pada subtree di mana tombol
+          diposisikan. */}
+      <GlobalSearchProvider>
+        <div className="flex min-h-svh">
+          <SessionHeartbeat />
+          <DashboardSidebar user={user} defaultCollapsed={collapsed} />
 
-        {/* `min-w-0` menahan kolom ini agar tidak melar mengikuti isinya — tanpa
-            itu, tabel lebar akan mendorong seluruh layout dan sidebar ikut
-            tergeser keluar layar. */}
-        <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar user={user} />
-          {children}
+          {/* `min-w-0` menahan kolom ini agar tidak melar mengikuti isinya — tanpa
+              itu, tabel lebar akan mendorong seluruh layout dan sidebar ikut
+              tergeser keluar layar. */}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <Topbar user={user} />
+            {children}
+          </div>
         </div>
-      </div>
+      </GlobalSearchProvider>
     </PermissionsProvider>
   );
 }
