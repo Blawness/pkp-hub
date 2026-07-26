@@ -23,8 +23,8 @@ const _profileNotScoped: ScopedPermission = "profile.updateOwn";
 const _reportNotScoped: ScopedPermission = "report.export";
 
 describe("registry resource", () => {
-  it("memuat 11 resource", () => {
-    expect(Object.keys(RESOURCES)).toHaveLength(11);
+  it("memuat 12 resource", () => {
+    expect(Object.keys(RESOURCES)).toHaveLength(12);
   });
 
   it("nama kunci registry sama dengan nama resource-nya", () => {

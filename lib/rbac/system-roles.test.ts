@@ -26,6 +26,7 @@ const EXPECTED_SURVEYOR: Record<string, Scope> = {
   "equipment.read": "all",
   "equipment.borrow": "all",
   "equipment.return": "all",
+  "search.use": "all",
   "profile.updateOwn": "own",
 };
 

@@ -7,18 +7,24 @@ import { Fragment } from "react";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { buildCrumbs } from "@/components/dashboard/nav-config";
 import { usePermissions } from "@/components/rbac/permissions-provider";
+import { GlobalSearchTrigger } from "@/components/search/global-search-trigger";
 import type { SessionUser } from "@/lib/auth-guards";
 
 export function Topbar({ user }: { user: SessionUser }) {
   const segments = useSelectedLayoutSegments();
   const { can } = usePermissions();
   const crumbs = buildCrumbs(segments, can);
+  // Tombol cmd-K hanya untuk role yang `search.use`. Palette global (termasuk
+  // listener ⌘K) di-gate oleh izin yang sama di `GlobalSearchProvider`, jadi
+  // user tanpa izin tidak melihat pemicu maupun mendengar pintasan keyboard —
+  // pagar akhir tetap di server lewat `rbacActionClient`.
+  const showSearch = can("search.use");
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-4 backdrop-blur-sm sm:px-6">
       <MobileNav user={user} />
 
-      <nav aria-label="Breadcrumb" className="min-w-0">
+      <nav aria-label="Breadcrumb" className="min-w-0 flex-1">
         <ol className="flex items-center gap-1.5 text-sm">
           {crumbs.map((crumb, index) => {
             const isLast = index === crumbs.length - 1;
@@ -52,6 +58,8 @@ export function Topbar({ user }: { user: SessionUser }) {
           })}
         </ol>
       </nav>
+
+      {showSearch ? <GlobalSearchTrigger /> : null}
     </header>
   );
 }
