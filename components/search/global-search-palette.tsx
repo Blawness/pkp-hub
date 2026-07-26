@@ -131,7 +131,7 @@ function GlobalSearchPalette() {
         return;
       }
       const data = res?.data;
-      if (data && data.success) {
+      if (data?.success) {
         setResults(data.results);
       } else {
         setResults([]);
