@@ -9,6 +9,7 @@ import { phaseResource } from "./phase";
 import { profileResource } from "./profile";
 import { projectResource } from "./project";
 import { reportResource } from "./report";
+import { searchResource } from "./search";
 import { userResource } from "./user";
 
 /**
@@ -25,6 +26,7 @@ export const RESOURCES = {
   payment: paymentResource,
   equipment: equipmentResource,
   equipmentItem: equipmentItemResource,
+  search: searchResource,
   user: userResource,
   profile: profileResource,
   report: reportResource,

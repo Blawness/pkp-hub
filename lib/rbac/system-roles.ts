@@ -71,6 +71,9 @@ export const SYSTEM_ROLE_GRANTS: Record<SystemRoleKey, Partial<Record<Permission
     "equipment.read": "all",
     "equipment.borrow": "all",
     "equipment.return": "all",
+    // Cmd-K global: scope tidak per-baris, pilih `all` agar surveyor bisa
+    // mencari proyek/dokumen yang ditugaskan kepadanya dari satu palet.
+    "search.use": "all",
     "profile.updateOwn": "own",
   },
 
