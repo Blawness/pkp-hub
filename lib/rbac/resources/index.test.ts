@@ -16,17 +16,32 @@ import {
  * tanpa tabel benar-benar kehilangan key `table`. Kalau itu rusak, baris
  * pertama gagal compile dan dua `@ts-expect-error` di bawah jadi "unused".
  */
-const _scopedOk: ScopedPermission[] = ["project.read", "payment.void", "document.share"];
+const _scopedOk: ScopedPermission[] = [
+  "project.read",
+  "payment.void",
+  "document.share",
+  "audit.read",
+];
 // @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
 const _profileNotScoped: ScopedPermission = "profile.updateOwn";
 // @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
 const _reportNotScoped: ScopedPermission = "report.export";
 // @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
 const _roleNotScoped: ScopedPermission = "role.read";
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _sessionNotScoped: ScopedPermission = "session.read";
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _settingsNotScoped: ScopedPermission = "settings.read";
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _storageNotScoped: ScopedPermission = "storage.read";
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _notificationNotScoped: ScopedPermission = "notification.manage";
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _backupNotScoped: ScopedPermission = "backup.export";
 
 describe("registry resource", () => {
-  it("memuat 13 resource", () => {
-    expect(Object.keys(RESOURCES)).toHaveLength(13);
+  it("memuat 19 resource", () => {
+    expect(Object.keys(RESOURCES)).toHaveLength(19);
   });
 
   it("nama kunci registry sama dengan nama resource-nya", () => {

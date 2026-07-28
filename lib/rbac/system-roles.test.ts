@@ -90,9 +90,12 @@ describe("seed system role", () => {
     }
   });
 
-  it("admin punya SETIAP permission KECUALI role.*", async () => {
+  it("admin punya SETIAP permission KECUALI superuser-only prefixes", async () => {
     const grants = await grantsOf("admin");
-    const expected = PERMISSIONS.filter((p) => !p.startsWith("role."));
+    const superuserOnly = ["role.", "audit.", "session.", "storage.", "backup."];
+    const expected = PERMISSIONS.filter(
+      (p) => !superuserOnly.some((prefix) => p.startsWith(prefix)),
+    );
     expect(Object.keys(grants).sort()).toEqual([...expected].sort());
   });
 
@@ -126,6 +129,48 @@ describe("seed system role", () => {
     await seedSystemRoles();
     await backfillUserRoles();
     expect(await grantsOf("surveyor")).toEqual(before);
+  });
+
+  it("admin TIDAK dapat permission superuser-only (audit, session, storage, backup)", async () => {
+    const grants = await grantsOf("admin");
+    const forbidden = [
+      "audit.read",
+      "session.read",
+      "session.revoke",
+      "storage.read",
+      "storage.cleanup",
+      "backup.export",
+      "backup.import",
+    ];
+    for (const perm of forbidden) {
+      expect(grants[perm], perm).toBeUndefined();
+    }
+  });
+
+  it("admin TETAP dapat settings.* dan notification.manage", async () => {
+    const grants = await grantsOf("admin");
+    expect(grants["settings.read"]).toBe("all");
+    expect(grants["settings.update"]).toBe("all");
+    expect(grants["notification.manage"]).toBe("all");
+  });
+
+  it("superuser dapat semua 11 permission baru", async () => {
+    const grants = await grantsOf("superuser");
+    const newPerms = [
+      "audit.read",
+      "session.read",
+      "session.revoke",
+      "settings.read",
+      "settings.update",
+      "storage.read",
+      "storage.cleanup",
+      "notification.manage",
+      "backup.export",
+      "backup.import",
+    ];
+    for (const perm of newPerms) {
+      expect(grants[perm], perm).toBe("all");
+    }
   });
 });
 

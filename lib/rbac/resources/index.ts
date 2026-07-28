@@ -1,9 +1,12 @@
 import type { AnyResource } from "../define-resource";
+import { auditResource } from "./audit";
+import { backupResource } from "./backup";
 import { clientResource } from "./client";
 import { documentResource } from "./document";
 import { equipmentResource } from "./equipment";
 import { equipmentItemResource } from "./equipment-item";
 import { mapResource } from "./map";
+import { notificationResource } from "./notification";
 import { paymentResource } from "./payment";
 import { phaseResource } from "./phase";
 import { profileResource } from "./profile";
@@ -11,6 +14,9 @@ import { projectResource } from "./project";
 import { reportResource } from "./report";
 import { roleResource } from "./role";
 import { searchResource } from "./search";
+import { sessionResource } from "./session";
+import { settingsResource } from "./settings";
+import { storageResource } from "./storage";
 import { userResource } from "./user";
 
 /**
@@ -19,19 +25,25 @@ import { userResource } from "./user";
  * disentuh, dan tipe `Permission` ikut bertambah dengan sendirinya.
  */
 export const RESOURCES = {
-  project: projectResource,
+  audit: auditResource,
+  backup: backupResource,
   client: clientResource,
-  phase: phaseResource,
-  map: mapResource,
   document: documentResource,
-  payment: paymentResource,
   equipment: equipmentResource,
   equipmentItem: equipmentItemResource,
-  search: searchResource,
-  user: userResource,
+  map: mapResource,
+  notification: notificationResource,
+  payment: paymentResource,
+  phase: phaseResource,
   profile: profileResource,
+  project: projectResource,
   report: reportResource,
   role: roleResource,
+  search: searchResource,
+  session: sessionResource,
+  settings: settingsResource,
+  storage: storageResource,
+  user: userResource,
 } as const;
 
 export type ResourceName = keyof typeof RESOURCES;

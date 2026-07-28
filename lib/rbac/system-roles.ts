@@ -54,13 +54,23 @@ const superuserGrants: Partial<Record<Permission, Scope>> = Object.fromEntries(
 );
 
 /**
- * Admin = katalog penuh MINUS `role.*`. Mengelola role/permission sengaja
- * tidak otomatis mengalir ke admin — itulah satu-satunya alasan `superuser`
- * ada. Turunan dari `superuserGrants`, bukan daftar manual, untuk alasan yang
- * sama seperti di atas.
+ * Prefix permission yang TIDAK mengalir ke admin — khusus superuser.
+ * `role.*` adalah yang asli; `audit.*`, `session.*`, `storage.*`,
+ * `backup.*` ditambah sesuai spec 2026-07-30.
+ */
+const SUPERUSER_ONLY_PREFIXES = ["role.", "audit.", "session.", "storage.", "backup."];
+
+/**
+ * Admin = katalog penuh MINUS prefix di `SUPERUSER_ONLY_PREFIXES`.
+ * Mengelola role/permission sengaja tidak otomatis mengalir ke admin —
+ * itulah satu-satunya alasan `superuser` ada. Turunan dari
+ * `superuserGrants`, bukan daftar manual, untuk alasan yang sama seperti
+ * di atas.
  */
 const adminGrants: Partial<Record<Permission, Scope>> = Object.fromEntries(
-  Object.entries(superuserGrants).filter(([permission]) => !permission.startsWith("role.")),
+  Object.entries(superuserGrants).filter(
+    ([permission]) => !SUPERUSER_ONLY_PREFIXES.some((prefix) => permission.startsWith(prefix)),
+  ),
 );
 
 /**
