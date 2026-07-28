@@ -9,6 +9,7 @@ import { phaseResource } from "./phase";
 import { profileResource } from "./profile";
 import { projectResource } from "./project";
 import { reportResource } from "./report";
+import { roleResource } from "./role";
 import { searchResource } from "./search";
 import { userResource } from "./user";
 
@@ -30,6 +31,7 @@ export const RESOURCES = {
   user: userResource,
   profile: profileResource,
   report: reportResource,
+  role: roleResource,
 } as const;
 
 export type ResourceName = keyof typeof RESOURCES;

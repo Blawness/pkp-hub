@@ -21,10 +21,12 @@ const _scopedOk: ScopedPermission[] = ["project.read", "payment.void", "document
 const _profileNotScoped: ScopedPermission = "profile.updateOwn";
 // @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
 const _reportNotScoped: ScopedPermission = "report.export";
+// @ts-expect-error resource tanpa tabel tidak boleh jadi ScopedPermission
+const _roleNotScoped: ScopedPermission = "role.read";
 
 describe("registry resource", () => {
-  it("memuat 12 resource", () => {
-    expect(Object.keys(RESOURCES)).toHaveLength(12);
+  it("memuat 13 resource", () => {
+    expect(Object.keys(RESOURCES)).toHaveLength(13);
   });
 
   it("nama kunci registry sama dengan nama resource-nya", () => {

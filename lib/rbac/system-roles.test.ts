@@ -67,16 +67,33 @@ async function grantsOf(key: string): Promise<Record<string, Scope>> {
 }
 
 describe("seed system role", () => {
-  it("membuat 3 role bawaan ber-flag isSystem", async () => {
+  it("membuat 4 role bawaan ber-flag isSystem", async () => {
     const rows = await db.select().from(roles).where(eq(roles.isSystem, true));
-    expect(rows.map((r) => r.key).sort()).toEqual(["admin", "client", "surveyor"]);
+    expect(rows.map((r) => r.key).sort()).toEqual(["admin", "client", "superuser", "surveyor"]);
     expect(rows.find((r) => r.key === "client")?.area).toBe("client");
     expect(rows.find((r) => r.key === "surveyor")?.area).toBe("staff");
+    expect(rows.find((r) => r.key === "superuser")?.area).toBe("staff");
   });
 
-  it("admin punya SETIAP permission di katalog", async () => {
-    const grants = await grantsOf("admin");
+  it("superuser punya SETIAP permission di katalog, termasuk role.*", async () => {
+    const grants = await grantsOf("superuser");
     expect(Object.keys(grants).sort()).toEqual([...PERMISSIONS].sort());
+    expect(grants["role.assign"]).toBe("all");
+  });
+
+  it("superuser ber-scope all kecuali profile.updateOwn yang own", async () => {
+    const grants = await grantsOf("superuser");
+    expect(grants["profile.updateOwn"]).toBe("own");
+    for (const [permission, scope] of Object.entries(grants)) {
+      if (permission === "profile.updateOwn") continue;
+      expect(scope, permission).toBe("all");
+    }
+  });
+
+  it("admin punya SETIAP permission KECUALI role.*", async () => {
+    const grants = await grantsOf("admin");
+    const expected = PERMISSIONS.filter((p) => !p.startsWith("role."));
+    expect(Object.keys(grants).sort()).toEqual([...expected].sort());
   });
 
   it("admin ber-scope all kecuali profile.updateOwn yang own", async () => {

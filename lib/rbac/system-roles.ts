@@ -4,7 +4,7 @@ import { rolePermissions, roles, userRoles, users } from "@/lib/db/schema";
 import { PERMISSIONS, type Permission } from "./resources";
 import type { Scope } from "./types";
 
-export type SystemRoleKey = "admin" | "surveyor" | "client";
+export type SystemRoleKey = "admin" | "surveyor" | "client" | "superuser";
 
 /**
  * Tiga role bawaan. `isSystem` true berarti tidak boleh dihapus atau
@@ -35,16 +35,32 @@ export const SYSTEM_ROLES: readonly {
     description: "Melihat proyeknya sendiri lewat portal, hanya baca.",
     area: "client",
   },
+  {
+    key: "superuser",
+    name: "Superuser",
+    description: "Akses admin penuh, ditambah kendali atas role & permission.",
+    area: "staff",
+  },
 ];
 
 /**
- * Admin memegang SELURUH katalog dengan scope `all` — kecuali
+ * Superuser memegang SELURUH katalog dengan scope `all` — kecuali
  * `profile.updateOwn`, yang menurut namanya memang hanya menyasar dirinya
  * sendiri. Ditulis sebagai turunan katalog, bukan daftar manual, supaya
- * permission baru tidak pernah lupa diberikan ke admin.
+ * permission baru tidak pernah lupa diberikan.
+ */
+const superuserGrants: Partial<Record<Permission, Scope>> = Object.fromEntries(
+  PERMISSIONS.map((permission) => [permission, permission === "profile.updateOwn" ? "own" : "all"]),
+);
+
+/**
+ * Admin = katalog penuh MINUS `role.*`. Mengelola role/permission sengaja
+ * tidak otomatis mengalir ke admin — itulah satu-satunya alasan `superuser`
+ * ada. Turunan dari `superuserGrants`, bukan daftar manual, untuk alasan yang
+ * sama seperti di atas.
  */
 const adminGrants: Partial<Record<Permission, Scope>> = Object.fromEntries(
-  PERMISSIONS.map((permission) => [permission, permission === "profile.updateOwn" ? "own" : "all"]),
+  Object.entries(superuserGrants).filter(([permission]) => !permission.startsWith("role.")),
 );
 
 /**
@@ -54,6 +70,7 @@ const adminGrants: Partial<Record<Permission, Scope>> = Object.fromEntries(
  */
 export const SYSTEM_ROLE_GRANTS: Record<SystemRoleKey, Partial<Record<Permission, Scope>>> = {
   admin: adminGrants,
+  superuser: superuserGrants,
 
   surveyor: {
     "project.read": "assigned",
