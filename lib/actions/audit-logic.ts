@@ -15,12 +15,26 @@ export type AuditLogRow = {
   createdAt: Date;
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
+
+const ENTITY_TYPES = [
+  "client",
+  "project",
+  "user",
+  "document",
+  "payment",
+  "phase",
+  "map",
+  "equipment",
+  "equipmentItem",
+  "role",
+] as const;
+
+export { ENTITY_TYPES };
 
 /**
- * Query audit log terbaru dengan pagination. Superuser-only —
- * `audit.read` tidak diberikan ke admin. Actor name diambil
- * lewat join ke tabel `user`.
+ * Query audit log terbaru dengan pagination + filter entity type.
+ * Superuser-only — `audit.read` tidak diberikan ke admin.
  */
 export async function listAuditLogs(
   ctx: RbacContext,
@@ -28,31 +42,40 @@ export async function listAuditLogs(
 ): Promise<{ rows: AuditLogRow[]; total: number }> {
   assertCan(ctx, "audit.read");
 
-  const offset = Math.max(0, (opts?.page ?? 0) - 1) * PAGE_SIZE;
+  const page = Math.max(1, opts?.page ?? 1);
+  const offset = (page - 1) * PAGE_SIZE;
 
-  const rows = await db
-    .select({
-      id: auditLog.id,
-      actorName: users.name,
-      action: auditLog.action,
-      entityType: auditLog.entityType,
-      entityId: auditLog.entityId,
-      detail: auditLog.detail,
-      ipAddress: auditLog.ipAddress,
-      createdAt: auditLog.createdAt,
-    })
-    .from(auditLog)
-    .leftJoin(users, eq(users.id, auditLog.actorId))
-    .orderBy(desc(auditLog.createdAt))
-    .limit(PAGE_SIZE)
-    .offset(offset);
+  const conditions = [];
+  if (opts?.entityType && ENTITY_TYPES.includes(opts.entityType as (typeof ENTITY_TYPES)[number])) {
+    conditions.push(eq(auditLog.entityType, opts.entityType));
+  }
 
-  // Hitung total untuk pagination. Tanpa filter entityType dulu;
-  // bisa ditambah nanti.
-  const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(auditLog);
+  const [rows, [cnt]] = await Promise.all([
+    db
+      .select({
+        id: auditLog.id,
+        actorName: users.name,
+        action: auditLog.action,
+        entityType: auditLog.entityType,
+        entityId: auditLog.entityId,
+        detail: auditLog.detail,
+        ipAddress: auditLog.ipAddress,
+        createdAt: auditLog.createdAt,
+      })
+      .from(auditLog)
+      .leftJoin(users, eq(users.id, auditLog.actorId))
+      .where(conditions.length > 0 ? sql`${conditions[0]}` : undefined)
+      .orderBy(desc(auditLog.createdAt))
+      .limit(PAGE_SIZE)
+      .offset(offset),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(auditLog)
+      .where(conditions.length > 0 ? sql`${conditions[0]}` : undefined),
+  ]);
 
   return {
     rows: rows.map((r) => ({ ...r, detail: r.detail as Record<string, unknown> | null })),
-    total: count,
+    total: cnt?.count ?? 0,
   };
 }

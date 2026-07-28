@@ -1,3 +1,10 @@
+"use client";
+
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { SelectField } from "@/components/ui/select-field";
 import {
   Table,
   TableBody,
@@ -39,6 +46,8 @@ const actionBadge: Record<string, string> = {
   archive: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
   restore: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
   login: "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400",
+  assign: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400",
+  void: "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400",
 };
 
 function ActionBadge({ action }: { action: string }) {
@@ -50,53 +59,121 @@ function ActionBadge({ action }: { action: string }) {
   );
 }
 
-export function AuditLogTable({ rows }: { rows: AuditLogRow[] }) {
-  if (rows.length === 0) {
-    return (
-      <p className="py-12 text-center text-muted-foreground text-sm">Belum ada catatan audit.</p>
-    );
+type Props = {
+  rows: AuditLogRow[];
+  currentPage: number;
+  totalPages: number;
+  entityType?: string;
+  entityTypes: string[];
+};
+
+export function AuditLogTable({ rows, currentPage, totalPages, entityType, entityTypes }: Props) {
+  const router = useRouter();
+
+  function buildHref(page: number, type?: string) {
+    const params = new URLSearchParams();
+    if (page > 1) params.set("page", String(page));
+    if (type) params.set("entityType", type);
+    const qs = params.toString();
+    return `/dashboard/settings/audit${qs ? `?${qs}` : ""}`;
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead className="w-40">Waktu</TableHead>
-            <TableHead>Aktor</TableHead>
-            <TableHead className="w-24">Aksi</TableHead>
-            <TableHead>Entitas</TableHead>
-            <TableHead>Detail</TableHead>
-            <TableHead className="w-36">IP</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((row) => (
-            <TableRow key={row.id}>
-              <TableCell className="whitespace-nowrap text-muted-foreground text-xs">
-                {formatDate(row.createdAt)}
-              </TableCell>
-              <TableCell className="font-medium text-sm">
-                {row.actorName ?? <span className="text-muted-foreground italic">Terhapus</span>}
-              </TableCell>
-              <TableCell>
-                <ActionBadge action={row.action} />
-              </TableCell>
-              <TableCell className="text-sm">
-                <span className="font-mono text-xs text-muted-foreground">{row.entityType}</span>
-                <span className="mx-1 text-muted-foreground">/</span>
-                <span className="font-mono text-xs">{row.entityId.slice(0, 8)}…</span>
-              </TableCell>
-              <TableCell>
-                <DetailCell detail={row.detail} />
-              </TableCell>
-              <TableCell className="font-mono text-muted-foreground text-xs">
-                {row.ipAddress ?? "—"}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="flex flex-col gap-3">
+      {/* Filter bar */}
+      <div className="flex items-center gap-3">
+        <SelectField
+          aria-label="Filter entitas"
+          className="w-48"
+          options={[
+            { value: "", label: "Semua entitas" },
+            ...entityTypes.map((t) => ({ value: t, label: t })),
+          ]}
+          value={entityType ?? ""}
+          onValueChange={(v) => {
+            const href = buildHref(1, v || undefined);
+            router.push(href);
+          }}
+        />
+      </div>
+
+      {rows.length === 0 ? (
+        <p className="py-12 text-center text-muted-foreground text-sm">Belum ada catatan audit.</p>
+      ) : (
+        <>
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-40">Waktu</TableHead>
+                  <TableHead>Aktor</TableHead>
+                  <TableHead className="w-24">Aksi</TableHead>
+                  <TableHead>Entitas</TableHead>
+                  <TableHead>Detail</TableHead>
+                  <TableHead className="w-36">IP</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((row) => (
+                  <TableRow key={row.id}>
+                    <TableCell className="whitespace-nowrap text-muted-foreground text-xs">
+                      {formatDate(row.createdAt)}
+                    </TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {row.actorName ?? (
+                        <span className="text-muted-foreground italic">Terhapus</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <ActionBadge action={row.action} />
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {row.entityType}
+                      </span>
+                      <span className="mx-1 text-muted-foreground">/</span>
+                      <span className="font-mono text-xs">{row.entityId.slice(0, 8)}…</span>
+                    </TableCell>
+                    <TableCell>
+                      <DetailCell detail={row.detail} />
+                    </TableCell>
+                    <TableCell className="font-mono text-muted-foreground text-xs">
+                      {row.ipAddress ?? "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <p className="text-muted-foreground text-sm">
+                Halaman {currentPage} dari {totalPages}
+              </p>
+              <div className="flex gap-2">
+                {currentPage > 1 && (
+                  <Link href={buildHref(currentPage - 1, entityType)}>
+                    <Button variant="outline" size="sm">
+                      <ChevronLeftIcon className="size-4" />
+                      Sebelumnya
+                    </Button>
+                  </Link>
+                )}
+                {currentPage < totalPages && (
+                  <Link href={buildHref(currentPage + 1, entityType)}>
+                    <Button variant="outline" size="sm">
+                      Berikutnya
+                      <ChevronRightIcon className="size-4" />
+                    </Button>
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -24,7 +24,11 @@ export default async function SettingsLayout({ children }: { children: ReactNode
   return (
     <div className="flex flex-1 flex-col">
       <div className="px-6 pt-6 sm:px-8">
-        <SettingsTabs showRoles={can(ctx, "role.read")} showAudit={can(ctx, "audit.read")} />
+        <SettingsTabs
+          showRoles={can(ctx, "role.read")}
+          showSessions={can(ctx, "session.read")}
+          showAudit={can(ctx, "audit.read")}
+        />
       </div>
       {children}
     </div>
