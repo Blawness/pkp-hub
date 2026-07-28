@@ -19,6 +19,9 @@
     "db:seed:reset": "SEED_RESET=1 tsx --env-file=.env.local lib/db/seed.ts",
     "db:check-drift": "tsx --env-file=.env.local scripts/check-drift.ts",
     "db:grant-superuser": "tsx --env-file=.env.local scripts/grant-superuser.ts",
+    "db:grant-superuser:prod": "tsx --env-file=.env.prod scripts/grant-superuser.ts",
+    "db:sync-roles": "tsx --env-file=.env.local scripts/sync-system-roles.ts",
+    "db:sync-roles:prod": "tsx --env-file=.env.prod scripts/sync-system-roles.ts",
     "test": "node --env-file=.env.local node_modules/vitest/vitest.mjs run",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui"
