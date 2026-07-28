@@ -1,12 +1,12 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { CoinsIcon, WrenchIcon } from "lucide-react";
+import { WrenchIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
-import { StatCard } from "@/components/dashboard/stat-card";
 import { EquipmentCatalog } from "@/components/equipment/equipment-catalog";
 import { EquipmentFilters } from "@/components/equipment/equipment-filters";
 import { EquipmentItemFormDialog } from "@/components/equipment/equipment-item-form-dialog";
 import { EquipmentSummary } from "@/components/equipment/equipment-summary";
 import type { EquipmentItemAccordionRow } from "@/components/equipment/equipment-unit-list";
+import { QuickBorrowWidget } from "@/components/equipment/quick-borrow-widget";
 import { ExportButton } from "@/components/export/export-button";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -19,7 +19,6 @@ import {
   totalPurchaseValue,
   usageDurationMs,
 } from "@/lib/equipment/derive";
-import { formatIDR } from "@/lib/format";
 import { can } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 import { rbacFilter } from "@/lib/rbac/filter";
@@ -72,7 +71,7 @@ export default async function EquipmentPage({
   const overallSummary = summarizeUnits(itemsWithUnits.flatMap((it) => it.units));
   // `totalPurchaseValue` cuma dipanggil kalau `canReadCost` — lihat komentar
   // fungsinya soal absennya `purchasePrice` yang menjumlah jadi 0.
-  const totalAssetValue = canReadCost
+  const _totalAssetValue = canReadCost
     ? totalPurchaseValue(
         itemsWithUnits
           .flatMap((it) => it.units)
@@ -150,15 +149,6 @@ export default async function EquipmentPage({
         }
       />
 
-      {totalAssetValue !== null ? (
-        <StatCard
-          label="Total nilai aset"
-          value={formatIDR(totalAssetValue)}
-          hint="Harga beli seluruh unit aktif"
-          icon={CoinsIcon}
-        />
-      ) : null}
-
       <EquipmentSummary
         total={overallSummary.total}
         tersedia={overallSummary.tersedia}
@@ -169,6 +159,9 @@ export default async function EquipmentPage({
       />
 
       <EquipmentFilters />
+
+      {/* Quick Borrow — mobile-friendly, selalu di atas daftar */}
+      <QuickBorrowWidget projectOptions={projectOptions} />
 
       <EquipmentCatalog
         items={rows}

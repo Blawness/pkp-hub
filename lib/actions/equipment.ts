@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import {
   archiveEquipmentForUser,
+  borrowByCodeForUser,
   borrowEquipmentForUser,
   correctUsageForUser,
   createEquipmentForUser,
@@ -84,6 +86,23 @@ export const correctUsage = rbacActionClient
     const usage = await correctUsageForUser(ctx.rbac, parsedInput);
     revalidatePath("/dashboard/equipment");
     revalidatePath(`/dashboard/equipment/unit/${usage.equipmentId}`);
+    revalidatePath(`/dashboard/projects/${usage.projectId}`);
+    return { success: true as const, usage };
+  });
+
+const borrowByCodeSchema = z.object({
+  code: z.string().min(1).max(20),
+  projectId: z.uuid(),
+  startedAt: z.coerce.date().optional(),
+});
+
+/** Quick borrow by code — mobile-friendly. Cari unit by kode, langsung pinjam. */
+export const borrowByCode = rbacActionClient
+  .metadata({ permission: "equipment.borrow" })
+  .inputSchema(borrowByCodeSchema)
+  .action(async ({ parsedInput, ctx }) => {
+    const usage = await borrowByCodeForUser(ctx.rbac, parsedInput);
+    revalidatePath("/dashboard/equipment");
     revalidatePath(`/dashboard/projects/${usage.projectId}`);
     return { success: true as const, usage };
   });

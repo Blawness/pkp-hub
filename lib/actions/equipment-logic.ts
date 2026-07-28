@@ -554,3 +554,62 @@ export async function correctUsageForUser(
 
   return row;
 }
+
+/**
+ * Quick borrow by code — mobile-friendly. Cari unit by kode, lalu pinjam.
+ * Dipakai QuickBorrowWidget. Surveyor dipaksa pinjam sebagai dirinya sendiri.
+ */
+export async function borrowByCodeForUser(
+  ctx: RbacContext,
+  input: { code: string; projectId: string; startedAt?: Date },
+): Promise<UsageRow> {
+  assertCan(ctx, "equipment.borrow");
+  await requireProjectReadOrReject(ctx, input.projectId);
+
+  const [unit] = await db
+    .select({ id: equipment.id, condition: equipment.condition, archivedAt: equipment.archivedAt })
+    .from(equipment)
+    .where(eq(equipment.code, input.code.trim().toUpperCase()));
+  if (!unit) throw new Error(`Alat dengan kode "${input.code}" tidak ditemukan.`);
+
+  const usedById = ctx.user.role === "admin" ? ctx.user.id : ctx.user.id;
+
+  const [activeSession] = await db
+    .select({ id: equipmentUsage.id })
+    .from(equipmentUsage)
+    .where(and(eq(equipmentUsage.equipmentId, unit.id), isNull(equipmentUsage.endedAt)));
+
+  const rejection = borrowRejection(unit, Boolean(activeSession));
+  if (rejection) throw new Error(rejection);
+
+  const windowError = validateUsageWindow(input.startedAt ?? new Date(), null, new Date());
+  if (windowError) throw new Error(windowError);
+
+  try {
+    const [row] = await db
+      .insert(equipmentUsage)
+      .values({
+        equipmentId: unit.id,
+        projectId: input.projectId,
+        usedById,
+        startedAt: input.startedAt ?? new Date(),
+        recordedById: ctx.user.id,
+      })
+      .returning();
+
+    await recordAudit({
+      actorId: ctx.user.id,
+      action: "borrow",
+      entityType: "equipment",
+      entityId: row.equipmentId,
+      detail: { projectId: input.projectId, usedById },
+    });
+
+    return row;
+  } catch (error) {
+    if (isActiveUsageUniqueViolation(error)) {
+      throw new Error("Alat sedang dipakai orang lain.");
+    }
+    throw error;
+  }
+}
