@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { SessionHeartbeat } from "@/components/auth/session-heartbeat";
-import { SIDEBAR_COOKIE } from "@/components/dashboard/nav-config";
+import { SIDEBAR_PIN_COOKIE } from "@/components/dashboard/nav-config";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
 import { PermissionsProvider } from "@/components/rbac/permissions-provider";
@@ -21,8 +21,8 @@ export const metadata: Metadata = {
  * only does a coarse cookie-cache check; this is the real gate — it hits the
  * DB via `getSession`/`requireUser` + pengecekan area.
  *
- * Kondisi ciut sidebar dibaca di sini, di server, supaya rail sudah tergambar
- * dengan lebar yang benar pada cat pertama (lihat `sidebar.tsx`).
+ * Preferensi pin sidebar dibaca di sini, di server, supaya panel sudah
+ * tergambar dengan lebar yang benar pada cat pertama (lihat `sidebar.tsx`).
  */
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
   // Gerbang AREA: user yang rumahnya bukan /dashboard (klien) dipantulkan ke
@@ -31,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (homeForRole(user.role) !== "/dashboard") redirect(homeForRole(user.role));
   const ctx = await getRbacContext();
   const cookieStore = await cookies();
-  const collapsed = cookieStore.get(SIDEBAR_COOKIE)?.value === "1";
+  const pinned = cookieStore.get(SIDEBAR_PIN_COOKIE)?.value === "1";
 
   return (
     // Hanya DAFTAR permission yang menyeberang ke klien (untuk gating
@@ -46,12 +46,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       <GlobalSearchProvider>
         <div className="flex min-h-svh">
           <SessionHeartbeat />
-          <DashboardSidebar user={user} defaultCollapsed={collapsed} />
+          <DashboardSidebar user={user} defaultPinned={pinned} />
 
           {/* `min-w-0` menahan kolom ini agar tidak melar mengikuti isinya — tanpa
               itu, tabel lebar akan mendorong seluruh layout dan sidebar ikut
               tergeser keluar layar. */}
-          <div className="flex min-w-0 flex-1 flex-col">
+          <div data-slot="content-column" className="flex min-w-0 flex-1 flex-col">
             <Topbar user={user} />
             {children}
           </div>

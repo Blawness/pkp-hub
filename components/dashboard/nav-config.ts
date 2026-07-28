@@ -10,7 +10,7 @@ import {
 import type { Permission } from "@/lib/rbac/resources";
 
 /**
- * Nama cookie penyimpan kondisi ciut sidebar.
+ * Nama cookie penyimpan preferensi PIN sidebar (`"1"` = dipin).
  *
  * Tinggal di modul netral ini — BUKAN di `sidebar.tsx` — karena file itu
  * ber-"use client". Konstanta yang diekspor dari modul klien lalu diimpor oleh
@@ -18,8 +18,13 @@ import type { Permission } from "@/lib/rbac/resources";
  * adalah referensi klien, sehingga `cookies().get(...)` mencari nama yang salah
  * dan selalu mengembalikan undefined — sidebar pun lupa pilihan penggunanya di
  * setiap muat ulang, tanpa satu pun error yang muncul.
+ *
+ * Namanya sengaja BEDA dari `pkp_sidebar_collapsed` yang lama: nilai lama
+ * berarti "menciut", kebalikan dari "dipin". Memakai ulang namanya akan
+ * membuat setiap pengguna yang dulu memilih rail mendadak mendapat sidebar
+ * terkunci lebar. Cookie lama dibiarkan kedaluwarsa sendiri.
  */
-export const SIDEBAR_COOKIE = "pkp_sidebar_collapsed";
+export const SIDEBAR_PIN_COOKIE = "pkp_sidebar_pinned";
 
 export type NavLink = {
   /** Segmen route pertama di bawah /dashboard; `null` untuk /dashboard sendiri. */
