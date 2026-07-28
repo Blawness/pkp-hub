@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
-import { projectStatusLogs, projects, users } from "@/lib/db/schema";
+import { mapLayers, projectPhases, projectStatusLogs, projects, users } from "@/lib/db/schema";
 import { statusLabel } from "@/lib/labels";
 import { notifyClientOfStatusChange } from "@/lib/notifications/project-status";
 import { assertCan } from "@/lib/rbac/can";
@@ -321,4 +321,89 @@ export async function getProjectDetailForUser(
 ): Promise<ProjectDetail> {
   const row = (await requireScopedRow(ctx, "project.read", projectId)) as ProjectRow;
   return redact(ctx, projectResource, row) as ProjectDetail;
+}
+
+/**
+ * Duplikat proyek — admin-only. Menyalin proyek + fase + layer peta.
+ * Dokumen dan pembayaran TIDAK disalin (terlalu berat + tidak relevan).
+ * Proyek baru selalu mulai dari status "baru".
+ */
+export async function duplicateProjectForUser(
+  ctx: RbacContext,
+  projectId: string,
+): Promise<ProjectRow> {
+  assertCan(ctx, "project.create");
+  const original = (await requireScopedRow(
+    ctx,
+    "project.read",
+    projectId,
+  )) as typeof projects.$inferSelect;
+
+  const [phases, layers] = await Promise.all([
+    db.select().from(projectPhases).where(eq(projectPhases.projectId, projectId)),
+    db.select().from(mapLayers).where(eq(mapLayers.projectId, projectId)),
+  ]);
+
+  const duplicate = await db.transaction(async (tx) => {
+    const [copy] = await tx
+      .insert(projects)
+      .values({
+        title: `${original.title} (salinan)`,
+        clientId: original.clientId,
+        surveyType: original.surveyType,
+        locationLabel: original.locationLabel,
+        assignedSurveyorId: original.assignedSurveyorId,
+        description: original.description,
+        projectValue: original.projectValue,
+        paymentStatus: "belum",
+        paymentNotes: null,
+      })
+      .returning();
+
+    await tx.insert(projectStatusLogs).values({
+      projectId: copy.id,
+      fromStatus: null,
+      toStatus: "baru",
+      changedById: ctx.user.id,
+    });
+
+    if (phases.length > 0) {
+      await tx.insert(projectPhases).values(
+        phases.map((p) => ({
+          projectId: copy.id,
+          name: p.name,
+          description: p.description,
+          weight: p.weight,
+          sortOrder: p.sortOrder,
+          assignedSurveyorId: p.assignedSurveyorId,
+          targetDate: p.targetDate,
+        })),
+      );
+    }
+
+    if (layers.length > 0) {
+      await tx.insert(mapLayers).values(
+        layers.map((l) => ({
+          projectId: copy.id,
+          name: l.name,
+          geojson: l.geojson,
+          areaSqm: l.areaSqm,
+          source: l.source,
+          createdById: ctx.user.id,
+        })),
+      );
+    }
+
+    return copy;
+  });
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "project",
+    entityId: duplicate.id,
+    detail: { title: duplicate.title, duplicatedFrom: projectId },
+  });
+
+  return duplicate;
 }

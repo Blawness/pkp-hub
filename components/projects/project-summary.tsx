@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { z } from "zod";
+import { DuplicateProjectButton } from "@/components/projects/duplicate-project-button";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import type { StatusLogRow } from "@/components/projects/status-history";
 import { StatusPipeline } from "@/components/projects/status-pipeline";
@@ -106,7 +107,10 @@ export function ProjectSummary({
             </p>
           </div>
           {canEdit ? (
-            <ProjectFormDialog clients={clients} surveyors={surveyors} project={editProject} />
+            <div className="flex gap-2">
+              <DuplicateProjectButton projectId={projectId} />
+              <ProjectFormDialog clients={clients} surveyors={surveyors} project={editProject} />
+            </div>
           ) : null}
         </div>
 

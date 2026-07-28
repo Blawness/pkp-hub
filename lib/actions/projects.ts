@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import {
   assignSurveyorForUser,
   changeProjectStatusForUser,
   createProjectForUser,
+  duplicateProjectForUser,
   updateProjectForUser,
 } from "@/lib/actions/projects-logic";
 import {
@@ -63,5 +65,15 @@ export const changeProjectStatus = rbacActionClient
   .action(async ({ parsedInput, ctx }) => {
     const project = await changeProjectStatusForUser(ctx.rbac, parsedInput);
     revalidatePath(`/dashboard/projects/${project.id}`);
+    return { success: true as const, project };
+  });
+
+/** Admin-only: duplikat proyek beserta fase dan layer peta. */
+export const duplicateProject = rbacActionClient
+  .metadata({ permission: "project.create" })
+  .inputSchema(z.object({ projectId: z.uuid() }))
+  .action(async ({ parsedInput, ctx }) => {
+    const project = await duplicateProjectForUser(ctx.rbac, parsedInput.projectId);
+    revalidatePath("/dashboard/projects");
     return { success: true as const, project };
   });
