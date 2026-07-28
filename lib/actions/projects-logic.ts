@@ -140,6 +140,17 @@ export async function createProjectForUser(ctx: RbacContext, input: ProjectInput
 
 export async function updateProjectForUser(ctx: RbacContext, input: UpdateProjectInput) {
   assertCan(ctx, "project.update");
+
+  // Row-level scoping: pastikan user punya akses ke proyek ini.
+  try {
+    await requireScopedRow(ctx, "project.update", input.id);
+  } catch (error) {
+    if (isNotFoundDigest(error)) {
+      throw new Error("Project not found or you do not have access to it.");
+    }
+    throw error;
+  }
+
   const [project] = await db
     .update(projects)
     .set({
@@ -167,6 +178,21 @@ export async function updateProjectForUser(ctx: RbacContext, input: UpdateProjec
 export async function assignSurveyorForUser(ctx: RbacContext, input: AssignSurveyorInput) {
   assertCan(ctx, "project.assignSurveyor");
 
+  // Row-level scoping: pastikan user punya akses ke proyek ini.
+  let project: typeof projects.$inferSelect;
+  try {
+    project = (await requireScopedRow(
+      ctx,
+      "project.assignSurveyor",
+      input.projectId,
+    )) as typeof projects.$inferSelect;
+  } catch (error) {
+    if (isNotFoundDigest(error)) {
+      throw new Error("Project not found or you do not have access to it.");
+    }
+    throw error;
+  }
+
   const surveyorId = nullableText(input.surveyorId);
   if (surveyorId) {
     // Never trust a bare id: it must belong to an existing user with role
@@ -178,20 +204,20 @@ export async function assignSurveyorForUser(ctx: RbacContext, input: AssignSurve
     }
   }
 
-  const [project] = await db
+  const [updated] = await db
     .update(projects)
     .set({ assignedSurveyorId: surveyorId, updatedAt: new Date() })
     .where(eq(projects.id, input.projectId))
     .returning();
-  if (!project) throw new Error("Project not found.");
+  if (!updated) throw new Error("Project not found.");
   await recordAudit({
     actorId: ctx.user.id,
     action: "assignSurveyor",
     entityType: "project",
-    entityId: project.id,
+    entityId: updated.id,
     detail: { surveyorId: surveyorId ?? null },
   });
-  return project;
+  return updated;
 }
 
 /**

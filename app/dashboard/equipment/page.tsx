@@ -16,7 +16,6 @@ import { projects, users } from "@/lib/db/schema";
 import {
   formatDuration,
   summarizeUnits,
-  totalPurchaseValue,
   usageDurationMs,
 } from "@/lib/equipment/derive";
 import { can } from "@/lib/rbac/can";
@@ -69,15 +68,6 @@ export default async function EquipmentPage({
   // Ringkasan total dihitung SEBELUM filter diterapkan — kartunya sendiri
   // adalah quick-filter, jadi harus tetap menunjukkan total sesungguhnya.
   const overallSummary = summarizeUnits(itemsWithUnits.flatMap((it) => it.units));
-  // `totalPurchaseValue` cuma dipanggil kalau `canReadCost` — lihat komentar
-  // fungsinya soal absennya `purchasePrice` yang menjumlah jadi 0.
-  const _totalAssetValue = canReadCost
-    ? totalPurchaseValue(
-        itemsWithUnits
-          .flatMap((it) => it.units)
-          .map((u) => ({ purchasePrice: "purchasePrice" in u ? u.purchasePrice : undefined })),
-      )
-    : null;
 
   // Filter di level item: item tampil kalau ADA unit yang cocok filter; unit
   // yang tidak cocok tersembunyi di dalam accordion-nya, bukan item-nya yang

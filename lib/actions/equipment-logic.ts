@@ -561,7 +561,7 @@ export async function correctUsageForUser(
  */
 export async function borrowByCodeForUser(
   ctx: RbacContext,
-  input: { code: string; projectId: string; startedAt?: Date },
+  input: { code: string; projectId: string; startedAt?: Date; usedById?: string },
 ): Promise<UsageRow> {
   assertCan(ctx, "equipment.borrow");
   await requireProjectReadOrReject(ctx, input.projectId);
@@ -572,7 +572,8 @@ export async function borrowByCodeForUser(
     .where(eq(equipment.code, input.code.trim().toUpperCase()));
   if (!unit) throw new Error(`Alat dengan kode "${input.code}" tidak ditemukan.`);
 
-  const usedById = ctx.user.role === "admin" ? ctx.user.id : ctx.user.id;
+  // Admin boleh pinjam atas nama surveyor; surveyor selalu pinjam sebagai dirinya sendiri.
+  const usedById = ctx.user.role === "admin" ? (input.usedById ?? ctx.user.id) : ctx.user.id;
 
   const [activeSession] = await db
     .select({ id: equipmentUsage.id })

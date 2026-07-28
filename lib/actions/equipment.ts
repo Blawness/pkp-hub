@@ -94,6 +94,8 @@ const borrowByCodeSchema = z.object({
   code: z.string().min(1).max(20),
   projectId: z.uuid(),
   startedAt: z.coerce.date().optional(),
+  // Admin boleh pinjam atas nama surveyor; untuk surveyor, server memaksa jadi id dirinya sendiri.
+  usedById: z.string().min(1).optional(),
 });
 
 /** Quick borrow by code — mobile-friendly. Cari unit by kode, langsung pinjam. */
