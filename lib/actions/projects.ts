@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import {
   assignSurveyorForUser,
+  bulkAdvanceProjectStatus,
   changeProjectStatusForUser,
   createProjectForUser,
   duplicateProjectForUser,
@@ -76,4 +77,14 @@ export const duplicateProject = rbacActionClient
     const project = await duplicateProjectForUser(ctx.rbac, parsedInput.projectId);
     revalidatePath("/dashboard/projects");
     return { success: true as const, project };
+  });
+
+/** Bulk: majukan status proyek satu langkah. */
+export const bulkAdvanceStatus = rbacActionClient
+  .metadata({ permission: "project.changeStatus" })
+  .inputSchema(z.object({ projectIds: z.array(z.uuid()).min(1).max(50) }))
+  .action(async ({ parsedInput, ctx }) => {
+    const result = await bulkAdvanceProjectStatus(ctx.rbac, parsedInput.projectIds);
+    revalidatePath("/dashboard/projects");
+    return { success: true as const, ...result };
   });

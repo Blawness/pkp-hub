@@ -4,9 +4,8 @@ import { PageHeader } from "@/components/dashboard/page-header";
 import { ActiveFilters } from "@/components/projects/active-filters";
 import { ProjectFilters } from "@/components/projects/project-filters";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
-import { projectsColumns } from "@/components/projects/projects-columns";
+import { ProjectsTable } from "@/components/projects/projects-table";
 import { Button } from "@/components/ui/button";
-import { DataTable } from "@/components/ui/data-table";
 import { EmptyState } from "@/components/ui/empty-state";
 import { listClients } from "@/lib/actions/clients-logic";
 import { db } from "@/lib/db";
@@ -90,12 +89,9 @@ export default async function ProjectsPage({
         }
       />
 
-      <DataTable
-        columns={projectsColumns}
-        data={rows}
-        searchable
-        searchPlaceholder="Cari proyek atau klien…"
-        rowHrefBase="/dashboard/projects"
+      <ProjectsTable
+        rows={rows}
+        ctx={ctx}
         toolbar={
           <>
             <ProjectFilters clients={clientRows} surveyors={surveyorRows} />

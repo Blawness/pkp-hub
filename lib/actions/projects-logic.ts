@@ -407,3 +407,69 @@ export async function duplicateProjectForUser(
 
   return duplicate;
 }
+
+const ALLOWED_BULK_TRANSITIONS: Record<string, string> = {
+  baru: "dijadwalkan",
+  dijadwalkan: "data_diambil",
+  data_diambil: "diproses",
+  diproses: "selesai",
+};
+
+/**
+ * Majukan status beberapa proyek satu langkah (bulk). Hanya proyek yang
+ * statusnya bisa dimajukan yang disentuh — sisanya dilewati tanpa error.
+ */
+export async function bulkAdvanceProjectStatus(
+  ctx: RbacContext,
+  projectIds: string[],
+): Promise<{ changed: number; skipped: number }> {
+  assertCan(ctx, "project.changeStatus");
+
+  let changed = 0;
+  let skipped = 0;
+
+  for (const id of projectIds) {
+    let project: typeof projects.$inferSelect;
+    try {
+      project = (await requireScopedRow(
+        ctx,
+        "project.changeStatus",
+        id,
+      )) as typeof projects.$inferSelect;
+    } catch {
+      skipped++;
+      continue;
+    }
+
+    const toStatus = ALLOWED_BULK_TRANSITIONS[project.status];
+    if (!toStatus) {
+      skipped++;
+      continue;
+    }
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(projects)
+        .set({ status: toStatus as typeof project.status, updatedAt: new Date() })
+        .where(eq(projects.id, id));
+      await tx.insert(projectStatusLogs).values({
+        projectId: id,
+        fromStatus: project.status,
+        toStatus: toStatus as typeof project.status,
+        changedById: ctx.user.id,
+      });
+    });
+
+    await recordAudit({
+      actorId: ctx.user.id,
+      action: "changeStatus",
+      entityType: "project",
+      entityId: id,
+      detail: { from: project.status, to: toStatus, bulk: true },
+    });
+
+    changed++;
+  }
+
+  return { changed, skipped };
+}

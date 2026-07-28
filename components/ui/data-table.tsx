@@ -8,6 +8,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   type Row,
+  type RowSelectionState,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
@@ -30,14 +31,6 @@ import { cn } from "@/lib/utils";
 /** Di atas ini, tabel dipaginasi; di bawahnya, satu halaman penuh lebih enak dibaca. */
 const PAGE_SIZE = 25;
 
-/**
- * Minimal, reusable TanStack Table wrapper over the shadcn `Table`
- * primitives (there is no upstream "data-table" block for the base-nova
- * style, so this follows the standard shadcn docs pattern by hand).
- *
- * Semua tambahan di bawah bersifat opt-in lewat prop, jadi tabel yang sudah
- * ada tidak berubah perilakunya sampai pemanggilnya meminta.
- */
 export function DataTable<TData extends { id: string }, TValue>({
   columns,
   data,
@@ -46,52 +39,86 @@ export function DataTable<TData extends { id: string }, TValue>({
   searchPlaceholder = "Cari…",
   toolbar,
   rowHrefBase,
+  selectable = false,
+  selectedIds = [],
+  onSelectionChange,
 }: {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
   emptyMessage?: React.ReactNode;
-  /** Menampilkan kotak pencarian. Menyaring SEMUA kolom, bukan satu kolom tertentu. */
   searchable?: boolean;
   searchPlaceholder?: string;
-  /** Kontrol tambahan (mis. filter) yang duduk sebaris dengan kotak pencarian. */
   toolbar?: React.ReactNode;
-  /**
-   * Membuat baris bisa dibuka; tujuannya `${rowHrefBase}/${row.id}`.
-   *
-   * Sengaja string, bukan callback `(row) => string`: halaman pemanggilnya
-   * adalah Server Component, dan fungsi tidak bisa diserialisasi melewati
-   * batas server→client. Karena itu pula `TData` diwajibkan punya `id` —
-   * supaya syarat itu ditagih saat kompilasi, bukan meledak saat dipakai.
-   */
   rowHrefBase?: string;
+  selectable?: boolean;
+  selectedIds?: string[];
+  onSelectionChange?: (ids: string[]) => void;
 }) {
   const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  // Sync external selection state → internal
+  React.useEffect(() => {
+    if (!selectable) return;
+    const next: RowSelectionState = {};
+    for (const id of selectedIds) next[id] = true;
+    setRowSelection(next);
+  }, [selectedIds, selectable]);
+
+  // Sync internal → external
+  React.useEffect(() => {
+    if (!selectable || !onSelectionChange) return;
+    const ids = Object.keys(rowSelection);
+    onSelectionChange(ids);
+  }, [rowSelection, selectable, onSelectionChange]);
 
   const paginated = data.length > PAGE_SIZE;
 
+  const finalColumns = React.useMemo(() => {
+    if (!selectable) return columns;
+
+    const selectCol: ColumnDef<TData, TValue> = {
+      id: "__select__",
+      header: ({ table }) => (
+        <input
+          type="checkbox"
+          aria-label="Pilih semua"
+          checked={table.getIsAllPageRowsSelected()}
+          onChange={(e) => table.toggleAllPageRowsSelected(e.target.checked)}
+          className="size-4 accent-primary"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          aria-label={`Pilih ${row.original.id}`}
+          checked={row.getIsSelected()}
+          onChange={(e) => row.toggleSelected(e.target.checked)}
+          className="size-4 accent-primary"
+        />
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    };
+    return [selectCol, ...columns];
+  }, [columns, selectable]);
+
   const table = useReactTable({
     data,
-    columns,
+    columns: finalColumns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     getPaginationRowModel: paginated ? getPaginationRowModel() : undefined,
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
-    state: { sorting, globalFilter },
+    onRowSelectionChange: selectable ? setRowSelection : undefined,
+    state: { sorting, globalFilter, rowSelection: selectable ? rowSelection : undefined },
     initialState: { pagination: { pageSize: PAGE_SIZE } },
   });
 
-  /**
-   * Baris yang bisa dibuka.
-   *
-   * `onClick` saja hanya melayani tetikus: <tr> bukan elemen interaktif, tidak
-   * bisa difokus, dan tidak diumumkan sebagai apa pun oleh pembaca layar. Jadi
-   * baris diberi `role="link"`, dapat fokus keyboard, dan menanggapi Enter —
-   * sama seperti tautan sungguhan.
-   */
   function rowProps(row: Row<TData>) {
     if (!rowHrefBase) return {};
     const href = `${rowHrefBase}/${row.original.id}`;
@@ -133,24 +160,13 @@ export function DataTable<TData extends { id: string }, TValue>({
               />
             </div>
           ) : null}
-          {/* `toolbar` bisa berupa elemen apa pun dari pemanggil (mis. filter di
-              Server Component). Saat search DAN toolbar sama-sama tampil, keduanya
-              jadi anak-anak dalam satu list — bungkus dengan Fragment ber-key
-              (tanpa menambah DOM) supaya React tidak memperingatkan "unique key". */}
           {toolbar ? <React.Fragment key="toolbar">{toolbar}</React.Fragment> : null}
         </div>
       ) : null}
 
-      {/* `overflow-x-auto` menjaga tabel lebar tetap menggulir di dalam
-          kartunya sendiri, bukan mendorong lebar seluruh halaman. */}
       <div className="overflow-hidden rounded-lg ring-1 ring-foreground/10">
         <div className="overflow-x-auto">
           <Table>
-            {/* Tidak sticky: header yang sticky akan menempel pada pembungkus
-                `overflow-x-auto` di atas — bukan pada viewport — sehingga ia
-                melayang menimpa baris pertama alih-alih diam di puncak. Scroll
-                horizontal untuk tabel lebar lebih berharga daripada header
-                yang mengambang. */}
             <TableHeader>
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id}>
@@ -178,7 +194,7 @@ export function DataTable<TData extends { id: string }, TValue>({
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length}
+                    colSpan={finalColumns.length}
                     className="p-0 text-center text-muted-foreground"
                   >
                     {globalFilter ? "Tidak ada hasil untuk pencarian ini." : emptyMessage}
