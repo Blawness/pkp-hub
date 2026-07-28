@@ -59,9 +59,20 @@ export function UsersTable({
                   </TableCell>
                   <TableCell className="text-muted-foreground">{user.email}</TableCell>
                   <TableCell>
-                    <Badge variant={user.role === "admin" ? "default" : "secondary"}>
-                      {roleLabel[user.role] ?? user.role}
-                    </Badge>
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Badge variant={user.role === "admin" ? "default" : "secondary"}>
+                        {roleLabel[user.role] ?? user.role}
+                      </Badge>
+                      {/* Role tambahan (mis. Superuser) hidup di
+                          `user_role_assignment`, bukan di `users.role` —
+                          tanpa badge ini seorang superuser tampil sebagai
+                          admin biasa. Diatur di Pengaturan → Peran. */}
+                      {user.extraRoles.map((extra) => (
+                        <Badge key={extra.key} variant="outline" title="Role tambahan">
+                          +{extra.name}
+                        </Badge>
+                      ))}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {user.archivedAt ? (

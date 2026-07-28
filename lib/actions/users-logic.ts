@@ -3,7 +3,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import type { Role } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { accounts, clients, sessions, userRoles, users } from "@/lib/db/schema";
+import { accounts, clients, roles, sessions, userRoles, users } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
 import { roleIdForKey } from "@/lib/rbac/system-roles";
 import type { RbacContext } from "@/lib/rbac/types";
@@ -32,13 +32,27 @@ import type { RbacContext } from "@/lib/rbac/types";
  * apa pun.
  */
 
-export type ManagedUser = {
+/** Satu baris `user` apa adanya, tanpa role tambahan yang perlu query kedua. */
+type UserRecord = {
   id: string;
   name: string;
   email: string;
   role: Role;
   archivedAt: Date | null;
   createdAt: Date;
+};
+
+export type ManagedUser = UserRecord & {
+  /**
+   * Role TAMBAHAN di atas `role` dasarnya (mis. `superuser`), dari
+   * `user_role_assignment`. Baris yang cuma mencerminkan role dasar tidak
+   * masuk sini — lihat `listExtraRoleAssignments` di `roles-logic.ts`, yang
+   * memakai aturan penyaringan yang sama.
+   *
+   * Tanpa ini halaman User berbohong secara halus: seorang superuser tampil
+   * sebagai "Admin" biasa, tanpa petunjuk apa pun bahwa ia punya izin lebih.
+   */
+  extraRoles: { key: string; name: string }[];
 };
 
 /** Role yang boleh dibuat/diberikan lewat manajemen user. */
@@ -57,7 +71,30 @@ export async function listUsers(): Promise<ManagedUser[]> {
     })
     .from(users);
 
-  return rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const assignments = await db
+    .select({
+      userId: userRoles.userId,
+      roleKey: roles.key,
+      roleName: roles.name,
+    })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId));
+
+  const baseRoleOf = new Map(rows.map((u) => [u.id, u.role as string]));
+  const extraByUser = new Map<string, { key: string; name: string }[]>();
+  for (const a of assignments) {
+    if (a.roleKey === baseRoleOf.get(a.userId)) continue;
+    const list = extraByUser.get(a.userId) ?? [];
+    list.push({ key: a.roleKey, name: a.roleName });
+    extraByUser.set(a.userId, list);
+  }
+
+  return rows
+    .map((u) => ({
+      ...u,
+      extraRoles: (extraByUser.get(u.id) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+    }))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 }
 
 /** Jumlah admin yang masih aktif, tidak menghitung `excludeUserId`. */
@@ -69,7 +106,7 @@ async function countOtherActiveAdmins(excludeUserId: string): Promise<number> {
   return rows.length;
 }
 
-async function getUserOrThrow(userId: string): Promise<ManagedUser> {
+async function getUserOrThrow(userId: string): Promise<UserRecord> {
   const [user] = await db
     .select({
       id: users.id,

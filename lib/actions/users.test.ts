@@ -22,7 +22,9 @@ import {
   mapLayers,
   projectStatusLogs,
   projects,
+  roles,
   sessions,
+  userRoles,
   users,
 } from "@/lib/db/schema";
 import { loadEffectivePermissions } from "@/lib/rbac/context";
@@ -357,5 +359,27 @@ describe("sinkronisasi user_role_assignment", () => {
     await setUserRole(adminACtx, adminB.id, "admin");
     permissions = await loadEffectivePermissions(adminB.id);
     expect(permissions.get("user.create")).toBe("all");
+  });
+});
+
+describe("listUsers extraRoles", () => {
+  it("menampilkan role tambahan, dan TIDAK mengulang role dasar", async () => {
+    const [superuserRole] = await db
+      .select({ id: roles.id })
+      .from(roles)
+      .where(eq(roles.key, "superuser"));
+    await db.insert(userRoles).values({ userId: adminB.id, roleId: superuserRole.id });
+
+    const rows = await listUsers();
+    const target = rows.find((u) => u.id === adminB.id);
+    // Role dasarnya "admin" — tidak boleh bocor ke daftar role tambahan.
+    expect(target?.extraRoles.map((r) => r.key)).toEqual(["superuser"]);
+
+    const plain = rows.find((u) => u.id === surveyor.id);
+    expect(plain?.extraRoles).toEqual([]);
+
+    await db
+      .delete(userRoles)
+      .where(and(eq(userRoles.userId, adminB.id), eq(userRoles.roleId, superuserRole.id)));
   });
 });
