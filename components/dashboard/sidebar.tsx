@@ -9,7 +9,6 @@ import { SidebarNav } from "@/components/dashboard/sidebar-nav";
 import { UserMenu } from "@/components/dashboard/user-menu";
 import { usePermissions } from "@/components/rbac/permissions-provider";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { SessionUser } from "@/lib/auth-guards";
 import { cn } from "@/lib/utils";
 
@@ -189,35 +188,35 @@ export function DashboardSidebar({
               collapsed ? "right-[calc(50%-0.875rem)]" : "right-3",
             )}
           >
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    onClick={togglePin}
-                    aria-label={pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
-                    // `aria-pressed`, bukan `aria-expanded`: ini tombol dwi-keadaan
-                    // yang MENGUNCI, bukan pengungkap. Sejak hover jadi pemicu
-                    // buka-tutup, "expanded" bukan lagi milik tombol ini.
-                    aria-pressed={pinned}
-                    className="text-muted-foreground"
-                  >
-                    <PanelLeftIcon
-                      className={cn("transition-transform", !pinned && "rotate-180")}
-                    />
-                  </Button>
-                }
-              />
-              <TooltipContent side="right">
-                {pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
-              </TooltipContent>
-            </Tooltip>
+            {/*
+              Sembunyikan tombol di rail sempit — di sana ia berdesakan dengan
+              ikon nav dan gampang tertekan tak sengaja.
+
+              KECUALI saat perangkat tidak punya hover: di layar sentuh panel
+              tidak pernah melebar, jadi aturan di atas akan menyembunyikan
+              tombol ini selamanya — padahal pin justru satu-satunya jalan keluar
+              dari rail di sana.
+            */}
+            {!collapsed || !hoverCapable ? (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={togglePin}
+                aria-label={pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
+                // `aria-pressed`, bukan `aria-expanded`: ini tombol dwi-keadaan
+                // yang MENGUNCI, bukan pengungkap. Sejak hover jadi pemicu
+                // buka-tutup, "expanded" bukan lagi milik tombol ini.
+                aria-pressed={pinned}
+                className="text-muted-foreground"
+              >
+                <PanelLeftIcon className={cn("transition-transform", !pinned && "rotate-180")} />
+              </Button>
+            ) : null}
           </div>
         </div>
 
         <div className="relative flex-1 overflow-y-auto py-2">
-          <SidebarNav links={links} collapsed={collapsed} />
+          <SidebarNav links={links} collapsed={collapsed} showTooltips={false} />
         </div>
 
         <div className="relative border-t border-sidebar-border p-2">

@@ -22,10 +22,18 @@ import { cn } from "@/lib/utils";
 export function SidebarNav({
   links,
   collapsed = false,
+  showTooltips = true,
   onNavigate,
 }: {
   links: NavLink[];
   collapsed?: boolean;
+  /**
+   * Matikan di sidebar desktop: di sana hover yang memunculkan tooltip adalah
+   * hover yang SAMA dengan yang melebarkan panel, jadi labelnya muncul dua
+   * kali sekaligus dan tooltip melayang di atas panel yang baru terbuka.
+   * Default `true` supaya laci mobile tidak ikut berubah.
+   */
+  showTooltips?: boolean;
   onNavigate?: () => void;
 }) {
   const segment = useSelectedLayoutSegment();
@@ -42,6 +50,10 @@ export function SidebarNav({
             href={link.href}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
+            // Saat menciut label tidak dirender, jadi tautan tinggal ikon tanpa
+            // nama sama sekali bagi pembaca layar. Sejak tooltip dimatikan di
+            // sidebar desktop, atribut inilah satu-satunya yang menamainya.
+            aria-label={collapsed ? link.label : undefined}
             className={cn(
               "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -73,8 +85,9 @@ export function SidebarNav({
         );
 
         // Saat menciut, label jadi tooltip — kalau tidak, sidebar rail hanya
-        // deretan ikon tanpa nama.
-        return collapsed ? (
+        // deretan ikon tanpa nama. Tidak berlaku di sidebar desktop, yang
+        // mengungkap labelnya dengan melebar (lihat `showTooltips`).
+        return collapsed && showTooltips ? (
           <Tooltip key={link.href}>
             <TooltipTrigger render={item} />
             <TooltipContent side="right">{link.label}</TooltipContent>

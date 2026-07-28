@@ -53,11 +53,13 @@ test.describe("sidebar staf", () => {
 
     await expectPanelWidth(page, WIDE_PX);
     // Saat dipin panel MENDORONG konten — ini beda mendasar dengan hover.
-    expect(await contentLeft(page)).toBeCloseTo(WIDE_PX, 0);
+    // `.poll`, bukan sekali baca: transisi lebar `<aside>` berjalan setelah
+    // klik, jadi kolom konten butuh waktu sebelum benar-benar berhenti di 256px.
+    await expect.poll(async () => contentLeft(page)).toBeCloseTo(WIDE_PX, 0);
 
     await page.reload();
     await expectPanelWidth(page, WIDE_PX);
-    expect(await contentLeft(page)).toBeCloseTo(WIDE_PX, 0);
+    await expect.poll(async () => contentLeft(page)).toBeCloseTo(WIDE_PX, 0);
   });
 
   test("lepas pin mengembalikan ke rail", async ({ page }) => {
@@ -118,5 +120,31 @@ test.describe("sidebar melebar saat hover", () => {
       .poll(async () => PANEL(page).evaluate((el) => el.contains(document.activeElement)))
       .toBe(true);
     await expectPanelWidth(page, WIDE_PX);
+  });
+});
+
+test.describe("sidebar rail tetap terbaca", () => {
+  test.use({ storageState: "e2e/.auth/admin.json" });
+
+  test("tautan ikon punya nama aksesibel saat rail", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expectPanelWidth(page, RAIL_PX);
+
+    // Labelnya tidak tergambar saat rail, tapi nama aksesibelnya HARUS ada —
+    // sejak tooltip dimatikan, `aria-label` satu-satunya yang tersisa untuk
+    // pembaca layar.
+    await expect(PANEL(page).getByRole("link", { name: "Proyek" })).toBeAttached();
+    await expect(PANEL(page).getByText("Proyek")).toBeHidden();
+  });
+
+  test("tombol pin tersembunyi di rail, muncul saat melebar", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expectPanelWidth(page, RAIL_PX);
+    // Di rail sempit tombol ini berdesakan dengan ikon nav dan gampang
+    // tertekan tak sengaja.
+    await expect(PIN_BUTTON(page)).toBeHidden();
+
+    await PANEL(page).hover();
+    await expect(PIN_BUTTON(page)).toBeVisible();
   });
 });
