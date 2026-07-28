@@ -13,6 +13,14 @@ import type { SessionUser } from "@/lib/auth-guards";
 import { cn } from "@/lib/utils";
 
 /**
+ * Jeda buka menahan panel supaya tidak berkedip saat kursor cuma melintas
+ * menuju konten. Jeda tutup lebih panjang agar kursor yang keluar sedikit
+ * lalu balik tidak memicu tutup-buka.
+ */
+const OPEN_DELAY_MS = 120;
+const CLOSE_DELAY_MS = 200;
+
+/**
  * Sidebar staf (desktop). Laci mobile hidup di `mobile-nav.tsx`.
  *
  * Preferensi pin disimpan di cookie, bukan localStorage, supaya layout di
@@ -26,15 +34,6 @@ import { cn } from "@/lib/utils";
  * alih mendorongnya: `<aside>` adalah flex item, jadi mengubah lebarnya selalu
  * menggeser kolom di sebelahnya.
  */
-
-/**
- * Jeda buka menahan panel supaya tidak berkedip saat kursor cuma melintas
- * menuju konten. Jeda tutup lebih panjang agar kursor yang keluar sedikit
- * lalu balik tidak memicu tutup-buka.
- */
-const OPEN_DELAY_MS = 120;
-const CLOSE_DELAY_MS = 200;
-
 export function DashboardSidebar({
   user,
   defaultPinned,
@@ -49,6 +48,9 @@ export function DashboardSidebar({
   // panel yang sempat salah gambar di desktop.
   const [hoverCapable, setHoverCapable] = useState(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Kehadiran kursor dilacak di ref, bukan state: pemakainya cuma handler blur
+  // dan tidak ada yang perlu digambar ulang saat nilainya berubah.
+  const pointerInside = useRef(false);
   const { can } = usePermissions();
   const links = buildLinks(can);
 
@@ -108,13 +110,12 @@ export function DashboardSidebar({
         // terdorong jauh ke bawah lipatan — tak terlihat sampai halaman
         // digulir habis.
         "sticky top-0 h-svh",
-        // `position: sticky` SELALU membentuk konteks tumpukan baru, walau
-        // z-index-nya "auto" — jadi tanpa z eksplisit di sini, seluruh isi
-        // `<aside>` (termasuk panel z-30 di dalamnya) tetap kalah tumpuk dari
-        // `content-column`, sibling belakangan dengan z sama-sama "auto".
-        // Topbar (`topbar.tsx`) juga sticky di z-30 — angka yang SAMA masih
-        // kalah karena seri z-index dimenangkan oleh urutan DOM belakangan,
-        // jadi di sini harus lebih tinggi, bukan cuma disamakan.
+        // `content-column` di layout dashboard memakai `isolate`, jadi seluruh
+        // isi halaman — termasuk z-index tinggi bawaan pustaka seperti Leaflet
+        // — terkurung pada `z: 0`. Yang tersisa untuk dikalahkan `<aside>`
+        // hanyalah topbar (`topbar.tsx`), yang sticky di z-30 eksplisit: angka
+        // yang SAMA masih kalah karena seri z-index dimenangkan urutan DOM
+        // belakangan, jadi di sini harus lebih tinggi, bukan cuma disamakan.
         "z-40",
         "transition-[width] duration-(--motion-base) ease-(--ease-out-expo)",
         pinned ? "w-64" : "w-[4.5rem]",
@@ -123,12 +124,29 @@ export function DashboardSidebar({
       <div
         data-slot="sidebar-panel"
         data-collapsed={collapsed}
-        onPointerEnter={() => scheduleHover(true, OPEN_DELAY_MS)}
-        onPointerLeave={() => scheduleHover(false, CLOSE_DELAY_MS)}
+        onPointerEnter={() => {
+          pointerInside.current = true;
+          scheduleHover(true, OPEN_DELAY_MS);
+        }}
+        onPointerLeave={() => {
+          pointerInside.current = false;
+          scheduleHover(false, CLOSE_DELAY_MS);
+        }}
         // Fase capture: `focus` tidak menggelembung, jadi tanpa `Capture`
         // fokus yang mendarat di tautan anak tidak akan pernah terdeteksi.
         onFocusCapture={() => revealNow(true)}
         onBlurCapture={(event) => {
+          // Kursor yang masih di dalam panel MEMVETO penutupan karena fokus.
+          // Kasus yang tidak kasat mata: `UserMenu` merender popup-nya lewat
+          // portal ke `<body>`, lalu Base UI memindahkan fokus ke sana. Trigger
+          // pun kehilangan fokus dengan `relatedTarget` menunjuk popup portal
+          // itu — di luar `currentTarget` menurut DOM, walau secara visual masih
+          // menempel di panel. Tanpa veto ini panel menciut ke rail tepat saat
+          // menunya dibuka, di bawah kursor yang tidak ke mana-mana; dan karena
+          // kursor tak pernah keluar, tidak ada `pointerenter` susulan yang
+          // membukanya lagi. `relatedTarget` bernilai null (fokus lepas ke
+          // dokumen) melewati jalur yang sama.
+          if (pointerInside.current) return;
           if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
             revealNow(false);
           }
@@ -185,6 +203,8 @@ export function DashboardSidebar({
           <div
             className={cn(
               "absolute top-1/2 -translate-y-1/2 transition-[right] duration-(--motion-base) ease-(--ease-out-expo)",
+              // 0.875rem = separuh `size-7` (1.75rem) milik `size="icon-sm"`:
+              // menggeser tombol dari tepi kanan ke titik tengah rail 4.5rem.
               collapsed ? "right-[calc(50%-0.875rem)]" : "right-3",
             )}
           >
@@ -196,22 +216,32 @@ export function DashboardSidebar({
               tidak pernah melebar, jadi aturan di atas akan menyembunyikan
               tombol ini selamanya — padahal pin justru satu-satunya jalan keluar
               dari rail di sana.
+
+              Disembunyikan secara KOSMETIK (`opacity-0 pointer-events-none`),
+              bukan dilepas dari DOM dan bukan `hidden`/`invisible` — ketiganya
+              mencabut tombol dari urutan tab. Dulu tombol ini baru muncul
+              setelah `collapsed` jadi false, dan itu hanya terjadi karena fokus
+              sudah mendarat di tautan nav pertama, yaitu SUDAH melewati posisi
+              DOM tombol ini: pengguna yang menab maju tidak pernah sampai
+              padanya. Dengan tetap terpasang, Tab mendarat di sini → memicu
+              `onFocusCapture` → panel melebar → tombol ikut terlihat.
             */}
-            {!collapsed || !hoverCapable ? (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={togglePin}
-                aria-label={pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
-                // `aria-pressed`, bukan `aria-expanded`: ini tombol dwi-keadaan
-                // yang MENGUNCI, bukan pengungkap. Sejak hover jadi pemicu
-                // buka-tutup, "expanded" bukan lagi milik tombol ini.
-                aria-pressed={pinned}
-                className="text-muted-foreground"
-              >
-                <PanelLeftIcon className={cn("transition-transform", !pinned && "rotate-180")} />
-              </Button>
-            ) : null}
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={togglePin}
+              aria-label={pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
+              // `aria-pressed`, bukan `aria-expanded`: ini tombol dwi-keadaan
+              // yang MENGUNCI, bukan pengungkap. Sejak hover jadi pemicu
+              // buka-tutup, "expanded" bukan lagi milik tombol ini.
+              aria-pressed={pinned}
+              className={cn(
+                "text-muted-foreground transition-opacity",
+                !collapsed || !hoverCapable ? "opacity-100" : "pointer-events-none opacity-0",
+              )}
+            >
+              <PanelLeftIcon className={cn("transition-transform", !pinned && "rotate-180")} />
+            </Button>
           </div>
         </div>
 

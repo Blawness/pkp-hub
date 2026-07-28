@@ -50,8 +50,17 @@ export default async function DashboardLayout({ children }: { children: ReactNod
 
           {/* `min-w-0` menahan kolom ini agar tidak melar mengikuti isinya — tanpa
               itu, tabel lebar akan mendorong seluruh layout dan sidebar ikut
-              tergeser keluar layar. */}
-          <div data-slot="content-column" className="flex min-w-0 flex-1 flex-col">
+              tergeser keluar layar.
+
+              `isolate` BUKAN kosmetik: sidebar melebar MENIMPA isi halaman yang
+              sembarang, dan isi itu memuat pustaka pihak ketiga dengan z-index
+              tinggi sendiri (Leaflet: `.leaflet-pane` 400, `.leaflet-control`
+              800, `.leaflet-top` 1000). Tanpa konteks tumpukan di sini semua
+              angka itu ikut bertanding di konteks akar dan menang telak atas
+              `z-40` milik sidebar. Kuncinya mengurung konten pada `z: 0` — bukan
+              menaikkan z sidebar mengejar angka apa pun yang dibawa pustaka
+              berikutnya. */}
+          <div data-slot="content-column" className="isolate flex min-w-0 flex-1 flex-col">
             <Topbar user={user} />
             {children}
           </div>
