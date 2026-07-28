@@ -74,3 +74,49 @@ test.describe("sidebar staf", () => {
       .toBeLessThanOrEqual(RAIL_PX + 1);
   });
 });
+
+test.describe("sidebar melebar saat hover", () => {
+  test.use({ storageState: "e2e/.auth/admin.json" });
+
+  test("hover melebarkan panel TANPA menggeser konten", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expectPanelWidth(page, RAIL_PX);
+    const before = await contentLeft(page);
+
+    await PANEL(page).hover();
+
+    await expectPanelWidth(page, WIDE_PX);
+    await expect(PANEL(page).getByText("PKP Hub")).toBeVisible();
+    // Klaim inti spec: panel menimpa, bukan mendorong.
+    expect(await contentLeft(page)).toBeCloseTo(before, 0);
+  });
+
+  test("kursor pergi mengembalikan ke rail", async ({ page }) => {
+    await page.goto("/dashboard");
+    await PANEL(page).hover();
+    await expectPanelWidth(page, WIDE_PX);
+
+    // Geser kursor jauh ke kanan, keluar dari panel.
+    await page.mouse.move(900, 400);
+    await expectPanelWidth(page, RAIL_PX);
+  });
+
+  test("fokus keyboard membuka panel", async ({ page }) => {
+    await page.goto("/dashboard");
+    await expectPanelWidth(page, RAIL_PX);
+
+    // Tab dari awal dokumen sampai fokus mendarat di dalam panel. Tanpa jalur
+    // fokus, pengguna keyboard akan mendarat di tautan yang labelnya
+    // tersembunyi — itu sebabnya test ini ada.
+    await page.locator("body").press("Tab");
+    for (let i = 0; i < 8; i++) {
+      if (await PANEL(page).evaluate((el) => el.contains(document.activeElement))) break;
+      await page.keyboard.press("Tab");
+    }
+
+    await expect
+      .poll(async () => PANEL(page).evaluate((el) => el.contains(document.activeElement)))
+      .toBe(true);
+    await expectPanelWidth(page, WIDE_PX);
+  });
+});

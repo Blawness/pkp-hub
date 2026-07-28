@@ -2,7 +2,7 @@
 
 import { PanelLeftIcon } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GridTexture } from "@/components/brand/grid-texture";
 import { buildLinks, SIDEBAR_PIN_COOKIE } from "@/components/dashboard/nav-config";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
@@ -27,6 +27,15 @@ import { cn } from "@/lib/utils";
  * alih mendorongnya: `<aside>` adalah flex item, jadi mengubah lebarnya selalu
  * menggeser kolom di sebelahnya.
  */
+
+/**
+ * Jeda buka menahan panel supaya tidak berkedip saat kursor cuma melintas
+ * menuju konten. Jeda tutup lebih panjang agar kursor yang keluar sedikit
+ * lalu balik tidak memicu tutup-buka.
+ */
+const OPEN_DELAY_MS = 120;
+const CLOSE_DELAY_MS = 200;
+
 export function DashboardSidebar({
   user,
   defaultPinned,
@@ -35,14 +44,56 @@ export function DashboardSidebar({
   defaultPinned: boolean;
 }) {
   const [pinned, setPinned] = useState(defaultPinned);
+  const [hovered, setHovered] = useState(false);
+  // Diasumsikan mampu-hover sampai terbukti sebaliknya: efek di bawah jalan
+  // sebelum interaksi pertama mungkin terjadi, dan menebak `true` menghindari
+  // panel yang sempat salah gambar di desktop.
+  const [hoverCapable, setHoverCapable] = useState(true);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { can } = usePermissions();
   const links = buildLinks(can);
 
-  const collapsed = !pinned;
+  const collapsed = !pinned && !hovered;
+
+  useEffect(() => {
+    setHoverCapable(window.matchMedia("(hover: hover)").matches);
+  }, []);
+
+  // Timer yang masih hidup saat komponen lepas akan memanggil setState pada
+  // komponen yang sudah tidak ada.
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
+  /**
+   * Jadwalkan buka/tutup karena kursor. Diam saja saat dipin (hover tidak
+   * berlaku) dan saat perangkat tidak punya hover — di layar sentuh
+   * `pointerenter` tetap menyala saat tap, dan tanpa penjagaan ini panel
+   * nyangkut terbuka sampai pengguna menyentuh tempat lain.
+   */
+  function scheduleHover(next: boolean, delay: number) {
+    if (pinned || !hoverCapable) return;
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setHovered(next), delay);
+  }
+
+  /** Buka/tutup seketika — dipakai jalur fokus, yang selalu disengaja. */
+  function revealNow(next: boolean) {
+    if (timer.current) clearTimeout(timer.current);
+    setHovered(next);
+  }
 
   function togglePin() {
     const next = !pinned;
     setPinned(next);
+    // Saat pin dilepas, kursor sedang berada di atas tombol — yang berarti di
+    // dalam panel. Tanpa baris ini `hovered` yang basi (false) membuat panel
+    // langsung menciut di bawah kursor, dan ia tidak akan terbuka lagi sampai
+    // kursor keluar lalu masuk kembali.
+    if (!next) revealNow(true);
     // max-age 1 tahun; preferensi tata letak, bukan data sensitif.
     // biome-ignore lint/suspicious/noDocumentCookie: CookieStore API belum ada di Safari, dan tidak sepadan untuk satu penulisan cookie sesederhana ini.
     document.cookie = `${SIDEBAR_PIN_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
@@ -58,6 +109,14 @@ export function DashboardSidebar({
         // terdorong jauh ke bawah lipatan — tak terlihat sampai halaman
         // digulir habis.
         "sticky top-0 h-svh",
+        // `position: sticky` SELALU membentuk konteks tumpukan baru, walau
+        // z-index-nya "auto" — jadi tanpa z eksplisit di sini, seluruh isi
+        // `<aside>` (termasuk panel z-30 di dalamnya) tetap kalah tumpuk dari
+        // `content-column`, sibling belakangan dengan z sama-sama "auto".
+        // Topbar (`topbar.tsx`) juga sticky di z-30 — angka yang SAMA masih
+        // kalah karena seri z-index dimenangkan oleh urutan DOM belakangan,
+        // jadi di sini harus lebih tinggi, bukan cuma disamakan.
+        "z-40",
         "transition-[width] duration-(--motion-base) ease-(--ease-out-expo)",
         pinned ? "w-64" : "w-[4.5rem]",
       )}
@@ -65,11 +124,26 @@ export function DashboardSidebar({
       <div
         data-slot="sidebar-panel"
         data-collapsed={collapsed}
+        onPointerEnter={() => scheduleHover(true, OPEN_DELAY_MS)}
+        onPointerLeave={() => scheduleHover(false, CLOSE_DELAY_MS)}
+        // Fase capture: `focus` tidak menggelembung, jadi tanpa `Capture`
+        // fokus yang mendarat di tautan anak tidak akan pernah terdeteksi.
+        onFocusCapture={() => revealNow(true)}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+            revealNow(false);
+          }
+        }}
         className={cn(
+          // z-30: panel harus menimpa kolom konten di sebelahnya saat melebar
+          // karena hover, bukan cuma duduk sejajar. (Konteks tumpukan yang
+          // sesungguhnya diperbaiki di `<aside>` — lihat komentar di sana.)
           "absolute inset-y-0 left-0 z-30 flex flex-col overflow-hidden",
           "border-r border-sidebar-border bg-sidebar text-sidebar-foreground",
           "transition-[width] duration-(--motion-base) ease-(--ease-out-expo)",
           collapsed ? "w-[4.5rem]" : "w-64",
+          // Hanya saat menimpa. Saat dipin tidak ada yang ditimpa.
+          !pinned && !collapsed && "shadow-lg",
         )}
       >
         {/* Tekstur grid yang sama dengan panel brand — memudar ke bawah supaya
@@ -82,12 +156,7 @@ export function DashboardSidebar({
           yang dimunculkan browser saat menunjuk tautan — jadi tombol di sana
           gampang tertimpa dan tak bisa ditekan.
         */}
-        <div
-          className={cn(
-            "relative flex h-16 items-center gap-2 px-3",
-            collapsed && "justify-center px-0",
-          )}
-        >
+        <div className="relative flex h-16 items-center gap-2 px-3">
           {collapsed ? null : (
             <>
               <Image
@@ -105,28 +174,46 @@ export function DashboardSidebar({
             </>
           )}
 
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={togglePin}
-                  aria-label={pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
-                  // `aria-pressed`, bukan `aria-expanded`: ini tombol dwi-keadaan
-                  // yang MENGUNCI, bukan pengungkap. Sejak hover jadi pemicu
-                  // buka-tutup, "expanded" bukan lagi milik tombol ini.
-                  aria-pressed={pinned}
-                  className="text-muted-foreground"
-                >
-                  <PanelLeftIcon className={cn("transition-transform", !pinned && "rotate-180")} />
-                </Button>
-              }
-            />
-            <TooltipContent side="right">
-              {pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
-            </TooltipContent>
-          </Tooltip>
+          {/*
+            Posisi tombol dianimasikan lewat `right`, BUKAN dibiarkan ikut
+            alur flex bersama logo/wordmark yang mucul-hilang seketika (bukan
+            bertransisi). Kalau tombol ikut alur flex itu, saat hover membuka
+            panel ia MELOMPAT dari tengah ke kanan dalam satu frame — dan
+            klik yang mendarat tepat di celah lompatan itu (skenario yang
+            sengaja dites: hover lalu langsung klik pin) mengenai latar
+            kosong header, bukan tombolnya.
+          */}
+          <div
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 transition-[right] duration-(--motion-base) ease-(--ease-out-expo)",
+              collapsed ? "right-[calc(50%-0.875rem)]" : "right-3",
+            )}
+          >
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    onClick={togglePin}
+                    aria-label={pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
+                    // `aria-pressed`, bukan `aria-expanded`: ini tombol dwi-keadaan
+                    // yang MENGUNCI, bukan pengungkap. Sejak hover jadi pemicu
+                    // buka-tutup, "expanded" bukan lagi milik tombol ini.
+                    aria-pressed={pinned}
+                    className="text-muted-foreground"
+                  >
+                    <PanelLeftIcon
+                      className={cn("transition-transform", !pinned && "rotate-180")}
+                    />
+                  </Button>
+                }
+              />
+              <TooltipContent side="right">
+                {pinned ? "Lepas pin sidebar" : "Pin sidebar tetap terbuka"}
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
 
         <div className="relative flex-1 overflow-y-auto py-2">
