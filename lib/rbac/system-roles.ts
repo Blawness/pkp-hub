@@ -130,6 +130,17 @@ export async function seedSystemRoles(): Promise<void> {
 }
 
 /**
+ * Cari id baris `role` sistem dari key-nya. Dipakai `users-logic.ts` untuk
+ * menjaga `user_role_assignment` tetap sinkron dengan `users.role`, dan oleh
+ * script bootstrap superuser.
+ */
+export async function roleIdForKey(key: SystemRoleKey): Promise<string> {
+  const [role] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, key));
+  if (!role) throw new Error(`rbac: role sistem "${key}" belum di-seed.`);
+  return role.id;
+}
+
+/**
  * Mengisi `user_role_assignment` dari kolom `users.role` yang lama — satu
  * baris per user. Idempoten lewat `onConflictDoNothing`, dan sengaja TIDAK
  * menghapus penugasan lain: user yang sudah diberi role tambahan tidak boleh

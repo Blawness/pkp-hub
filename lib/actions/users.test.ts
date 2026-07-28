@@ -25,6 +25,7 @@ import {
   sessions,
   users,
 } from "@/lib/db/schema";
+import { loadEffectivePermissions } from "@/lib/rbac/context";
 import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
 import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
 import type { RbacContext } from "@/lib/rbac/types";
@@ -319,5 +320,42 @@ describe("setUserPassword", () => {
 
     const live = await db.select().from(sessions).where(eq(sessions.userId, surveyor.id));
     expect(live).toHaveLength(0);
+  });
+});
+
+describe("sinkronisasi user_role_assignment", () => {
+  it("createStaffUser memberi permission efektif sesuai role, bukan cuma users.role", async () => {
+    const { id } = await createStaffUser(adminACtx, {
+      name: "Staf Sinkron",
+      email: "staf-sinkron@fixture.test",
+      role: "surveyor",
+      password: "rahasia-kuat-123",
+    });
+
+    const permissions = await loadEffectivePermissions(id);
+    expect(permissions.get("equipment.read")).toBe("all");
+    expect(permissions.has("user.create")).toBe(false);
+  });
+
+  it("createClientUser memberi permission client", async () => {
+    const { id } = await createClientUser(adminACtx, {
+      name: "Klien Sinkron",
+      email: "klien-sinkron@fixture.test",
+      password: "rahasia-kuat-123",
+    });
+
+    const permissions = await loadEffectivePermissions(id);
+    expect(permissions.get("project.read")).toBe("own");
+  });
+
+  it("setUserRole memindahkan grant dari role lama ke role baru", async () => {
+    await setUserRole(adminACtx, adminB.id, "surveyor");
+    let permissions = await loadEffectivePermissions(adminB.id);
+    expect(permissions.has("user.create")).toBe(false);
+    expect(permissions.get("equipment.read")).toBe("all");
+
+    await setUserRole(adminACtx, adminB.id, "admin");
+    permissions = await loadEffectivePermissions(adminB.id);
+    expect(permissions.get("user.create")).toBe("all");
   });
 });

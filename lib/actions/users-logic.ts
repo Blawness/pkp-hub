@@ -3,8 +3,9 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq, isNull, ne } from "drizzle-orm";
 import type { Role } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
-import { accounts, clients, sessions, users } from "@/lib/db/schema";
+import { accounts, clients, sessions, userRoles, users } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
+import { roleIdForKey } from "@/lib/rbac/system-roles";
 import type { RbacContext } from "@/lib/rbac/types";
 
 /**
@@ -117,6 +118,9 @@ export async function createStaffUser(
     role: input.role,
   });
 
+  const roleId = await roleIdForKey(input.role);
+  await db.insert(userRoles).values({ userId, roleId }).onConflictDoNothing();
+
   await db.insert(accounts).values({
     id: randomUUID(),
     accountId: userId,
@@ -174,6 +178,9 @@ export async function createClientUser(
   // Tautkan user ke baris klien — ini yang membedakan akun berguna dari akun yatim.
   await db.update(clients).set({ userId }).where(eq(clients.id, clientId));
 
+  const roleId = await roleIdForKey("client");
+  await db.insert(userRoles).values({ userId, roleId }).onConflictDoNothing();
+
   await db.insert(accounts).values({
     id: randomUUID(),
     accountId: userId,
@@ -208,7 +215,17 @@ export async function setUserRole(
     }
   }
 
+  // Kolom `users.role` dan tabel `user_role_assignment` harus bergerak
+  // bersama: yang pertama dibaca proxy.ts (tanpa DB), yang kedua sumber izin
+  // efektif. Kalau hanya satu yang berubah, user berakhir tanpa izin apa pun.
+  const oldRoleId = await roleIdForKey(target.role as StaffRole);
   await db.update(users).set({ role, updatedAt: new Date() }).where(eq(users.id, userId));
+  await db
+    .delete(userRoles)
+    .where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, oldRoleId)));
+
+  const newRoleId = await roleIdForKey(role);
+  await db.insert(userRoles).values({ userId, roleId: newRoleId }).onConflictDoNothing();
 }
 
 /**
