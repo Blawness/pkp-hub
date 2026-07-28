@@ -7,18 +7,23 @@ import { cn } from "@/lib/utils";
 const TABS = [
   { href: "/dashboard/settings/users", label: "User" },
   { href: "/dashboard/settings/roles", label: "Peran" },
+  { href: "/dashboard/settings/audit", label: "Audit" },
 ] as const;
 
 /**
  * Tab internal di dalam area Pengaturan. Sengaja terpisah dari sidebar
  * (`nav-config.ts`), yang cuma punya satu entri "Pengaturan" — tab "Peran"
- * hanya untuk yang punya `role.read` (praktis: superuser), jadi disembunyikan
- * lewat prop `showRoles`, bukan lewat gating nav-config yang sekarang cuma
- * mengenal satu permission per entri.
+ * hanya untuk yang punya `role.read` (praktis: superuser), tab "Audit" hanya
+ * untuk yang punya `audit.read` (superuser-only), jadi disembunyikan lewat
+ * prop `showRoles` / `showAudit`, bukan lewat gating nav-config.
  */
-export function SettingsTabs({ showRoles }: { showRoles: boolean }) {
+export function SettingsTabs({ showRoles, showAudit }: { showRoles: boolean; showAudit: boolean }) {
   const pathname = usePathname();
-  const tabs = showRoles ? TABS : TABS.filter((tab) => tab.label !== "Peran");
+  const tabs = TABS.filter((tab) => {
+    if (tab.label === "Peran" && !showRoles) return false;
+    if (tab.label === "Audit" && !showAudit) return false;
+    return true;
+  });
   if (tabs.length < 2) return null;
 
   return (
