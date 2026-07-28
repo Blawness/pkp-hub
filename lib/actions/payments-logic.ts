@@ -8,6 +8,7 @@ import type {
   RegenerateReceiptInput,
   VoidPaymentInput,
 } from "@/lib/actions/payments-schemas";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import type * as schema from "@/lib/db/schema";
 import { clients, payments, projects } from "@/lib/db/schema";
@@ -315,6 +316,15 @@ export async function recordPaymentForUser(
   });
 
   const fileUrl = await issueReceiptQuietly(payment, store);
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "payment",
+    entityId: payment.id,
+    detail: { amount: input.amount, receiptNumber: payment.receiptNumber },
+  });
+
   return { ...payment, receiptFileUrl: fileUrl };
 }
 
@@ -343,6 +353,15 @@ export async function voidPaymentForUser(
   });
 
   await issueReceiptQuietly(payment, store);
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "void",
+    entityType: "payment",
+    entityId: payment.id,
+    detail: { reason: input.reason, receiptNumber: existing.receiptNumber },
+  });
+
   return payment;
 }
 

@@ -1,4 +1,5 @@
 import { eq, isNull } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { clients } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
@@ -29,6 +30,13 @@ export async function createClientForUser(ctx: RbacContext, input: ClientInput) 
       notes: nullableText(input.notes),
     })
     .returning();
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "client",
+    entityId: client.id,
+    detail: { name: input.name },
+  });
   return client;
 }
 
@@ -48,6 +56,13 @@ export async function updateClientForUser(ctx: RbacContext, input: UpdateClientI
     .where(eq(clients.id, input.id))
     .returning();
   if (!client) throw new Error("Client not found.");
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "client",
+    entityId: client.id,
+    detail: { name: input.name },
+  });
   return client;
 }
 
@@ -59,6 +74,13 @@ export async function archiveClientForUser(ctx: RbacContext, input: ArchiveClien
     .where(eq(clients.id, input.id))
     .returning();
   if (!client) throw new Error("Client not found.");
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "archive",
+    entityType: "client",
+    entityId: client.id,
+    detail: { name: client.name },
+  });
   return client;
 }
 

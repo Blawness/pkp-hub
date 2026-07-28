@@ -7,6 +7,7 @@ import type {
   UpdatePhaseInput,
   UpdatePhaseNoteInput,
 } from "@/lib/actions/phases-schemas";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { projectPhases } from "@/lib/db/schema";
 import { calculateProgress, completedAtFor, nextSortOrder, resequence } from "@/lib/phases/derive";
@@ -108,6 +109,14 @@ export async function createPhaseForUser(
     })
     .returning();
 
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "phase",
+    entityId: row.id,
+    detail: { name: input.name, projectId: input.projectId },
+  });
+
   return row;
 }
 
@@ -131,6 +140,14 @@ export async function updatePhaseForUser(
     .where(eq(projectPhases.id, input.phaseId))
     .returning();
 
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "phase",
+    entityId: row.id,
+    detail: { name: input.name },
+  });
+
   return row;
 }
 
@@ -151,6 +168,14 @@ export async function setPhaseStatusForUser(
     })
     .where(eq(projectPhases.id, input.phaseId))
     .returning();
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "setStatus",
+    entityType: "phase",
+    entityId: row.id,
+    detail: { from: phase.status, to: input.status },
+  });
 
   return row;
 }
@@ -182,6 +207,15 @@ export async function deletePhaseForUser(
   const phase = await requireScopedPhaseOrReject(ctx, "phase.delete", input.phaseId);
 
   await db.delete(projectPhases).where(eq(projectPhases.id, input.phaseId));
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "delete",
+    entityType: "phase",
+    entityId: input.phaseId,
+    detail: { projectId: phase.projectId },
+  });
+
   return { projectId: phase.projectId };
 }
 
@@ -217,6 +251,14 @@ export async function reorderPhasesForUser(
         .set({ sortOrder, updatedAt: new Date() })
         .where(and(eq(projectPhases.id, id), eq(projectPhases.projectId, input.projectId)));
     }
+  });
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "reorder",
+    entityType: "phase",
+    entityId: input.projectId,
+    detail: { count: input.orderedPhaseIds.length },
   });
 
   return db

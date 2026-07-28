@@ -5,6 +5,7 @@ import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
 import { db } from "./index";
 import {
   accounts,
+  auditLog,
   clients,
   documents,
   equipment,
@@ -75,6 +76,7 @@ async function seed() {
     await db.delete(userRoles);
     await db.delete(rolePermissions);
     await db.delete(roles);
+    await db.delete(auditLog);
     await db.delete(users);
   }
 

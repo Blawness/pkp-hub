@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { projectStatusLogs, projects, users } from "@/lib/db/schema";
 import { statusLabel } from "@/lib/labels";
@@ -126,6 +127,13 @@ export async function createProjectForUser(ctx: RbacContext, input: ProjectInput
       toStatus: "baru",
       changedById: ctx.user.id,
     });
+    await recordAudit({
+      actorId: ctx.user.id,
+      action: "create",
+      entityType: "project",
+      entityId: inserted.id,
+      detail: { title: input.title },
+    });
     return inserted;
   });
 }
@@ -146,6 +154,13 @@ export async function updateProjectForUser(ctx: RbacContext, input: UpdateProjec
     .where(eq(projects.id, input.id))
     .returning();
   if (!project) throw new Error("Project not found.");
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "project",
+    entityId: project.id,
+    detail: { title: input.title },
+  });
   return project;
 }
 
@@ -169,6 +184,13 @@ export async function assignSurveyorForUser(ctx: RbacContext, input: AssignSurve
     .where(eq(projects.id, input.projectId))
     .returning();
   if (!project) throw new Error("Project not found.");
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "assignSurveyor",
+    entityType: "project",
+    entityId: project.id,
+    detail: { surveyorId: surveyorId ?? null },
+  });
   return project;
 }
 
@@ -253,6 +275,14 @@ export async function changeProjectStatusForUser(
   } catch (error) {
     console.error(`[notifikasi] gagal mengabari klien soal proyek ${updated.id}:`, error);
   }
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "changeStatus",
+    entityType: "project",
+    entityId: updated.id,
+    detail: { from: project.status, to: input.toStatus },
+  });
 
   return updated;
 }

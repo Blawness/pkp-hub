@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, isNull, ne } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
 import type { Role } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { accounts, clients, roles, sessions, userRoles, users } from "@/lib/db/schema";
@@ -166,6 +167,14 @@ export async function createStaffUser(
     password: await hashPassword(input.password),
   });
 
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "user",
+    entityId: userId,
+    detail: { name: input.name, role: input.role },
+  });
+
   return { id: userId };
 }
 
@@ -226,6 +235,14 @@ export async function createClientUser(
     password: await hashPassword(input.password),
   });
 
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "user",
+    entityId: userId,
+    detail: { name: input.name, role: "client" },
+  });
+
   return { id: userId, clientId };
 }
 
@@ -263,6 +280,14 @@ export async function setUserRole(
 
   const newRoleId = await roleIdForKey(role);
   await db.insert(userRoles).values({ userId, roleId: newRoleId }).onConflictDoNothing();
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "setRole",
+    entityType: "user",
+    entityId: userId,
+    detail: { from: target.role, to: role },
+  });
 }
 
 /**
@@ -280,6 +305,14 @@ export async function setUserName(ctx: RbacContext, userId: string, name: string
     .update(users)
     .set({ name: name.trim(), updatedAt: new Date() })
     .where(eq(users.id, userId));
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "user",
+    entityId: userId,
+    detail: { name },
+  });
 }
 
 /**
@@ -347,6 +380,14 @@ export async function setUserPassword(
   // Ganti password harus mengusir sesi yang masih berjalan; kalau tidak, orang
   // yang password-nya baru saja dicabut tetap login sampai sesinya kedaluwarsa.
   await db.delete(sessions).where(eq(sessions.userId, userId));
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "user",
+    entityId: userId,
+    detail: { field: "password" },
+  });
 }
 
 /** Arsipkan user: aksesnya dicabut, riwayatnya utuh. */
@@ -375,6 +416,14 @@ export async function archiveUser(ctx: RbacContext, userId: string): Promise<voi
   // jadi ini lapis kedua — tapi lapis pertama yang membuat pencabutan terasa
   // seketika, bukan menunggu cookie sesi kedaluwarsa.
   await db.delete(sessions).where(eq(sessions.userId, userId));
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "archive",
+    entityType: "user",
+    entityId: userId,
+    detail: { name: target.name },
+  });
 }
 
 /** Pulihkan user yang terarsip. Ia harus set/diberi password lagi untuk masuk. */
@@ -385,4 +434,11 @@ export async function restoreUser(ctx: RbacContext, userId: string): Promise<voi
     .update(users)
     .set({ archivedAt: null, updatedAt: new Date() })
     .where(eq(users.id, userId));
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "restore",
+    entityType: "user",
+    entityId: userId,
+  });
 }

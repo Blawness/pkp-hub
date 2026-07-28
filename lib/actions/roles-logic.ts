@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { rolePermissions, roles, userRoles, users } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
@@ -142,6 +143,14 @@ export async function createRole(
     );
   }
 
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "role",
+    entityId: roleId,
+    detail: { name: input.name, key },
+  });
+
   return { id: roleId };
 }
 
@@ -177,6 +186,14 @@ export async function updateRole(
       })),
     );
   }
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "role",
+    entityId: input.roleId,
+    detail: { name: input.name },
+  });
 }
 
 /** Hapus role kustom. Role sistem ditolak. */
@@ -186,6 +203,15 @@ export async function deleteRole(ctx: RbacContext, roleId: string): Promise<void
   if (role.isSystem) {
     throw new Error("Role sistem tidak bisa dihapus.");
   }
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "delete",
+    entityType: "role",
+    entityId: roleId,
+    detail: { name: role.name },
+  });
+
   await db.delete(roles).where(eq(roles.id, roleId));
 }
 
@@ -244,6 +270,14 @@ export async function assignRole(ctx: RbacContext, userId: string, roleId: strin
   if (!targetUser) throw new Error("User tidak ditemukan.");
 
   await db.insert(userRoles).values({ userId, roleId }).onConflictDoNothing();
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "assign",
+    entityType: "role",
+    entityId: roleId,
+    detail: { userId },
+  });
 }
 
 /**
@@ -264,4 +298,12 @@ export async function unassignRole(
     );
   }
   await db.delete(userRoles).where(and(eq(userRoles.userId, userId), eq(userRoles.roleId, roleId)));
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "unassign",
+    entityType: "role",
+    entityId: roleId,
+    detail: { userId },
+  });
 }

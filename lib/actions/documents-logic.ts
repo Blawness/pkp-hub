@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, ilike, lte } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { clients, documents, projects } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
@@ -84,6 +85,13 @@ export async function uploadDocumentForUser(ctx: RbacContext, input: UploadDocum
       uploadedById: ctx.user.id,
     })
     .returning();
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "document",
+    entityId: doc.id,
+    detail: { name: input.name, projectId: input.projectId },
+  });
   return doc;
 }
 
@@ -100,6 +108,13 @@ export async function toggleDocumentShareForUser(
     .set({ sharedWithClient: input.sharedWithClient })
     .where(eq(documents.id, input.id))
     .returning();
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "document",
+    entityId: doc.id,
+    detail: { sharedWithClient: input.sharedWithClient },
+  });
   return doc;
 }
 
@@ -115,6 +130,13 @@ export async function deleteDocumentForUser(ctx: RbacContext, input: DeleteDocum
     // Best-effort: metadata row is already gone; a dangling object in
     // storage is a cleanup concern, not a reason to fail the request.
   }
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "delete",
+    entityType: "document",
+    entityId: existing.id,
+    detail: { name: existing.name },
+  });
   return existing;
 }
 

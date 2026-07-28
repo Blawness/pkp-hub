@@ -7,6 +7,7 @@ import type {
   ReturnEquipmentInput,
   UpdateEquipmentInput,
 } from "@/lib/actions/equipment-schemas";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { equipment, equipmentItem, equipmentUsage, projects, users } from "@/lib/db/schema";
 import {
@@ -292,7 +293,17 @@ export async function createEquipmentForUser(
         notes: input.notes && input.notes.length > 0 ? input.notes : null,
       })
       .returning();
-    return { ...row, itemName: item.name, category: item.category, image: item.image };
+    const result = { ...row, itemName: item.name, category: item.category, image: item.image };
+
+    await recordAudit({
+      actorId: ctx.user.id,
+      action: "create",
+      entityType: "equipment",
+      entityId: result.id,
+      detail: { code: result.code, itemId: input.itemId },
+    });
+
+    return result;
   } catch (error) {
     if (isCodeUniqueViolation(error)) {
       throw new Error("Kode unit sudah dipakai — pakai kode lain.");
@@ -338,7 +349,17 @@ export async function updateEquipmentForUser(
       .where(eq(equipment.id, input.equipmentId))
       .returning();
     if (!row) throw new Error("Alat tidak ditemukan.");
-    return { ...row, itemName: item.name, category: item.category, image: item.image };
+    const result = { ...row, itemName: item.name, category: item.category, image: item.image };
+
+    await recordAudit({
+      actorId: ctx.user.id,
+      action: "update",
+      entityType: "equipment",
+      entityId: result.id,
+      detail: { code: result.code },
+    });
+
+    return result;
   } catch (error) {
     if (isCodeUniqueViolation(error)) {
       throw new Error("Kode unit sudah dipakai — pakai kode lain.");
@@ -368,6 +389,14 @@ export async function archiveEquipmentForUser(
     })
     .from(equipmentItem)
     .where(eq(equipmentItem.id, row.itemId));
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "archive",
+    entityType: "equipment",
+    entityId: row.id,
+    detail: { code: row.code },
+  });
 
   return { ...row, itemName: item.name, category: item.category, image: item.image };
 }
@@ -429,6 +458,15 @@ export async function borrowEquipmentForUser(
         recordedById: ctx.user.id,
       })
       .returning();
+
+    await recordAudit({
+      actorId: ctx.user.id,
+      action: "borrow",
+      entityType: "equipment",
+      entityId: row.equipmentId,
+      detail: { projectId: input.projectId, usedById },
+    });
+
     return row;
   } catch (error) {
     if (isActiveUsageUniqueViolation(error)) {
@@ -468,6 +506,15 @@ export async function returnEquipmentForUser(
     })
     .where(eq(equipmentUsage.id, input.usageId))
     .returning();
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "return",
+    entityType: "equipment",
+    entityId: row.equipmentId,
+    detail: { usageId: input.usageId },
+  });
+
   return row;
 }
 
@@ -496,5 +543,14 @@ export async function correctUsageForUser(
     })
     .where(eq(equipmentUsage.id, input.usageId))
     .returning();
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "correctUsage",
+    entityType: "equipment",
+    entityId: row.equipmentId,
+    detail: { usageId: input.usageId },
+  });
+
   return row;
 }

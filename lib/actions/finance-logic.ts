@@ -1,5 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { recomputePaymentStatus } from "@/lib/actions/payments-logic";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { payments, projects } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
@@ -84,6 +85,15 @@ export async function updatePaymentForUser(ctx: RbacContext, input: UpdatePaymen
     if (!updated) throw new Error("Project not found.");
 
     const status = await recomputePaymentStatus(tx, input.projectId);
+
+    await recordAudit({
+      actorId: ctx.user.id,
+      action: "updateFinance",
+      entityType: "project",
+      entityId: input.projectId,
+      detail: { projectValue: input.projectValue },
+    });
+
     return { ...updated, paymentStatus: status };
   });
 }

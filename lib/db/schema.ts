@@ -527,7 +527,7 @@ export const auditLog = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     actorId: text("actor_id")
       .notNull()
-      .references(() => users.id, { onDelete: "restrict" }),
+      .references(() => users.id, { onDelete: "cascade" }),
     action: text("action").notNull(),
     entityType: text("entity_type").notNull(),
     entityId: text("entity_id").notNull(),

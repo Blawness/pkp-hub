@@ -1,4 +1,5 @@
 import { desc, eq } from "drizzle-orm";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { mapLayers } from "@/lib/db/schema";
 import { importCsvToGeoJson } from "@/lib/geo/csv-import";
@@ -71,6 +72,15 @@ export async function saveMapLayerForUser(ctx: RbacContext, input: SaveMapLayerI
       createdById: ctx.user.id,
     })
     .returning();
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "map",
+    entityId: layer.id,
+    detail: { name: input.name, projectId: input.projectId, source: "manual" },
+  });
+
   return layer;
 }
 
@@ -109,6 +119,14 @@ export async function importMapCsvForUser(ctx: RbacContext, input: ImportMapCsvI
     })
     .returning();
 
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "map",
+    entityId: layer.id,
+    detail: { name: input.name, source: "import_csv", pointCount: result.pointCount },
+  });
+
   return {
     layer,
     format: result.format,
@@ -131,6 +149,15 @@ export async function deleteMapLayerForUser(ctx: RbacContext, id: string) {
       // Best-effort: metadata row is already gone.
     }
   }
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "delete",
+    entityType: "map",
+    entityId: existing.id,
+    detail: { name: existing.name },
+  });
+
   return existing;
 }
 

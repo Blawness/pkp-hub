@@ -5,6 +5,7 @@ import type {
   UpdateEquipmentItemInput,
 } from "@/lib/actions/equipment-items-schemas";
 import { type EquipmentListItem, listEquipmentForUser } from "@/lib/actions/equipment-logic";
+import { recordAudit } from "@/lib/audit";
 import { db } from "@/lib/db";
 import { equipment, equipmentItem } from "@/lib/db/schema";
 import { summarizeUnits } from "@/lib/equipment/derive";
@@ -81,6 +82,15 @@ export async function createEquipmentItemForUser(
       image: input.image && input.image.length > 0 ? input.image : null,
     })
     .returning();
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "create",
+    entityType: "equipmentItem",
+    entityId: row.id,
+    detail: { name: input.name },
+  });
+
   return row;
 }
 
@@ -122,6 +132,15 @@ export async function updateEquipmentItemForUser(
   if (existing.image && existing.image !== nextImage) {
     await deleteImageObject(existing.image);
   }
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "update",
+    entityType: "equipmentItem",
+    entityId: row.id,
+    detail: { name: input.name },
+  });
+
   return row;
 }
 
@@ -166,5 +185,14 @@ export async function archiveEquipmentItemForUser(
     .where(eq(equipmentItem.id, input.itemId))
     .returning();
   if (!row) throw new Error("Jenis alat tidak ditemukan.");
+
+  await recordAudit({
+    actorId: ctx.user.id,
+    action: "archive",
+    entityType: "equipmentItem",
+    entityId: row.id,
+    detail: { name: row.name },
+  });
+
   return row;
 }
