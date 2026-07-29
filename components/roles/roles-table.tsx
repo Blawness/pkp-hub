@@ -78,9 +78,9 @@ export function RolesTable({
                       </Button>
                     </TableCell>
                     <TableCell>
-                      {role.isSystem ? null : (
-                        <div className="flex justify-end gap-2">
-                          <RoleFormDialog permissions={permissions} role={role} />
+                      <div className="flex justify-end gap-2">
+                        <RoleFormDialog permissions={permissions} role={role} />
+                        {role.isSystem ? null : (
                           <ConfirmDialog
                             trigger={
                               <Button variant="outline" size="sm">
@@ -93,8 +93,8 @@ export function RolesTable({
                             confirmVariant="destructive"
                             onConfirm={() => handleDelete(role.id)}
                           />
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                   {expandedId === role.id ? (

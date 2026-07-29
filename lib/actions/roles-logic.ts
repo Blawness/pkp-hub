@@ -154,7 +154,13 @@ export async function createRole(
   return { id: roleId };
 }
 
-/** Ubah nama/deskripsi/grant role kustom. Role sistem ditolak. */
+/**
+ * Ubah nama/deskripsi/grant role.
+ *
+ * Untuk role SISTEM hanya grant yang diubah — nama/deskripsi tetap
+ * dari kode (`system-roles.ts`). Perubahan grant role sistem akan
+ * HILANG saat `db:seed` / `db:sync-roles` dijalankan.
+ */
 export async function updateRole(
   ctx: RbacContext,
   input: { roleId: string; name: string; description?: string; grants: RoleGrant[] },
@@ -163,18 +169,18 @@ export async function updateRole(
   assertKnownPermissions(input.grants);
 
   const role = await getRoleOrThrow(input.roleId);
-  if (role.isSystem) {
-    throw new Error("Role sistem tidak bisa diubah dari sini — grant-nya ditentukan di kode.");
-  }
 
-  await db
-    .update(roles)
-    .set({
-      name: input.name.trim(),
-      description: input.description?.trim() || null,
-      updatedAt: new Date(),
-    })
-    .where(eq(roles.id, input.roleId));
+  // Role sistem: hanya update grant, jangan sentuh nama/deskripsi
+  if (!role.isSystem) {
+    await db
+      .update(roles)
+      .set({
+        name: input.name.trim(),
+        description: input.description?.trim() || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(roles.id, input.roleId));
+  }
 
   await db.delete(rolePermissions).where(eq(rolePermissions.roleId, input.roleId));
   if (input.grants.length > 0) {
@@ -192,7 +198,7 @@ export async function updateRole(
     action: "update",
     entityType: "role",
     entityId: input.roleId,
-    detail: { name: input.name },
+    detail: { name: role.name, isSystem: role.isSystem, grantCount: input.grants.length },
   });
 }
 

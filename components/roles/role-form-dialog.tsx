@@ -52,7 +52,13 @@ function grantsToRecord(
   return record;
 }
 
-/** Dialog buat role baru (tanpa prop `role`) atau ubah role kustom (dengan `role`). */
+/**
+ * Dialog buat role baru (tanpa prop `role`) atau ubah role (dengan `role`).
+ *
+ * Untuk role SISTEM: nama/deskripsi/area tidak bisa diedit (diatur kode),
+ * hanya grant permission yang bisa diubah. Perubahan grant role sistem akan
+ * HILANG saat `db:seed` / `db:sync-roles` dijalankan.
+ */
 export function RoleFormDialog({
   permissions,
   role,
@@ -137,10 +143,15 @@ export function RoleFormDialog({
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>{isEdit ? `Ubah role "${role?.name}"` : "Buat role baru"}</DialogTitle>
+            <DialogTitle>
+              {isEdit
+                ? `Ubah izin — ${role?.name}`
+                : "Buat role baru"}
+            </DialogTitle>
             <DialogDescription>
-              Pilih scope tiap izin. Scope yang tidak didukung sebuah resource otomatis tidak
-              memberi akses (fail-closed) — salah pilih tidak berbahaya.
+              {isEdit && role?.isSystem
+                ? "⚠️ Role sistem — grant-nya ditentukan di kode. Perubahan lewat UI akan HILANG saat `db:seed` / `db:sync-roles` dijalankan. Nama/deskripsi tidak bisa diedit."
+                : "Pilih scope tiap izin. Scope yang tidak didukung sebuah resource otomatis tidak memberi akses (fail-closed) — salah pilih tidak berbahaya."}
             </DialogDescription>
           </DialogHeader>
 
@@ -153,7 +164,7 @@ export function RoleFormDialog({
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Nama</Label>
-              <Input id="name" aria-invalid={!!errors.name} {...register("name")} />
+              <Input id="name" aria-invalid={!!errors.name} {...register("name")} disabled={role?.isSystem} />
               {errors.name ? (
                 <p className="text-destructive text-xs">{errors.name.message}</p>
               ) : null}
@@ -161,7 +172,7 @@ export function RoleFormDialog({
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="description">Deskripsi</Label>
-              <Input id="description" {...register("description")} />
+              <Input id="description" {...register("description")} disabled={role?.isSystem} />
             </div>
 
             {isEdit ? null : (
@@ -194,6 +205,11 @@ export function RoleFormDialog({
           </div>
 
           <DialogFooter>
+            {role?.isSystem ? (
+              <p className="mr-auto text-muted-foreground text-xs">
+                Perubahan akan hilang saat seed ulang.
+              </p>
+            ) : null}
             <Button type="submit" disabled={isPending}>
               {isPending ? "Menyimpan…" : isEdit ? "Simpan" : "Buat role"}
             </Button>
