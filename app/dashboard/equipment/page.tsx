@@ -13,11 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { listEquipmentItemsForUser } from "@/lib/actions/equipment-items-logic";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
-import {
-  formatDuration,
-  summarizeUnits,
-  usageDurationMs,
-} from "@/lib/equipment/derive";
+import { formatDuration, summarizeUnits, usageDurationMs } from "@/lib/equipment/derive";
 import { can } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 import { rbacFilter } from "@/lib/rbac/filter";
@@ -150,14 +146,18 @@ export default async function EquipmentPage({
 
       <EquipmentFilters />
 
-      {/* Quick Borrow — mobile-friendly, selalu di atas daftar */}
-      <QuickBorrowWidget projectOptions={projectOptions} />
+      {/* Quick Borrow — masih eksperimental (spesifikasi 2026-07-30),
+          sementara hanya admin yang melihat sampai alur multi-borrow-nya
+          mantap. Surveyor pinjam dari kartu unit / halaman detail seperti
+          biasa. */}
+      {isAdmin ? <QuickBorrowWidget projectOptions={projectOptions} /> : null}
 
       <EquipmentCatalog
         items={rows}
         isAdmin={isAdmin}
         projectOptions={projectOptions}
         surveyors={surveyors}
+        currentUserId={user.id}
         emptyMessage={
           <EmptyState
             icon={WrenchIcon}

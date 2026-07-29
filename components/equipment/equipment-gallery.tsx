@@ -27,11 +27,16 @@ export function EquipmentGallery({
   isAdmin,
   projectOptions,
   surveyors,
+  onUnitClick,
 }: {
   items: EquipmentItemAccordionRow[];
   isAdmin: boolean;
   projectOptions: { id: string; title: string }[];
   surveyors: { id: string; name: string }[];
+  /** Dikirim ke `EquipmentUnitList` saat user mengklik baris unit di
+   * dalam dialog detail item. Pemanggil (EquipmentCatalog) yang
+   * menampilkan modal detail unit. */
+  onUnitClick: (unitId: string) => void;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
   const active = items.find((it) => it.id === openId) ?? null;
@@ -135,6 +140,7 @@ export function EquipmentGallery({
               isAdmin={isAdmin}
               projectOptions={projectOptions}
               surveyors={surveyors}
+              onUnitClick={onUnitClick}
             />
           </DialogContent>
         ) : null}

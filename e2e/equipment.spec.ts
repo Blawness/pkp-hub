@@ -89,18 +89,23 @@ test.describe("Inventaris alat — quantity per item (2026-07-16)", () => {
     await expect(itemCard.getByText("Semua dipinjam")).toBeVisible();
     await page.getByText(itemName).click();
 
-    // 5. Kembalikan, dari halaman detail unit. Tombol "Kembalikan" membuka
-    //    dialog konfirmasi lebih dulu (ada di kartu Status pakai), lalu
-    //    dikonfirmasi.
-    await page.getByRole("link", { name: unitCode }).click();
-    await expect(page.getByText(/Sedang dipakai oleh/)).toBeVisible();
-    await page.getByRole("button", { name: "Kembalikan" }).first().click();
+    // 5. Kembalikan, dari modal detail unit (spek 2026-07-30: detail unit
+    //    selalu modal di semua tampilan inventaris). Klik baris unit di
+    //    dalam dialog galeri — baris unit sekarang `<div role="button">`,
+    //    bukan `<Link>`. Modal akan muncul di atas dialog galeri.
+    const galleryDialog = page.getByRole("dialog", { name: itemName });
+    await galleryDialog.getByRole("button", { name: `Lihat detail unit ${unitCode}` }).click();
+    const unitModal = page.getByRole("dialog", { name: "Detail unit" });
+    await expect(unitModal.getByText(/Sedang dipakai oleh/)).toBeVisible();
+    await unitModal.getByRole("button", { name: "Kembalikan" }).first().click();
     const returnConfirm = page.getByRole("dialog", { name: "Kembalikan alat?" });
     await returnConfirm.getByRole("button", { name: "Kembalikan" }).click();
 
     // 6. Assert durasi muncul di riwayat, dan unit sudah tidak lagi "Dipakai".
-    await expect(page.getByText("Tersedia — tidak sedang dipakai.")).toBeVisible();
-    const historyRow = page
+    //    Tunggu modal unit selesai refetch setelah return — aksi "Kembalikan"
+    //    me-revalidate path dan useAction me-refetch otomatis.
+    await expect(unitModal.getByText("Tersedia — tidak sedang dipakai.")).toBeVisible();
+    const historyRow = unitModal
       .getByRole("row")
       .filter({ hasText: "Pengukuran batas tanah Cimahi" })
       .last();

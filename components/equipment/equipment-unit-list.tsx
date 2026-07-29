@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowUpRightIcon, PencilIcon, Trash2Icon, Undo2Icon } from "lucide-react";
-import Link from "next/link";
+import type { KeyboardEvent } from "react";
 import { ArchiveEquipmentButton } from "@/components/equipment/archive-equipment-button";
 import { BorrowDialog } from "@/components/equipment/borrow-dialog";
 import { EquipmentFormDialog } from "@/components/equipment/equipment-form-dialog";
@@ -69,173 +69,186 @@ export function EquipmentUnitList({
   isAdmin,
   projectOptions,
   surveyors,
+  onUnitClick,
 }: {
   item: { id: string; name: string };
   units: EquipmentUnitRow[];
   isAdmin: boolean;
   projectOptions: { id: string; title: string }[];
   surveyors: { id: string; name: string }[];
+  /** Dipanggil saat user mengklik baris unit (bukan tombol aksinya).
+   * Pemanggil (EquipmentCatalog) yang menampilkan modal detail; kita
+   * sengaja TIDAK menavigasi ke `/dashboard/equipment/unit/[id]` lagi —
+   * halaman itu sekarang jadi fallback, bukan jalur utama. */
+  onUnitClick: (unitId: string) => void;
 }) {
   return (
     <div className="flex flex-col gap-2">
       {units.length === 0 ? (
         <p className="text-sm text-muted-foreground">Belum ada unit.</p>
       ) : (
-        units.map((unit) => (
-          // Seluruh kotak adalah link ke detail unit, KECUALI tombol aksinya.
-          // Caranya link overlay (`absolute inset-0`) + tombol di `z-10` di
-          // atasnya — bukan membungkus kotaknya dalam <a>, karena <button> di
-          // dalam <a> itu HTML tidak valid dan bikin klik "Pinjam"/"Edit" ikut
-          // memicu navigasi.
-          <div
-            key={unit.id}
-            className="group relative flex flex-col gap-2 rounded-md border border-border p-2 transition-colors hover:bg-accent/50 focus-within:ring-2 focus-within:ring-ring sm:flex-row sm:items-center sm:justify-between"
-          >
-            <Link
-              href={`/dashboard/equipment/unit/${unit.id}`}
-              className="absolute inset-0 rounded-md focus:outline-none"
+        units.map((unit) => {
+          function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onUnitClick(unit.id);
+            }
+          }
+          return (
+            // Seluruh kotak adalah tombol pemicu modal, KECUALI tombol
+            // aksinya. Tombol aksi pakai `z-10` di atas overlay klik
+            // supaya klik "Pinjam"/"Edit" tidak ikut membuka modal
+            // (sama pola dengan overlay Link yang dulu, hanya target
+            // handler-nya beda).
+            // biome-ignore lint/a11y/useSemanticElements: <button> di dalam <button> itu HTML tidak valid — kartu berisi tombol aksi (Pinjam, Edit, Hapus) yang harus tetap interaktif sendiri, jadi pemicu klik kartu hanya bisa berupa div dengan role ARIA.
+            <div
+              key={unit.id}
+              role="button"
+              tabIndex={0}
+              aria-label={`Lihat detail unit ${unit.code}`}
+              onClick={() => onUnitClick(unit.id)}
+              onKeyDown={handleKeyDown}
+              className="group relative flex cursor-pointer flex-col gap-2 rounded-md border border-border p-2 transition-colors hover:bg-accent/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="sr-only">Lihat detail unit {unit.code}</span>
-            </Link>
+              <div className="min-w-0">
+                <p className="font-medium group-hover:underline">{unit.code}</p>
+                <p className="text-xs text-muted-foreground">
+                  {unit.serialNumber ? `SN ${unit.serialNumber}` : "Tanpa no. seri"}
+                </p>
+              </div>
 
-            <div className="min-w-0">
-              <p className="font-medium group-hover:underline">{unit.code}</p>
-              <p className="text-xs text-muted-foreground">
-                {unit.serialNumber ? `SN ${unit.serialNumber}` : "Tanpa no. seri"}
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between gap-2 sm:justify-end">
-              {/* Badge non-interaktif — sengaja DI LUAR lapis z-10 supaya kliknya
+              <div className="flex items-center justify-between gap-2 sm:justify-end">
+                {/* Badge non-interaktif — sengaja DI LUAR lapis z-10 supaya kliknya
                   tetap tembus ke link overlay di bawahnya. */}
-              {unit.activeUsage ? (
-                <div className="flex min-w-0 flex-col gap-0.5">
-                  <Badge className="w-fit">Terpinjam</Badge>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {unit.activeUsage.usedByName} · {unit.activeUsage.projectTitle}
-                  </span>
-                </div>
-              ) : (
-                <Badge variant={conditionVariant[unit.condition] ?? "secondary"}>
-                  {equipmentConditionLabel[unit.condition] ?? unit.condition}
-                </Badge>
-              )}
-
-              {/* Quick action: ikon semua. Setiap tombol tetap punya `aria-label`
-                  — tooltip itu petunjuk visual saat hover, bukan nama aksesibelnya. */}
-              <div className="relative z-10 flex shrink-0 items-center gap-1">
                 {unit.activeUsage ? (
-                  unit.activeUsage.canReturn ? (
-                    <Tooltip>
-                      <ReturnButton
-                        usageId={unit.activeUsage.usageId}
-                        equipmentName={`${item.name} (${unit.code})`}
-                        durationLabel={unit.activeUsage.durationLabel}
-                        trigger={
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                size="icon-sm"
-                                variant="outline"
-                                aria-label={`Kembalikan ${unit.code}`}
-                              >
-                                <Undo2Icon />
-                              </Button>
-                            }
-                          />
-                        }
-                      />
-                      <TooltipContent>Kembalikan</TooltipContent>
-                    </Tooltip>
-                  ) : null
-                ) : unit.canBorrow ? (
-                  <Tooltip>
-                    <BorrowDialog
-                      fixedEquipment={{
-                        id: unit.id,
-                        name: `${item.name} (${unit.code})`,
-                      }}
-                      projectOptions={projectOptions}
-                      isAdmin={isAdmin}
-                      surveyors={surveyors}
-                      trigger={
-                        <TooltipTrigger
-                          render={
-                            <Button
-                              size="icon-sm"
-                              variant="outline"
-                              aria-label={`Pinjam ${unit.code}`}
-                            >
-                              {/* Panah keluar / panah balik = pasangan pinjam-kembali.
-                                  `HandHelping` tidak terbaca di ukuran 14px. */}
-                              <ArrowUpRightIcon />
-                            </Button>
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <Badge className="w-fit">Terpinjam</Badge>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {unit.activeUsage.usedByName} · {unit.activeUsage.projectTitle}
+                    </span>
+                  </div>
+                ) : (
+                  <Badge variant={conditionVariant[unit.condition] ?? "secondary"}>
+                    {equipmentConditionLabel[unit.condition] ?? unit.condition}
+                  </Badge>
+                )}
+
+                {/* Quick action: ikon semua. Setiap tombol tetap punya `aria-label`
+                  — tooltip itu petunjuk visual saat hover, bukan nama aksesibelnya. */}
+                <div className="relative z-10 flex shrink-0 items-center gap-1">
+                  {unit.activeUsage ? (
+                    unit.activeUsage.canReturn ? (
+                      <Tooltip>
+                        <ReturnButton
+                          usageId={unit.activeUsage.usageId}
+                          equipmentName={`${item.name} (${unit.code})`}
+                          durationLabel={unit.activeUsage.durationLabel}
+                          trigger={
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  size="icon-sm"
+                                  variant="outline"
+                                  aria-label={`Kembalikan ${unit.code}`}
+                                >
+                                  <Undo2Icon />
+                                </Button>
+                              }
+                            />
                           }
                         />
-                      }
-                    />
-                    <TooltipContent>Pinjam</TooltipContent>
-                  </Tooltip>
-                ) : null}
-
-                {isAdmin ? (
-                  <>
+                        <TooltipContent>Kembalikan</TooltipContent>
+                      </Tooltip>
+                    ) : null
+                  ) : unit.canBorrow ? (
                     <Tooltip>
-                      <EquipmentFormDialog
-                        itemId={item.id}
-                        itemName={item.name}
-                        editing={{
-                          equipmentId: unit.id,
-                          code: unit.code,
-                          serialNumber: unit.serialNumber,
-                          condition: unit.condition as EquipmentConditionInput,
-                          purchaseDate: unit.purchaseDate ?? null,
-                          purchasePrice: unit.purchasePrice ?? null,
-                          notes: unit.notes ?? null,
+                      <BorrowDialog
+                        fixedEquipment={{
+                          id: unit.id,
+                          name: `${item.name} (${unit.code})`,
                         }}
+                        projectOptions={projectOptions}
+                        isAdmin={isAdmin}
+                        surveyors={surveyors}
                         trigger={
                           <TooltipTrigger
                             render={
                               <Button
                                 size="icon-sm"
                                 variant="outline"
-                                aria-label={`Edit ${unit.code}`}
+                                aria-label={`Pinjam ${unit.code}`}
                               >
-                                <PencilIcon />
+                                {/* Panah keluar / panah balik = pasangan pinjam-kembali.
+                                  `HandHelping` tidak terbaca di ukuran 14px. */}
+                                <ArrowUpRightIcon />
                               </Button>
                             }
                           />
                         }
                       />
-                      <TooltipContent>Edit unit</TooltipContent>
+                      <TooltipContent>Pinjam</TooltipContent>
                     </Tooltip>
+                  ) : null}
 
-                    <Tooltip>
-                      <ArchiveEquipmentButton
-                        equipmentId={unit.id}
-                        equipmentName={`${item.name} (${unit.code})`}
-                        trigger={
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                size="icon-sm"
-                                variant="outline"
-                                aria-label={`Hapus ${unit.code}`}
-                              >
-                                <Trash2Icon />
-                              </Button>
-                            }
-                          />
-                        }
-                      />
-                      <TooltipContent>Hapus unit</TooltipContent>
-                    </Tooltip>
-                  </>
-                ) : null}
+                  {isAdmin ? (
+                    <>
+                      <Tooltip>
+                        <EquipmentFormDialog
+                          itemId={item.id}
+                          itemName={item.name}
+                          editing={{
+                            equipmentId: unit.id,
+                            code: unit.code,
+                            serialNumber: unit.serialNumber,
+                            condition: unit.condition as EquipmentConditionInput,
+                            purchaseDate: unit.purchaseDate ?? null,
+                            purchasePrice: unit.purchasePrice ?? null,
+                            notes: unit.notes ?? null,
+                          }}
+                          trigger={
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  size="icon-sm"
+                                  variant="outline"
+                                  aria-label={`Edit ${unit.code}`}
+                                >
+                                  <PencilIcon />
+                                </Button>
+                              }
+                            />
+                          }
+                        />
+                        <TooltipContent>Edit unit</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <ArchiveEquipmentButton
+                          equipmentId={unit.id}
+                          equipmentName={`${item.name} (${unit.code})`}
+                          trigger={
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  size="icon-sm"
+                                  variant="outline"
+                                  aria-label={`Hapus ${unit.code}`}
+                                >
+                                  <Trash2Icon />
+                                </Button>
+                              }
+                            />
+                          }
+                        />
+                        <TooltipContent>Hapus unit</TooltipContent>
+                      </Tooltip>
+                    </>
+                  ) : null}
+                </div>
               </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
 
       {isAdmin ? (

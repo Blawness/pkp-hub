@@ -28,11 +28,16 @@ export function EquipmentItemAccordion({
   isAdmin,
   projectOptions,
   surveyors,
+  onUnitClick,
 }: {
   items: EquipmentItemAccordionRow[];
   isAdmin: boolean;
   projectOptions: { id: string; title: string }[];
   surveyors: { id: string; name: string }[];
+  /** Dikirim ke `EquipmentUnitList` saat user mengklik baris unit di
+   * dalam accordion. Pemanggil (EquipmentCatalog) yang menampilkan
+   * modal detail unit. */
+  onUnitClick: (unitId: string) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -110,6 +115,7 @@ export function EquipmentItemAccordion({
                   isAdmin={isAdmin}
                   projectOptions={projectOptions}
                   surveyors={surveyors}
+                  onUnitClick={onUnitClick}
                 />
               </div>
             ) : null}
