@@ -57,13 +57,18 @@ test.describe("PWA service worker", () => {
     expect(cacheControl).toContain("no-store");
   });
 
-  test("SW body punya listener install + fetch (syarat Chrome untuk prompt)", async ({
+  test("SW body punya listener install tapi TANPA fetch (supaya App Router tidak putus)", async ({
     request,
   }) => {
     const res = await request.get("/sw.js");
     const body = await res.text();
     expect(body).toMatch(/addEventListener\(['"]install['"]/);
-    expect(body).toMatch(/addEventListener\(['"]fetch['"]/);
+    // Fetch handler sengaja TIDAK dipasang — `event.respondWith(fetch(req))`
+    // dapat memutuskan RSC payload/streaming milik Next App Router sehingga
+    // link/button tidak responsif setelah install. Cukup cek tidak ada
+    // listener fetch aktif; `clients.claim()` ada di comment sebagai
+    // peringatan dan tidak dijalankan.
+    expect(body).not.toMatch(/addEventListener\(['"]fetch['"]/);
   });
 });
 
