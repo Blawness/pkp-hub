@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { sameIds } from "@/components/ui/data-table-selection";
 
 /** Di atas ini, tabel dipaginasi; di bawahnya, satu halaman penuh lebih enak dibaca. */
 const PAGE_SIZE = 25;
@@ -58,19 +59,45 @@ export function DataTable<TData extends { id: string }, TValue>({
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  // Refs untuk memutus siklus ping-pong antara dua efek di bawah.
+  // `Object.keys(rowSelection)` selalu mengembalikan array BARU, jadi kalau
+  // kita membandingkan lewat `useEffect` deps saja, dua efek ini akan saling
+  // picu: external → internal → emit array baru → external re-render dengan
+  // reference baru → internal lagi, dst. Sampai React memotong dengan
+  // "Maximum update depth exceeded" dan halaman membeku.
+  //
+  // Penyimpanan: ref ini mencatat "nilai terakhir yang BENAR-BENAR saya
+  // apply/emit" — bukan nilai terkini. Selama isinya sama, kita skip
+  // pemanggilan setter walau deps referensi-nya berubah.
+  const lastAppliedExternalRef = React.useRef<string[] | null>(null);
+  const lastEmittedInternalRef = React.useRef<string[] | null>(null);
 
-  // Sync external selection state → internal
+  // Sync external selection state → internal. Hanya apply kalau `selectedIds`
+  // BENAR-BENAR berbeda dari yang terakhir kita terapkan — kalau parent
+  // mengirim array reference baru dengan isi yang sama (akibat effect 2 di
+  // bawah yang emit via `Object.keys`), kita diam.
   React.useEffect(() => {
     if (!selectable) return;
+    if (lastAppliedExternalRef.current && sameIds(lastAppliedExternalRef.current, selectedIds)) {
+      return;
+    }
+    lastAppliedExternalRef.current = selectedIds;
     const next: RowSelectionState = {};
     for (const id of selectedIds) next[id] = true;
     setRowSelection(next);
   }, [selectedIds, selectable]);
 
-  // Sync internal → external
+  // Sync internal → external. Hanya emit kalau ids internal BENAR-BENAR
+  // berbeda dari yang terakhir kita kirim ke parent. `Object.keys` di sini
+  // selalu array baru — perbandingan via ref adalah satu-satunya cara untuk
+  // memutus loop.
   React.useEffect(() => {
     if (!selectable || !onSelectionChange) return;
     const ids = Object.keys(rowSelection);
+    if (lastEmittedInternalRef.current && sameIds(lastEmittedInternalRef.current, ids)) {
+      return;
+    }
+    lastEmittedInternalRef.current = ids;
     onSelectionChange(ids);
   }, [rowSelection, selectable, onSelectionChange]);
 
