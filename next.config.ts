@@ -32,7 +32,33 @@ const nextConfig: NextConfig = {
     viewTransition: true,
   },
   async headers() {
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    return [
+      { source: "/(.*)", headers: securityHeaders },
+      // Header khusus service worker. SW jalan di konteksnya sendiri
+      // (bukan mewarisi CSP halaman), jadi boleh kita kunci lebih ketat
+      // tanpa mempengaruhi app utama. Cache-Control agresif agar user
+      // selalu dapat versi SW terbaru setelah deploy.
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self'" },
+          // Service worker butuh ini agar bisa diperbarui tanpa restart tab.
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      // Manifest di-serve dengan Content-Type yang konsisten di semua
+      // static host. Next.js biasanya menebak dari ekstensi, tapi untuk
+      // `.webmanifest` eksplisit lebih aman.
+      {
+        source: "/manifest.webmanifest",
+        headers: [
+          { key: "Content-Type", value: "application/manifest+json; charset=utf-8" },
+          { key: "Cache-Control", value: "public, max-age=3600" },
+        ],
+      },
+    ];
   },
 };
 
