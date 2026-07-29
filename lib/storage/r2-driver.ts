@@ -36,6 +36,18 @@ export function createR2Driver(): StorageDriver {
   const client = new S3Client({
     region: "auto",
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    // AWS SDK default-nya virtual-hosted-style (subdomain): ia menyusun URL
+    // presigned sebagai `https://<bucket>.<account>.r2.cloudflarestorage.com/
+    // <key>`. Format itu TIDAK valid untuk endpoint R2 default — R2 menjawab
+    // 403 karena hostname-nya berbeda dari pola yang dipetakan ke bucket.
+    //
+    // `objectBase` di atas dan URL yang kita simpan di DB keduanya
+    // path-style (`<account>.r2.../pkp-cms/<key>`); paksa presigner ikut
+    // format itu supaya presigned URL benar-benar menunjuk ke objek yang
+    // sama. Tanpa ini, halaman inventaris di produksi menampilkan ikon
+    // "image broken" — server tampak sehat, browser menerima 403 untuk
+    // SETIAP gambar.
+    forcePathStyle: true,
     credentials: {
       accessKeyId: env.R2_ACCESS_KEY_ID as string,
       secretAccessKey: env.R2_SECRET_ACCESS_KEY as string,
