@@ -40,8 +40,8 @@ const _notificationNotScoped: ScopedPermission = "notification.manage";
 const _backupNotScoped: ScopedPermission = "backup.export";
 
 describe("registry resource", () => {
-  it("memuat 19 resource", () => {
-    expect(Object.keys(RESOURCES)).toHaveLength(19);
+  it("memuat 20 resource", () => {
+    expect(Object.keys(RESOURCES)).toHaveLength(20);
   });
 
   it("nama kunci registry sama dengan nama resource-nya", () => {

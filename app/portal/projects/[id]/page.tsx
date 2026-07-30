@@ -3,10 +3,12 @@ import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaView } from "@/components/map/peta-view";
 import { PortalPayments } from "@/components/payments/portal-payments";
 import { PhaseTimeline } from "@/components/projects/phase-timeline";
+import { ProjectMessages } from "@/components/projects/project-messages";
 import { StatusBadge } from "@/components/projects/status-badge";
 import { StatusHistory } from "@/components/projects/status-history";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { listCommentsForProject } from "@/lib/actions/comments-logic";
 import { listSharedDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
@@ -67,6 +69,9 @@ export default async function PortalProjectDetailPage({
       downloadUrl: p.receiptFileUrl ? await downloadUrlFor(p.receiptFileUrl) : null,
     })),
   );
+
+  // Pesan proyek (F-2025-07-005): thread dua arah klien ↔ staf.
+  const commentRows = await listCommentsForProject(ctx, { projectId: project.id });
 
   const totalAreaSqm = mapLayerRows.reduce((sum, l) => sum + (l.areaSqm ?? 0), 0);
 
@@ -187,6 +192,19 @@ export default async function PortalProjectDetailPage({
             remaining={paymentSummary.remaining}
             status={paymentSummary.status}
             paymentNotes={project.paymentNotes}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pesan</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ProjectMessages
+            projectId={project.id}
+            currentUserId={ctx.user.id}
+            initialComments={commentRows}
           />
         </CardContent>
       </Card>

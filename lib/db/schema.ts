@@ -613,3 +613,49 @@ export const userRolesRelations = relations(userRoles, ({ one }) => ({
   user: one(users, { fields: [userRoles.userId], references: [users.id] }),
   role: one(roles, { fields: [userRoles.roleId], references: [roles.id] }),
 }));
+
+/* -------------------------------------------------------------------------- */
+/* Komentar proyek — pesan dua arah klien ↔ staf (spec 2026-07-30, F-2025-07-005) */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Thread pesan per proyek. Menggantikan WhatsApp sebagai saluran komunikasi
+ * klien ↔ studio, sehingga setiap pertanyaan dan jawaban punya jejak audit
+ * yang menempel ke proyeknya.
+ *
+ * `readByClient` / `readByStaff` adalah penyederhanaan v1: satu boolean per
+ * sisi, bukan per user. Untuk studio kecil (1 admin + beberapa surveyor) ini
+ * cukup — "sudah dibaca staf" berarti setidaknya satu staf sudah melihat.
+ * Kalau nanti butuh unread badge per individu, tambahkan tabel join
+ * `comment_read (commentId, userId, readAt)` tanpa mengubah tabel ini.
+ *
+ * `authorId` memakai `onDelete: "restrict"` (sama dengan `documents.uploadedById`,
+ * `payments.recordedById`): menghapus user yang pernah mengirim pesan akan
+ * gagal, bukan menghapus pesannya — riwayat komunikasi harus bertahan.
+ */
+export const comments = pgTable(
+  "comment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "restrict" }),
+    body: text("body").notNull(),
+    readByClient: boolean("read_by_client").notNull().default(false),
+    readByStaff: boolean("read_by_staff").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("comment_project_id_idx").on(t.projectId),
+    index("comment_author_id_idx").on(t.authorId),
+    index("comment_created_at_idx").on(t.createdAt),
+  ],
+);
+
+export const commentsRelations = relations(comments, ({ one }) => ({
+  project: one(projects, { fields: [comments.projectId], references: [projects.id] }),
+  author: one(users, { fields: [comments.authorId], references: [users.id] }),
+}));
