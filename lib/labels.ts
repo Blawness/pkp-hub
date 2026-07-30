@@ -80,3 +80,15 @@ export const projectStatusOrder = [
   "selesai",
   "dibatalkan",
 ] as const;
+
+/** Tailwind color classes untuk badge aksi di audit-log & timeline. */
+export const actionBadge: Record<string, string> = {
+  create: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400",
+  update: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
+  delete: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400",
+  archive: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
+  restore: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+  login: "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400",
+  assign: "bg-cyan-50 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-400",
+  void: "bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400",
+};

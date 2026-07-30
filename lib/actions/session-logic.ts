@@ -1,4 +1,4 @@
-import { desc, eq, gt } from "drizzle-orm";
+import { desc, eq, gt, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { sessions, users } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
@@ -60,4 +60,34 @@ export async function revokeSession(ctx: RbacContext, sessionId: string): Promis
   }
 
   await db.delete(sessions).where(eq(sessions.id, sessionId));
+}
+
+/**
+ * Cabut banyak sesi sekaligus. Anti-self-revoke: sesi milik
+ * `ctx.user.id` otomatis dilewati (tidak error — hanya tidak dicabut).
+ * Mengembalikan jumlah sesi yang benar-benar dicabut.
+ */
+export async function bulkRevokeSessions(ctx: RbacContext, sessionIds: string[]): Promise<number> {
+  assertCan(ctx, "session.revoke");
+
+  if (sessionIds.length === 0) return 0;
+
+  // Ambil semua sesi target + userId-nya.
+  const targets = await db
+    .select({ id: sessions.id, userId: sessions.userId })
+    .from(sessions)
+    .where(inArray(sessions.id, sessionIds));
+
+  // Anti-self-revoke: jangan cabut sesi sendiri.
+  const cabut = targets.filter((s) => s.userId !== ctx.user.id);
+  if (cabut.length === 0) return 0;
+
+  await db.delete(sessions).where(
+    inArray(
+      sessions.id,
+      cabut.map((s) => s.id),
+    ),
+  );
+
+  return cabut.length;
 }

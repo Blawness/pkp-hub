@@ -1,6 +1,5 @@
 "use client";
 
-import { useAction } from "next-safe-action/hooks";
 import { type ChangeEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +15,7 @@ import {
   MIN_UTM_ZONE,
 } from "@/lib/geo/reproject";
 import type { DetectedCoordinateFormat, UtmHemisphere } from "@/lib/geo/types";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import type { MapLayerRow } from "./peta-map";
 
 const zoneOptions = Array.from(
@@ -47,7 +47,7 @@ export function CsvImportForm({
   const [utmHemisphere, setUtmHemisphere] = useState<UtmHemisphere>(DEFAULT_UTM_HEMISPHERE);
   const [error, setError] = useState<string | null>(null);
 
-  const { executeAsync, isExecuting } = useAction(importMapCsv);
+  const { executeAsync, isExecuting } = useToastAction(importMapCsv);
 
   const preview = (() => {
     if (!csvText) return null;

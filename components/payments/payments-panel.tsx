@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { RecordPaymentDialog } from "@/components/payments/record-payment-dialog";
 import { VoidPaymentDialog } from "@/components/payments/void-payment-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +15,7 @@ import {
 } from "@/components/ui/table";
 import { regenerateReceipt } from "@/lib/actions/payments";
 import { formatIDR, formatTanggalIndo } from "@/lib/format";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { paymentMethodLabel, paymentStatusLabel } from "@/lib/labels";
 
 export type PaymentPanelRow = {
@@ -47,7 +47,7 @@ export function PaymentsPanel({
   status: string;
 }) {
   const router = useRouter();
-  const { executeAsync, isPending } = useAction(regenerateReceipt);
+  const { executeAsync, isPending } = useToastAction(regenerateReceipt);
   const hasValue = projectValue != null && projectValue > 0;
   const overpaid = hasValue && totalPaid > projectValue;
 

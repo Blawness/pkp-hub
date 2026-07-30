@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { voidPayment } from "@/lib/actions/payments";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 export function VoidPaymentDialog({
   paymentId,
@@ -33,7 +33,9 @@ export function VoidPaymentDialog({
     handleSubmit,
     formState: { isSubmitting },
   } = useForm<{ reason: string }>({ defaultValues: { reason: "" } });
-  const { executeAsync } = useAction(voidPayment);
+  const { executeAsync } = useToastAction(voidPayment, {
+    successMessage: "Pembayaran dibatalkan.",
+  });
 
   const onSubmit = async ({ reason }: { reason: string }) => {
     setFormError(null);

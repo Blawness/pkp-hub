@@ -1,16 +1,16 @@
+import {
+  BarChart3Icon,
+  CalendarIcon,
+  CheckCircleIcon,
+  ClipboardListIcon,
+  Settings2Icon,
+  XCircleIcon,
+} from "lucide-react";
 import Link from "next/link";
+import { StatusDot } from "@/components/projects/status-badge";
 import { projectStatusOrder, statusLabel } from "@/lib/labels";
 import { toneFor } from "@/lib/status-color";
 import { cn } from "@/lib/utils";
-import { StatusDot } from "@/components/projects/status-badge";
-import {
-  ClipboardListIcon,
-  CalendarIcon,
-  BarChart3Icon,
-  Settings2Icon,
-  CheckCircleIcon,
-  XCircleIcon,
-} from "lucide-react";
 
 /**
  * Sebaran proyek per status, sebagai SATU kartu.

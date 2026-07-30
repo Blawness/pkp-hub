@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -11,6 +10,7 @@ import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createEquipment, updateEquipment } from "@/lib/actions/equipment";
 import type { EquipmentConditionInput } from "@/lib/actions/equipment-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { equipmentConditionLabel } from "@/lib/labels";
 
 type FormValues = {
@@ -62,8 +62,8 @@ export function EquipmentForm({
   };
 
   const { control, register, handleSubmit, reset } = useForm<FormValues>({ defaultValues });
-  const { executeAsync: executeCreate, isExecuting: isCreating } = useAction(createEquipment);
-  const { executeAsync: executeUpdate, isExecuting: isUpdating } = useAction(updateEquipment);
+  const { executeAsync: executeCreate, isExecuting: isCreating } = useToastAction(createEquipment);
+  const { executeAsync: executeUpdate, isExecuting: isUpdating } = useToastAction(updateEquipment);
   const isSubmitting = isCreating || isUpdating;
 
   const onSubmit = async (values: FormValues) => {

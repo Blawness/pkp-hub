@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -19,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { assignRoleAction, unassignRoleAction } from "@/lib/actions/roles";
 import type { AssignableUser, RoleAssignment } from "@/lib/actions/roles-logic";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Cermin client-side dari `assignRoleSchema`. Sengaja tidak mengimpor
@@ -60,7 +60,7 @@ export function RoleAssignmentsPanel({
     defaultValues: { userId: "", roleId: "" },
   });
 
-  const assign = useAction(assignRoleAction, {
+  const assign = useToastAction(assignRoleAction, {
     onSuccess: () => {
       reset({ userId: "", roleId: "" });
       setFormError(null);
@@ -69,7 +69,7 @@ export function RoleAssignmentsPanel({
     onError: ({ error }) => setFormError(error.serverError ?? "Gagal menambah role."),
   });
 
-  const { executeAsync: unassign } = useAction(unassignRoleAction);
+  const { executeAsync: unassign } = useToastAction(unassignRoleAction);
 
   async function handleUnassign(userId: string, roleId: string) {
     const result = await unassign({ userId, roleId });

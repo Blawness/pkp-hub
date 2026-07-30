@@ -2,9 +2,9 @@
 
 import { ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { reorderPhases } from "@/lib/actions/phases";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Admin-only. `orderedPhaseIds` HARUS berisi SEMUA fase proyek — server
@@ -22,7 +22,11 @@ export function PhaseReorderButtons({
   index: number;
 }) {
   const router = useRouter();
-  const { executeAsync, isExecuting } = useAction(reorderPhases);
+  const { executeAsync, isExecuting } = useToastAction(reorderPhases, {
+    // Reorder bisa diklik beruntun — toast tiap klik berisik; urutan baru
+    // sudah terlihat langsung di UI.
+    silentOnSuccess: true,
+  });
 
   async function move(delta: number) {
     const target = index + delta;

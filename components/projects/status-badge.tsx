@@ -1,15 +1,15 @@
-import { statusLabel } from "@/lib/labels"
-import type { ProjectStatus } from "@/lib/actions/projects-logic"
-import { toneFor } from "@/lib/status-color"
-import { cn } from "@/lib/utils"
 import {
-  ClipboardListIcon,
-  CalendarIcon,
   BarChart3Icon,
-  Settings2Icon,
+  CalendarIcon,
   CheckCircleIcon,
+  ClipboardListIcon,
+  Settings2Icon,
   XCircleIcon,
-} from "lucide-react"
+} from "lucide-react";
+import type { ProjectStatus } from "@/lib/actions/projects-logic";
+import { statusLabel } from "@/lib/labels";
+import { toneFor } from "@/lib/status-color";
+import { cn } from "@/lib/utils";
 
 /**
  * Lencana status proyek dengan icon. Warnanya bergantung pada nilai status,
@@ -29,23 +29,23 @@ const statusIconMap: Record<ProjectStatus, React.ReactNode> = {
   diproses: <Settings2Icon className="size-4" aria-hidden />,
   selesai: <CheckCircleIcon className="size-4" aria-hidden />,
   dibatalkan: <XCircleIcon className="size-4" aria-hidden />,
-}
+};
 
 export function StatusBadge({
   status,
   variant = "default",
   className,
 }: {
-  status: string
-  variant?: "default" | "compact" | "text-only"
-  className?: string
+  status: string;
+  variant?: "default" | "compact" | "text-only";
+  className?: string;
 }) {
-  const tone = toneFor(status)
-  const label = statusLabel[status] ?? status
-  const icon = statusIconMap[status as ProjectStatus]
+  const tone = toneFor(status);
+  const label = statusLabel[status] ?? status;
+  const icon = statusIconMap[status as ProjectStatus];
 
   if (variant === "text-only") {
-    return <span className={cn("text-sm", className)}>{label}</span>
+    return <span className={cn("text-sm", className)}>{label}</span>;
   }
 
   if (variant === "compact") {
@@ -54,14 +54,14 @@ export function StatusBadge({
         className={cn(
           "inline-flex h-6 w-6 items-center justify-center rounded-md",
           tone.badge,
-          className
+          className,
         )}
         title={label}
         aria-label={label}
       >
         {icon}
       </div>
-    )
+    );
   }
 
   // default variant: icon + label with dot
@@ -70,35 +70,23 @@ export function StatusBadge({
       className={cn(
         "inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium",
         tone.badge,
-        className
+        className,
       )}
       aria-label={label}
     >
       {icon}
       {label}
     </span>
-  )
+  );
 }
 
 /**
  * Dot indicator — just the colored circle (for tables, pipelines).
  * Useful when space is tight.
  */
-export function StatusDot({
-  status,
-  className,
-}: {
-  status: string
-  className?: string
-}) {
-  const tone = toneFor(status)
-  const label = statusLabel[status] ?? status
+export function StatusDot({ status, className }: { status: string; className?: string }) {
+  const tone = toneFor(status);
+  const label = statusLabel[status] ?? status;
 
-  return (
-    <div
-      className={cn("h-2 w-2 rounded-full", tone.fill)}
-      title={label}
-      aria-label={label}
-    />
-  )
+  return <div className={cn("h-2 w-2 rounded-full", tone.fill)} title={label} aria-label={label} />;
 }

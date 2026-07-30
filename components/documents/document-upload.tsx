@@ -1,6 +1,5 @@
 "use client";
 
-import { useAction } from "next-safe-action/hooks";
 import { type ChangeEvent, type DragEvent, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { uploadDocument } from "@/lib/actions/documents";
 import type { DocumentCategory } from "@/lib/actions/documents-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { documentCategoryLabel } from "@/lib/labels";
 
 type UploadTarget = { mode: "presigned" | "direct"; uploadUrl: string; publicUrl: string };
@@ -29,7 +29,7 @@ export function DocumentUpload({ projectId }: { projectId: string }) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { executeAsync } = useAction(uploadDocument);
+  const { executeAsync } = useToastAction(uploadDocument);
 
   function pickFile(f: File) {
     setFile(f);

@@ -5,6 +5,7 @@ import { MotionProvider } from "@/components/motion/motion-provider";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { RegisterSW } from "@/components/pwa/register-sw";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 
 const geistSans = Geist({
@@ -76,6 +77,9 @@ export default function RootLayout({
           <TooltipProvider>
             <MotionProvider>
               {children}
+              {/* Toast global — feedback sukses/error untuk semua server
+                  action (dipakai via `useToastAction`). */}
+              <Toaster />
               {/* PWA bootstrap. RegisterSW efeknya nol render; InstallPrompt
                   me-mount tombol mengambang + modal secara lazy di client. */}
               <RegisterSW />

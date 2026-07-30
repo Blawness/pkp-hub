@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLog, users } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
@@ -78,4 +78,42 @@ export async function listAuditLogs(
     rows: rows.map((r) => ({ ...r, detail: r.detail as Record<string, unknown> | null })),
     total: cnt?.count ?? 0,
   };
+}
+
+/**
+ * Audit timeline untuk satu entitas spesifik (proyek, klien, dsb.).
+ * Memakai composite index `audit_log_entity_idx(entityType, entityId)`
+ * — index-only scan yang sangat murah. Hasil dibatasi ke `limit` terbaru.
+ *
+ * Permission: `project.read` untuk proyek, `client.read` untuk klien,
+ * `audit.read` untuk entitas lain. Ini memungkinkan staf melihat riwayat
+ * proyek/klien tanpa harus superuser.
+ */
+export async function listAuditForEntity(
+  ctx: RbacContext,
+  params: { entityType: string; entityId: string; limit?: number },
+): Promise<AuditLogRow[]> {
+  // Gate sesuai entitas — superuser dipersempit tidak perlu di sini.
+  if (params.entityType === "project") assertCan(ctx, "project.read");
+  else if (params.entityType === "client") assertCan(ctx, "client.read");
+  else assertCan(ctx, "audit.read");
+
+  const rows = await db
+    .select({
+      id: auditLog.id,
+      actorName: users.name,
+      action: auditLog.action,
+      entityType: auditLog.entityType,
+      entityId: auditLog.entityId,
+      detail: auditLog.detail,
+      ipAddress: auditLog.ipAddress,
+      createdAt: auditLog.createdAt,
+    })
+    .from(auditLog)
+    .leftJoin(users, eq(users.id, auditLog.actorId))
+    .where(and(eq(auditLog.entityType, params.entityType), eq(auditLog.entityId, params.entityId)))
+    .orderBy(desc(auditLog.createdAt))
+    .limit(params.limit ?? 30);
+
+  return rows.map((r) => ({ ...r, detail: r.detail as Record<string, unknown> | null }));
 }

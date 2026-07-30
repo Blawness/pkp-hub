@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -15,6 +14,7 @@ import { updateOwnNameSchema } from "@/lib/actions/profile-schemas";
 import { passwordSchema } from "@/lib/actions/users-schemas";
 import { authClient } from "@/lib/auth-client";
 import type { SessionUser } from "@/lib/auth-guards";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 type NameValues = z.infer<typeof updateOwnNameSchema>;
 
@@ -63,7 +63,7 @@ export function ProfileForm({ user, hasPassword }: { user: SessionUser; hasPassw
     defaultValues: { name: user.name },
   });
 
-  const updateName = useAction(updateOwnNameAction, {
+  const updateName = useToastAction(updateOwnNameAction, {
     onSuccess: ({ input }) => {
       setNameDone(true);
       // Jadikan nilai yang baru tersimpan sebagai titik nol form, supaya begitu

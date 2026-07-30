@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SelectField, type SelectOption } from "@/components/ui/select-field";
 import { assignSurveyor } from "@/lib/actions/projects";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /** Admin-only: this component must never be rendered for a surveyor. */
 export function AssignSurveyorForm({
@@ -22,7 +22,7 @@ export function AssignSurveyorForm({
   const router = useRouter();
   const [surveyorId, setSurveyorId] = useState(currentSurveyorId ?? "");
   const [error, setError] = useState<string | null>(null);
-  const { executeAsync, isExecuting } = useAction(assignSurveyor);
+  const { executeAsync, isExecuting } = useToastAction(assignSurveyor);
 
   const options: SelectOption[] = [
     { value: "", label: "Belum ditugaskan" },

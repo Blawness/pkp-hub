@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { type ReactElement, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createPhase, updatePhase } from "@/lib/actions/phases";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 type FormValues = {
   name: string;
@@ -39,7 +39,7 @@ type PhaseEditTarget = {
 
 /**
  * Admin-only: tambah fase baru ATAU edit fase yang ada, tergantung apakah
- * `editing` di-pass. Pola sama dengan `record-payment-dialog.tsx` (`useAction`
+ * `editing` di-pass. Pola sama dengan `record-payment-dialog.tsx` (`useToastAction`
  * + `executeAsync`, error di state lokal) — bukan `createStaffDialog` yang
  * pakai zodResolver, supaya konsisten dengan komponen fase lain di berkas ini.
  */
@@ -67,8 +67,8 @@ export function PhaseFormDialog({
   };
 
   const { control, register, handleSubmit, reset } = useForm<FormValues>({ defaultValues });
-  const { executeAsync: executeCreate, isExecuting: isCreating } = useAction(createPhase);
-  const { executeAsync: executeUpdate, isExecuting: isUpdating } = useAction(updatePhase);
+  const { executeAsync: executeCreate, isExecuting: isCreating } = useToastAction(createPhase);
+  const { executeAsync: executeUpdate, isExecuting: isUpdating } = useToastAction(updatePhase);
   const isSubmitting = isCreating || isUpdating;
 
   const onSubmit = async (values: FormValues) => {

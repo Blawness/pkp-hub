@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { SessionHeartbeat } from "@/components/auth/session-heartbeat";
+import { BottomNav } from "@/components/dashboard/bottom-nav";
 import { SIDEBAR_PIN_COOKIE } from "@/components/dashboard/nav-config";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { Topbar } from "@/components/dashboard/topbar";
@@ -60,9 +61,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
               `z-40` milik sidebar. Kuncinya mengurung konten pada `z: 0` — bukan
               menaikkan z sidebar mengejar angka apa pun yang dibawa pustaka
               berikutnya. */}
-          <div data-slot="content-column" className="isolate flex min-w-0 flex-1 flex-col">
+          <div
+            data-slot="content-column"
+            className="isolate flex min-w-0 flex-1 flex-col pb-14 md:pb-0"
+          >
             <Topbar user={user} />
             {children}
+            <BottomNav />
           </div>
         </div>
       </GlobalSearchProvider>

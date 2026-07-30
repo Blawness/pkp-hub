@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { toggleDocumentShare } from "@/lib/actions/documents";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /** Admin-only control — never render this for a non-admin. Optimistic UI. */
 export function DocumentShareToggle({
@@ -16,7 +16,7 @@ export function DocumentShareToggle({
 }) {
   const router = useRouter();
   const [optimistic, setOptimistic] = useState(sharedWithClient);
-  const { executeAsync, isExecuting } = useAction(toggleDocumentShare);
+  const { executeAsync, isExecuting } = useToastAction(toggleDocumentShare);
 
   return (
     <button

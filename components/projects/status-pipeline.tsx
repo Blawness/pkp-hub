@@ -2,7 +2,6 @@
 
 import { CheckIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { StatusBadge } from "@/components/projects/status-badge";
 import { StatusHistory, type StatusLogRow } from "@/components/projects/status-history";
@@ -23,6 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { changeProjectStatus } from "@/lib/actions/projects";
 import { projectStatusEnum } from "@/lib/actions/projects-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { statusLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -53,7 +53,9 @@ export function StatusPipeline({
   logs: StatusLogRow[];
 }) {
   const router = useRouter();
-  const { executeAsync, isExecuting } = useAction(changeProjectStatus);
+  const { executeAsync, isExecuting } = useToastAction(changeProjectStatus, {
+    successMessage: "Status proyek diperbarui.",
+  });
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   // Aksi destruktif menunggu konfirmasi; simpan target di sini (null = tertutup).

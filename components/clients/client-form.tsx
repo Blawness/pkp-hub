@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -13,6 +12,7 @@ import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createClient, updateClient } from "@/lib/actions/clients";
 import { clientInputSchema } from "@/lib/actions/clients-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { clientTypeLabel } from "@/lib/labels";
 
 type ClientFormValues = z.infer<typeof clientInputSchema>;
@@ -53,8 +53,8 @@ export function ClientForm({
     },
   });
 
-  const { executeAsync: executeCreate } = useAction(createClient);
-  const { executeAsync: executeUpdate } = useAction(updateClient);
+  const { executeAsync: executeCreate } = useToastAction(createClient);
+  const { executeAsync: executeUpdate } = useToastAction(updateClient);
 
   const onSubmit = async (values: ClientFormValues) => {
     setFormError(null);

@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { archiveEquipmentItem } from "@/lib/actions/equipment-items";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Admin-only. Server (`archiveEquipmentItemForUser`) menegakkan ulang perannya
@@ -22,7 +22,9 @@ export function ArchiveEquipmentItemButton({
   itemName: string;
 }) {
   const router = useRouter();
-  const { executeAsync } = useAction(archiveEquipmentItem);
+  const { executeAsync } = useToastAction(archiveEquipmentItem, {
+    successMessage: "Unit diarsipkan.",
+  });
 
   async function handleArchive(): Promise<{ error?: string } | undefined> {
     const result = await executeAsync({ itemId });

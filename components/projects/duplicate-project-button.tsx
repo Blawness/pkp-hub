@@ -2,17 +2,18 @@
 
 import { CopyIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { duplicateProject } from "@/lib/actions/projects";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Tombol duplikat proyek. Admin-only — client component
- * karena pakai useAction untuk optimisitic feedback.
+ * karena pakai useToastAction untuk optimisitic feedback.
  */
 export function DuplicateProjectButton({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const { execute, isPending } = useAction(duplicateProject, {
+  const { execute, isPending } = useToastAction(duplicateProject, {
+    successMessage: "Proyek diduplikat.",
     onSuccess: ({ data }) => {
       if (data?.project) {
         router.push(`/dashboard/projects/${data.project.id}`);

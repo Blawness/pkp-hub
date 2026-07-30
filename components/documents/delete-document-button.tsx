@@ -2,15 +2,17 @@
 
 import { Trash2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { deleteDocument } from "@/lib/actions/documents";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /** Admin-only control — never render this for a non-admin. */
 export function DeleteDocumentButton({ documentId }: { documentId: string }) {
   const router = useRouter();
-  const { executeAsync, isExecuting } = useAction(deleteDocument);
+  const { executeAsync, isExecuting } = useToastAction(deleteDocument, {
+    successMessage: "Dokumen dihapus.",
+  });
 
   async function handleDelete(): Promise<{ error?: string } | undefined> {
     const result = await executeAsync({ id: documentId });

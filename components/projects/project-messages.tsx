@@ -1,7 +1,6 @@
 "use client";
 
 import { MessageSquareIcon, SendIcon } from "lucide-react";
-import { useAction } from "next-safe-action/hooks";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +8,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Textarea } from "@/components/ui/textarea";
 import { createComment, markCommentsRead } from "@/lib/actions/comments";
 import type { CommentWithAuthor } from "@/lib/actions/comments-logic";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { roleLabel } from "@/lib/labels";
 import { cn } from "@/lib/utils";
 
@@ -37,8 +37,14 @@ export function ProjectMessages({
   const [formError, setFormError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const { executeAsync: executeCreate, isExecuting: isSending } = useAction(createComment);
-  const { executeAsync: executeMarkRead } = useAction(markCommentsRead);
+  const { executeAsync: executeCreate, isExecuting: isSending } = useToastAction(createComment, {
+    // Pesan yang muncul di daftar adalah feedback-nya; toast tiap kirim berisik.
+    silentOnSuccess: true,
+  });
+  const { executeAsync: executeMarkRead } = useToastAction(markCommentsRead, {
+    // Fire-and-forget saat mount — jangan toast apa pun kecuali error.
+    silentOnSuccess: true,
+  });
 
   // Mark as read saat pertama kali dibuka.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount, executeMarkRead is stable

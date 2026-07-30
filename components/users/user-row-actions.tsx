@@ -9,7 +9,6 @@ import {
   PencilIcon,
   UserCogIcon,
 } from "lucide-react";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -40,6 +39,7 @@ import {
 } from "@/lib/actions/users";
 import type { ManagedUser } from "@/lib/actions/users-logic";
 import { setUserNameSchema, setUserPasswordSchema } from "@/lib/actions/users-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 type PasswordValues = z.infer<typeof setUserPasswordSchema>;
 type NameValues = z.infer<typeof setUserNameSchema>;
@@ -67,13 +67,13 @@ export function UserRowActions({
   const [nameOpen, setNameOpen] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
-  const setRole = useAction(setUserRoleAction, {
+  const setRole = useToastAction(setUserRoleAction, {
     onError: ({ error }) => window.alert(error.serverError ?? "Gagal mengubah role."),
   });
-  const archive = useAction(archiveUserAction, {
+  const archive = useToastAction(archiveUserAction, {
     onError: ({ error }) => window.alert(error.serverError ?? "Gagal mengarsipkan."),
   });
-  const restore = useAction(restoreUserAction, {
+  const restore = useToastAction(restoreUserAction, {
     onError: ({ error }) => window.alert(error.serverError ?? "Gagal memulihkan."),
   });
 
@@ -87,7 +87,7 @@ export function UserRowActions({
     defaultValues: { userId: user.id, password: "" },
   });
 
-  const setPassword = useAction(setUserPasswordAction, {
+  const setPassword = useToastAction(setUserPasswordAction, {
     onSuccess: () => {
       reset({ userId: user.id, password: "" });
       setFormError(null);
@@ -106,7 +106,7 @@ export function UserRowActions({
     defaultValues: { userId: user.id, name: user.name },
   });
 
-  const setName = useAction(setUserNameAction, {
+  const setName = useToastAction(setUserNameAction, {
     onSuccess: () => {
       setNameError(null);
       setNameOpen(false);

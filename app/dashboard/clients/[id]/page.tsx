@@ -5,12 +5,14 @@ import { notFound } from "next/navigation";
 import { ArchiveClientButton } from "@/components/clients/archive-client-button";
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { InviteClientButton } from "@/components/clients/invite-client-button";
+import { EntityTimeline } from "@/components/audit/entity-timeline";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getClientById } from "@/lib/actions/clients-logic";
+import { listAuditForEntity } from "@/lib/actions/audit-logic";
 import { db } from "@/lib/db";
 import { projects, users } from "@/lib/db/schema";
 import { clientTypeLabel, statusLabel } from "@/lib/labels";
@@ -48,6 +50,13 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
     .select({ id: users.id, name: users.name })
     .from(users)
     .where(eq(users.role, "surveyor"));
+
+  // Timeline audit untuk klien ini — semua aksi (buat, undang, arsip, dsb.)
+  // sudah di-`recordAudit` otomatis di logic layer.
+  const auditRows = await listAuditForEntity(ctx, {
+    entityType: "client",
+    entityId: client.id,
+  });
 
   return (
     <main className="flex flex-col gap-6 p-8">
@@ -137,6 +146,15 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ i
               </Link>
             ))
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Riwayat Aktivitas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <EntityTimeline rows={auditRows} />
         </CardContent>
       </Card>
     </main>

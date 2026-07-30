@@ -46,6 +46,7 @@ export function DataTable<TData extends { id: string }, TValue>({
   onSelectionChange,
   columnVisibility,
   onColumnVisibilityChange,
+  searchStorageKey,
 }: {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
@@ -65,10 +66,25 @@ export function DataTable<TData extends { id: string }, TValue>({
    */
   columnVisibility?: VisibilityState;
   onColumnVisibilityChange?: (next: VisibilityState) => void;
+  /**
+   * Kunci localStorage untuk menyimpan isian pencarian. Dipakai agar filter
+   * tidak hilang saat navigasi; diambil ulang saat mount.
+   */
+  searchStorageKey?: string;
 }) {
   const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = React.useState("");
+  const [globalFilter, setGlobalFilter] = React.useState(
+    typeof window !== "undefined" && searchStorageKey
+      ? localStorage.getItem(`datatable-search:${searchStorageKey}`) ?? ""
+      : "",
+  );
+
+  // Persist search query ke localStorage tiap berubah
+  React.useEffect(() => {
+    if (!searchStorageKey) return;
+    localStorage.setItem(`datatable-search:${searchStorageKey}`, globalFilter);
+  }, [globalFilter, searchStorageKey]);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   // Refs untuk memutus siklus ping-pong antara dua efek di bawah.
   // `Object.keys(rowSelection)` selalu mengembalikan array BARU, jadi kalau

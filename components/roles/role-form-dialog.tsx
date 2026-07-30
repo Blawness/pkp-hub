@@ -3,7 +3,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,6 +22,7 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { createRoleAction, updateRoleAction } from "@/lib/actions/roles";
 import type { RoleSummary } from "@/lib/actions/roles-logic";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Hanya field yang dipegang react-hook-form. Sengaja TIDAK memakai
@@ -96,11 +96,11 @@ export function RoleFormDialog({
     router.refresh();
   }
 
-  const createAction = useAction(createRoleAction, {
+  const createAction = useToastAction(createRoleAction, {
     onSuccess: closeAndReset,
     onError: ({ error }) => setFormError(error.serverError ?? "Gagal membuat role."),
   });
-  const updateAction = useAction(updateRoleAction, {
+  const updateAction = useToastAction(updateRoleAction, {
     onSuccess: closeAndReset,
     onError: ({ error }) => setFormError(error.serverError ?? "Gagal mengubah role."),
   });

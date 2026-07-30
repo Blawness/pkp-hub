@@ -3,7 +3,6 @@
 import type { FeatureCollection } from "geojson";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { saveMapLayer } from "@/lib/actions/maps";
 import { calculateAreaSqm, formatArea } from "@/lib/geo/area";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { CsvImportForm } from "./csv-import-form";
 import { MapLayerList } from "./map-layer-list";
 import type { MapLayerRow } from "./peta-map";
@@ -47,7 +47,7 @@ export function PetaTab({
   const [draftName, setDraftName] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const { executeAsync: executeSave, isExecuting: isSaving } = useAction(saveMapLayer);
+  const { executeAsync: executeSave, isExecuting: isSaving } = useToastAction(saveMapLayer);
 
   const draftAreaSqm = draft ? calculateAreaSqm(draft) : null;
 

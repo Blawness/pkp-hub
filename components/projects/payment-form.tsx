@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -9,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { updatePayment } from "@/lib/actions/finance";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 type PaymentFormValues = {
   projectValue: string;
@@ -43,7 +43,7 @@ export function PaymentForm({
       paymentNotes: paymentNotes ?? "",
     },
   });
-  const { executeAsync } = useAction(updatePayment);
+  const { executeAsync } = useToastAction(updatePayment);
 
   const onSubmit = async (values: PaymentFormValues) => {
     setFormError(null);

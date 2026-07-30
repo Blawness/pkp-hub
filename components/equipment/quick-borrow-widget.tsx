@@ -2,11 +2,11 @@
 
 import { ArrowDownIcon, Loader2Icon, ScanIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { borrowByCode } from "@/lib/actions/equipment";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,7 +30,7 @@ export function QuickBorrowWidget({
   const [projectId, setProjectId] = useState(projectOptions[0]?.id ?? "");
   const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
 
-  const borrowAction = useAction(borrowByCode, {
+  const borrowAction = useToastAction(borrowByCode, {
     onSuccess: () => {
       setFeedback({ ok: true, msg: "Alat berhasil dipinjam." });
       setCode("");

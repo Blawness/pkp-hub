@@ -1,6 +1,5 @@
 "use client";
 
-import { useAction } from "next-safe-action/hooks";
 import { useEffect, useState } from "react";
 import { EquipmentUnitDetailContent } from "@/components/equipment/equipment-unit-detail-content";
 import {
@@ -11,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { getEquipmentDetail } from "@/lib/actions/equipment-detail";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /** Modal detail unit untuk tampilan Tabel (spesifikasi 2026-07-30). Konten
  * persis sama dengan halaman `/dashboard/equipment/unit/[unitId]` — di-
@@ -41,7 +41,7 @@ export function EquipmentUnitDetailModal({
   surveyors: { id: string; name: string }[];
   currentUserId: string;
 }) {
-  const { execute, result, isExecuting, hasErrored } = useAction(getEquipmentDetail);
+  const { execute, result, isExecuting, hasErrored } = useToastAction(getEquipmentDetail);
   const [hasFetchedFor, setHasFetchedFor] = useState<string | null>(null);
 
   // Fetch on open, ATAU saat unitId berganti (buka unit lain tanpa menutup

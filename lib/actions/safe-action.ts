@@ -24,8 +24,14 @@ const permissionMetadataSchema = z.object({
 
 export const rbacActionClient = createSafeActionClient({
   handleServerError(error) {
-    if (error instanceof Error) return error.message;
-    return "Unexpected error.";
+    // Jangan bocorkan detail error ke klien di production — pesan asli
+    // (hostname DB, nama bucket, SQL state) adalah informasi internal.
+    // App-level Error yang kami lempar sudah berbahasa Indonesia dan
+    // aman; `handleServerError` ini menangkap sisanya (unexpected).
+    if (process.env.NODE_ENV !== "production" && error instanceof Error) {
+      return error.message;
+    }
+    return "Terjadi kesalahan tak terduga. Silakan coba lagi.";
   },
   defineMetadataSchema: () => permissionMetadataSchema,
 })

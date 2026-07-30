@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PlusIcon } from "lucide-react";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -21,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { createClientUserAction } from "@/lib/actions/users";
 import { createClientUserSchema } from "@/lib/actions/users-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 type FormValues = z.infer<typeof createClientUserSchema>;
 
@@ -54,7 +54,7 @@ export function CreateClientDialog() {
     },
   });
 
-  const { execute, isPending } = useAction(createClientUserAction, {
+  const { execute, isPending } = useToastAction(createClientUserAction, {
     onSuccess: () => {
       reset();
       setFormError(null);

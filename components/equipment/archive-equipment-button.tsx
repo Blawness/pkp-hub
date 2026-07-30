@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { archiveEquipment } from "@/lib/actions/equipment";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Admin-only. Server (`archiveEquipmentForUser`) menegakkan ulang perannya — ini bukan gantinya.
@@ -25,7 +25,9 @@ export function ArchiveEquipmentButton({
   trigger?: ReactElement;
 }) {
   const router = useRouter();
-  const { executeAsync } = useAction(archiveEquipment);
+  const { executeAsync } = useToastAction(archiveEquipment, {
+    successMessage: "Alat diarsipkan.",
+  });
 
   async function handleArchive(): Promise<{ error?: string } | undefined> {
     const result = await executeAsync({ equipmentId });

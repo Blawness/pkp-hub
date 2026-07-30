@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { type ReactNode, useState } from "react";
 import { PhaseFormDialog } from "@/components/projects/phase-form-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { deletePhase, setPhaseStatus, updatePhaseNote } from "@/lib/actions/phases";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { phaseStatusLabel } from "@/lib/labels";
 import type { PhaseStatus } from "@/lib/phases/derive";
 
@@ -55,9 +55,10 @@ export function PhaseCard({
   const [statusError, setStatusError] = useState<string | null>(null);
   const [noteError, setNoteError] = useState<string | null>(null);
 
-  const { executeAsync: executeStatus, isExecuting: isSavingStatus } = useAction(setPhaseStatus);
-  const { executeAsync: executeNote, isExecuting: isSavingNote } = useAction(updatePhaseNote);
-  const { executeAsync: executeDelete, isExecuting: isDeleting } = useAction(deletePhase);
+  const { executeAsync: executeStatus, isExecuting: isSavingStatus } =
+    useToastAction(setPhaseStatus);
+  const { executeAsync: executeNote, isExecuting: isSavingNote } = useToastAction(updatePhaseNote);
+  const { executeAsync: executeDelete, isExecuting: isDeleting } = useToastAction(deletePhase);
 
   async function saveStatus(next: PhaseStatus) {
     setStatus(next);

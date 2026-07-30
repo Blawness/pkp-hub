@@ -1,15 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { archiveClient } from "@/lib/actions/clients";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 export function ArchiveClientButton({ clientId }: { clientId: string }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const { executeAsync, isExecuting } = useAction(archiveClient);
+  const { executeAsync, isExecuting } = useToastAction(archiveClient, {
+    successMessage: "Klien diarsipkan.",
+  });
 
   return (
     <div className="flex flex-col items-end gap-1">

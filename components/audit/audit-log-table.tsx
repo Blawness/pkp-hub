@@ -4,6 +4,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { RelativeTime } from "@/components/ui/relative-time";
 import { SelectField } from "@/components/ui/select-field";
 import {
   Table,
@@ -15,16 +16,6 @@ import {
 } from "@/components/ui/table";
 import type { AuditLogRow } from "@/lib/actions/audit-logic";
 import { cn } from "@/lib/utils";
-
-function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(date);
-}
 
 function DetailCell({ detail }: { detail: Record<string, unknown> | null }) {
   if (!detail) return <span className="text-muted-foreground">—</span>;
@@ -117,7 +108,7 @@ export function AuditLogTable({ rows, currentPage, totalPages, entityType, entit
                 {rows.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className="whitespace-nowrap text-muted-foreground text-xs">
-                      {formatDate(row.createdAt)}
+                      <RelativeTime date={row.createdAt} />
                     </TableCell>
                     <TableCell className="font-medium text-sm">
                       {row.actorName ?? (

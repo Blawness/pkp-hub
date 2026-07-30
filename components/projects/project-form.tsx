@@ -2,7 +2,6 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
@@ -13,6 +12,7 @@ import { optionsFromLabels, SelectField, type SelectOption } from "@/components/
 import { Textarea } from "@/components/ui/textarea";
 import { createProject, updateProject } from "@/lib/actions/projects";
 import { projectInputSchema } from "@/lib/actions/projects-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { surveyTypeLabel } from "@/lib/labels";
 
 type ProjectFormValues = z.infer<typeof projectInputSchema>;
@@ -59,8 +59,8 @@ export function ProjectForm({
     },
   });
 
-  const { executeAsync: executeCreate } = useAction(createProject);
-  const { executeAsync: executeUpdate } = useAction(updateProject);
+  const { executeAsync: executeCreate } = useToastAction(createProject);
+  const { executeAsync: executeUpdate } = useToastAction(updateProject);
 
   const clientOptions: SelectOption[] = clients.map((c) => ({ value: c.id, label: c.name }));
   const typeOptions = optionsFromLabels(surveyTypeLabel);

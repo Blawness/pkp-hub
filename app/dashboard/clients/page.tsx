@@ -48,6 +48,7 @@ export default async function ClientsPage({
         data={rows}
         searchable
         searchPlaceholder="Cari nama klien…"
+        searchStorageKey="clients-search"
         rowHrefBase="/dashboard/clients"
         emptyMessage={
           <EmptyState

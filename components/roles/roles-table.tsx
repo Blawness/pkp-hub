@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { Fragment, useState } from "react";
 import { RoleFormDialog } from "@/components/roles/role-form-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +16,7 @@ import {
 } from "@/components/ui/table";
 import { deleteRoleAction } from "@/lib/actions/roles";
 import type { RoleSummary } from "@/lib/actions/roles-logic";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 export function RolesTable({
   roles,
@@ -28,7 +28,7 @@ export function RolesTable({
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const router = useRouter();
-  const { executeAsync } = useAction(deleteRoleAction);
+  const { executeAsync } = useToastAction(deleteRoleAction);
 
   async function handleDelete(roleId: string): Promise<{ error?: string } | undefined> {
     const result = await executeAsync({ roleId });

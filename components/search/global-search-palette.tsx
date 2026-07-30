@@ -1,7 +1,16 @@
 "use client";
 
+import {
+  Building2Icon,
+  FileTextIcon,
+  FolderKanbanIcon,
+  HistoryIcon,
+  SettingsIcon,
+  ShieldCheckIcon,
+  UserIcon,
+  WrenchIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import { usePermissions } from "@/components/rbac/permissions-provider";
 import {
@@ -16,6 +25,8 @@ import {
 import { LoadingContainer } from "@/components/ui/loading-container";
 import { globalSearch } from "@/lib/actions/search";
 import type { SearchResult } from "@/lib/actions/search-logic";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
+import type { Permission } from "@/lib/rbac/resources";
 
 /**
  * Pintu masuk UI untuk Cmd-K global. Dipasang di layout `/dashboard` lewat
@@ -26,7 +37,7 @@ import type { SearchResult } from "@/lib/actions/search-logic";
  *   1. user mengetik → `query` lokal cmdk terisi
  *   2. `useDebouncedValue` menahan 200 md → `debouncedQuery`
  *   3. effect menjalankan `globalSearch({ q: debouncedQuery })` lewat
- *      `useAction` (pembungkus next-safe-action); hasilnya ditulis ke `results`
+ *      `useToastAction` (pembungkus next-safe-action); hasilnya ditulis ke `results`
  *   4. render mengelompokkan hasil per `kind` ke tiga `CommandGroup`
  *   5. tekan Enter → `onSelect` → `router.push(href)` lalu tutup dialog
  *
@@ -70,6 +81,76 @@ const HEADINGS: Record<SearchResult["kind"], string> = {
 const KIND_ORDER: SearchResult["kind"][] = ["client", "project", "document"];
 const MIN_CHARS = 2;
 
+type QuickAction = {
+  id: string;
+  label: string;
+  keywords: string[];
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  permission?: Permission;
+};
+
+const QUICK_ACTIONS: QuickAction[] = [
+  {
+    id: "projects",
+    label: "Proyek",
+    keywords: ["proyek", "project", "buat"],
+    href: "/dashboard/projects",
+    icon: FolderKanbanIcon,
+  },
+  {
+    id: "clients",
+    label: "Klien",
+    keywords: ["klien", "client", "pelanggan"],
+    href: "/dashboard/clients",
+    icon: Building2Icon,
+  },
+  {
+    id: "documents",
+    label: "Dokumen",
+    keywords: ["dokumen", "document", "unggah"],
+    href: "/dashboard/documents",
+    icon: FileTextIcon,
+  },
+  {
+    id: "equipment",
+    label: "Alat",
+    keywords: ["alat", "equipment", "inventaris"],
+    href: "/dashboard/equipment",
+    icon: WrenchIcon,
+  },
+  {
+    id: "settings",
+    label: "Pengaturan",
+    keywords: ["pengaturan", "settings", "setelan", "konfigurasi"],
+    href: "/dashboard/settings",
+    icon: SettingsIcon,
+  },
+  {
+    id: "sessions",
+    label: "Sesi Aktif",
+    keywords: ["sesi", "session", "login", "online"],
+    href: "/dashboard/settings/sessions",
+    icon: ShieldCheckIcon,
+    permission: "session.read",
+  },
+  {
+    id: "audit",
+    label: "Log Audit",
+    keywords: ["audit", "log", "riwayat", "aktivitas"],
+    href: "/dashboard/settings/audit",
+    icon: HistoryIcon,
+    permission: "audit.read",
+  },
+  {
+    id: "profile",
+    label: "Profil",
+    keywords: ["profil", "profile", "akun", "account"],
+    href: "/dashboard/profile",
+    icon: UserIcon,
+  },
+];
+
 function GlobalSearchPalette() {
   const { open, setOpen } = useGlobalSearch();
   const router = useRouter();
@@ -81,7 +162,7 @@ function GlobalSearchPalette() {
   const debouncedQuery = useDebouncedValue(query, 200);
   const [results, setResults] = useState<SearchResult[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const { executeAsync, isExecuting } = useAction(globalSearch);
+  const { executeAsync, isExecuting } = useToastAction(globalSearch);
 
   // Pintasan global ⌘K / Ctrl+K. Dipasang sekali per mount; `setOpen` stabil
   // dari context (state setter), jadi dependensi `[open]` tidak wajib tapi
@@ -106,7 +187,7 @@ function GlobalSearchPalette() {
     setFetchError(null);
   }, [open]);
 
-  // Fetch saat istilah tundaan berubah. `executeAsync` dari `useAction` aman
+  // Fetch saat istilah tundaan berubah. `executeAsync` dari `useToastAction` aman
   // disimpan di deps karena hook tersebut sudah men-stabilkan referensinya
   // lewat useCallback internal; perubahan referensinya bukan pemicu render.
   useEffect(() => {
@@ -142,6 +223,23 @@ function GlobalSearchPalette() {
     };
   }, [debouncedQuery, executeAsync]);
 
+  const { can } = usePermissions();
+
+  const trimmed = query.trim();
+
+  const allowedActions = useMemo(
+    () => QUICK_ACTIONS.filter((a) => !a.permission || can(a.permission)),
+    [can],
+  );
+
+  const filteredActions = useMemo(() => {
+    if (trimmed.length === 0) return allowedActions;
+    const t = trimmed.toLowerCase();
+    return allowedActions.filter(
+      (a) => a.keywords.some((k) => k.includes(t)) || a.label.toLowerCase().includes(t),
+    );
+  }, [allowedActions, trimmed]);
+
   const grouped = useMemo(() => {
     const buckets: Record<SearchResult["kind"], SearchResult[]> = {
       client: [],
@@ -157,7 +255,6 @@ function GlobalSearchPalette() {
     router.push(href);
   }
 
-  const trimmed = query.trim();
   const showInitialHint = trimmed.length === 0;
   const showTooShortHint = trimmed.length > 0 && trimmed.length < MIN_CHARS;
   // Loading = fetch in-flight DAN belum ada hasil basi untuk ditampilkan
@@ -185,6 +282,16 @@ function GlobalSearchPalette() {
           placeholder="Cari klien, proyek, atau dokumen…"
         />
         <CommandList>
+          {filteredActions.length > 0 ? (
+            <CommandGroup heading="Navigasi">
+              {filteredActions.map((a) => (
+                <CommandItem key={a.id} value={a.label} onSelect={() => handleSelect(a.href)}>
+                  <a.icon className="mr-2 size-4" />
+                  <span>{a.label}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ) : null}
           {showInitialHint ? (
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
               Ketik untuk mencari klien, proyek, atau dokumen.

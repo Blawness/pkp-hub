@@ -13,6 +13,8 @@ import { PaymentForm } from "@/components/projects/payment-form";
 import { PhaseTimeline } from "@/components/projects/phase-timeline";
 import { ProjectMessages } from "@/components/projects/project-messages";
 import { ProjectSummary } from "@/components/projects/project-summary";
+import { EntityTimeline } from "@/components/audit/entity-timeline";
+import { listAuditForEntity } from "@/lib/actions/audit-logic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -82,6 +84,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // ada apa pun yang bisa masuk ke payload-nya. `project.update` (admin-only)
   // menggerbangi aksi kelola proyek di bawah.
   const isAdmin = can(ctx, "project.update");
+
+  // Timeline audit untuk proyek ini — semua aksi (status, assign, dsb.)
+  // sudah di-`recordAudit` otomatis di logic layer. Index entity memastikan
+  // query ini tetap ringan walaupun `audit_log` tumbuh.
+  const auditRows = await listAuditForEntity(ctx, {
+    entityType: "project",
+    entityId: project.id,
+  });
+
   const canReadPayments = can(ctx, "payment.read");
   const paymentRows = canReadPayments ? await listPaymentsForProject(ctx, project.id) : [];
   const paymentSummary = canReadPayments ? await getPaymentSummary(ctx, project.id) : null;
@@ -275,6 +286,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
           <TabsTrigger value="alat">Alat</TabsTrigger>
           <TabsTrigger value="pesan">Pesan</TabsTrigger>
+          <TabsTrigger value="riwayat">Riwayat</TabsTrigger>
           {"projectValue" in project ? <TabsTrigger value="keuangan">Keuangan</TabsTrigger> : null}
         </TabsList>
 
@@ -339,6 +351,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             currentUserId={user.id}
             initialComments={commentRows}
           />
+        </TabsContent>
+
+        <TabsContent value="riwayat" className="pt-4">
+          <EntityTimeline rows={auditRows} />
         </TabsContent>
 
         {/* Both the trigger above and this panel only exist in the tree when

@@ -1,11 +1,11 @@
 "use client";
 
 import { LayersIcon, Trash2Icon } from "lucide-react";
-import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { deleteMapLayer } from "@/lib/actions/maps";
 import { formatArea } from "@/lib/geo/area";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import type { MapLayerRow } from "./peta-map";
 
 const sourceLabel: Record<string, string> = {
@@ -31,7 +31,7 @@ export function MapLayerList({
   onToggleVisible: (id: string) => void;
   onDeleted: (id: string) => void;
 }) {
-  const { executeAsync, isExecuting } = useAction(deleteMapLayer);
+  const { executeAsync, isExecuting } = useToastAction(deleteMapLayer);
 
   async function handleDelete(id: string) {
     if (!confirm("Hapus layer peta ini?")) return;
@@ -75,6 +75,7 @@ export function MapLayerList({
             variant="ghost"
             size="icon-sm"
             disabled={isExecuting}
+            aria-label={`Hapus layer ${layer.name}`}
             onClick={() => handleDelete(layer.id)}
           >
             <Trash2Icon />

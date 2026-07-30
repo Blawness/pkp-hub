@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,7 @@ import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { recordPayment } from "@/lib/actions/payments";
 import type { PaymentMethod } from "@/lib/actions/payments-schemas";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 import { paymentMethodLabel } from "@/lib/labels";
 
 type FormValues = {
@@ -56,7 +56,9 @@ export function RecordPaymentDialog({
   } = useForm<FormValues>({
     defaultValues: { amount: "", paidAt: today(), method: "transfer", note: "" },
   });
-  const { executeAsync } = useAction(recordPayment);
+  const { executeAsync } = useToastAction(recordPayment, {
+    successMessage: "Pembayaran dicatat.",
+  });
 
   const onSubmit = async (values: FormValues) => {
     setFormError(null);

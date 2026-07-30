@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { cloneElement, type ReactElement, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { borrowEquipment } from "@/lib/actions/equipment";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 type FormValues = {
   equipmentId: string;
@@ -81,7 +81,9 @@ export function BorrowDialog({
   };
 
   const { control, register, handleSubmit, reset } = useForm<FormValues>({ defaultValues });
-  const { executeAsync, isExecuting } = useAction(borrowEquipment);
+  const { executeAsync, isExecuting } = useToastAction(borrowEquipment, {
+    successMessage: "Peminjaman dicatat.",
+  });
 
   const onSubmit = async (values: FormValues) => {
     setFormError(null);

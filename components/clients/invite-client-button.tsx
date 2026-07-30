@@ -1,10 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { inviteClientUser } from "@/lib/actions/invite-client-user";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Tombol "Undang ke portal" di halaman detail klien. Memanggil `inviteClientUser`
@@ -29,7 +29,9 @@ export function InviteClientButton({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-  const { executeAsync, isExecuting } = useAction(inviteClientUser);
+  const { executeAsync, isExecuting } = useToastAction(inviteClientUser, {
+    successMessage: "Undangan terkirim.",
+  });
 
   if (archived) return null;
   if (hasUser) {

@@ -1,11 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useAction } from "next-safe-action/hooks";
 import type { ReactElement } from "react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { returnEquipment } from "@/lib/actions/equipment";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Menutup sesi pakai yang sedang berjalan, dengan konfirmasi. `usageId` datang
@@ -25,7 +25,9 @@ export function ReturnButton({
   trigger?: ReactElement;
 }) {
   const router = useRouter();
-  const { executeAsync } = useAction(returnEquipment);
+  const { executeAsync } = useToastAction(returnEquipment, {
+    successMessage: "Alat dikembalikan.",
+  });
 
   async function handleReturn(): Promise<{ error?: string } | undefined> {
     const result = await executeAsync({ usageId });

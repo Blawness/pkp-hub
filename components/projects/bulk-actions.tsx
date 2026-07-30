@@ -1,9 +1,9 @@
 "use client";
 
 import { ArrowRightIcon } from "lucide-react";
-import { useAction } from "next-safe-action/hooks";
 import { Button } from "@/components/ui/button";
 import { bulkAdvanceStatus } from "@/lib/actions/projects";
+import { useToastAction } from "@/lib/hooks/use-toast-action";
 
 /**
  * Toolbar aksi massal. Muncul saat ada baris terpilih.
@@ -16,7 +16,7 @@ export function BulkActions({
   selectedIds: string[];
   onDone: () => void;
 }) {
-  const { execute, isPending } = useAction(bulkAdvanceStatus, {
+  const { execute, isPending } = useToastAction(bulkAdvanceStatus, {
     onSuccess: onDone,
   });
 
