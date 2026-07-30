@@ -2,6 +2,7 @@ import type { AnyResource } from "../define-resource";
 import { auditResource } from "./audit";
 import { backupResource } from "./backup";
 import { clientResource } from "./client";
+import { commentResource } from "./comment";
 import { documentResource } from "./document";
 import { equipmentResource } from "./equipment";
 import { equipmentItemResource } from "./equipment-item";
@@ -28,6 +29,7 @@ export const RESOURCES = {
   audit: auditResource,
   backup: backupResource,
   client: clientResource,
+  comment: commentResource,
   document: documentResource,
   equipment: equipmentResource,
   equipmentItem: equipmentItemResource,

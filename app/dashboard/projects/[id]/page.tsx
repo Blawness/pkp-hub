@@ -11,11 +11,13 @@ import { PetaTab } from "@/components/map/peta-tab";
 import { PaymentsPanel } from "@/components/payments/payments-panel";
 import { PaymentForm } from "@/components/projects/payment-form";
 import { PhaseTimeline } from "@/components/projects/phase-timeline";
+import { ProjectMessages } from "@/components/projects/project-messages";
 import { ProjectSummary } from "@/components/projects/project-summary";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getClientById } from "@/lib/actions/clients-logic";
+import { listCommentsForProject } from "@/lib/actions/comments-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
 import { listEquipmentForUser, listUsageForProject } from "@/lib/actions/equipment-logic";
 import { listMapLayersForProject } from "@/lib/actions/maps-logic";
@@ -124,6 +126,10 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   const progress = await getProjectProgress(ctx, project.id);
   const phasesDone = phases.filter((p) => p.status === "selesai").length;
   const phasesTotal = phases.length;
+
+  // Pesan proyek (F-2025-07-005): thread dua arah klien ↔ staf.
+  const commentRows = await listCommentsForProject(ctx, { projectId: project.id });
+
   // Daftar surveyor untuk dropdown penanggung jawab fase — hanya admin yang
   // butuh. Query inline, sama seperti `surveyorRows` di atas. BEDANYA: kita
   // saring `archivedAt` — menugaskan fase ke surveyor yang sudah diarsipkan
@@ -268,6 +274,7 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
           <TabsTrigger value="peta">Peta</TabsTrigger>
           <TabsTrigger value="dokumen">Dokumen</TabsTrigger>
           <TabsTrigger value="alat">Alat</TabsTrigger>
+          <TabsTrigger value="pesan">Pesan</TabsTrigger>
           {"projectValue" in project ? <TabsTrigger value="keuangan">Keuangan</TabsTrigger> : null}
         </TabsList>
 
@@ -323,6 +330,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             canRecord={user.role !== "client"}
             isAdmin={isAdmin}
             surveyors={phaseSurveyors}
+          />
+        </TabsContent>
+
+        <TabsContent value="pesan" className="pt-4">
+          <ProjectMessages
+            projectId={project.id}
+            currentUserId={user.id}
+            initialComments={commentRows}
           />
         </TabsContent>
 

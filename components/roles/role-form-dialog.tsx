@@ -143,11 +143,7 @@ export function RoleFormDialog({
       <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
         <form onSubmit={handleSubmit(onSubmit)}>
           <DialogHeader>
-            <DialogTitle>
-              {isEdit
-                ? `Ubah izin — ${role?.name}`
-                : "Buat role baru"}
-            </DialogTitle>
+            <DialogTitle>{isEdit ? `Ubah izin — ${role?.name}` : "Buat role baru"}</DialogTitle>
             <DialogDescription>
               {isEdit && role?.isSystem
                 ? "⚠️ Role sistem — grant-nya ditentukan di kode. Perubahan lewat UI akan HILANG saat `db:seed` / `db:sync-roles` dijalankan. Nama/deskripsi tidak bisa diedit."
@@ -164,7 +160,12 @@ export function RoleFormDialog({
 
             <div className="flex flex-col gap-2">
               <Label htmlFor="name">Nama</Label>
-              <Input id="name" aria-invalid={!!errors.name} {...register("name")} disabled={role?.isSystem} />
+              <Input
+                id="name"
+                aria-invalid={!!errors.name}
+                {...register("name")}
+                disabled={role?.isSystem}
+              />
               {errors.name ? (
                 <p className="text-destructive text-xs">{errors.name.message}</p>
               ) : null}

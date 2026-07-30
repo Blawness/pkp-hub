@@ -27,6 +27,8 @@ const EXPECTED_SURVEYOR: Record<string, Scope> = {
   "equipment.borrow": "all",
   "equipment.return": "all",
   "search.use": "all",
+  "comment.read": "assigned",
+  "comment.create": "assigned",
   "profile.updateOwn": "own",
 };
 
@@ -42,6 +44,9 @@ const EXPECTED_CLIENT: Record<string, Scope> = {
   // ke `own`, jadi di sini `own` hanya untuk konsistensi dengan surveyor
   // (`all`).
   "search.use": "own",
+  // Pesan proyek (F-2025-07-005): klien membaca & menulis di proyeknya sendiri.
+  "comment.read": "own",
+  "comment.create": "own",
   "profile.updateOwn": "own",
 };
 

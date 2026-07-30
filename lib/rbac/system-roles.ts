@@ -101,6 +101,10 @@ export const SYSTEM_ROLE_GRANTS: Record<SystemRoleKey, Partial<Record<Permission
     // Cmd-K global: scope tidak per-baris, pilih `all` agar surveyor bisa
     // mencari proyek/dokumen yang ditugaskan kepadanya dari satu palet.
     "search.use": "all",
+    // Pesan proyek (F-2025-07-005): surveyor membaca & menulis di proyek
+    // yang ditugaskan padanya — sama dengan fase dan dokumen.
+    "comment.read": "assigned",
+    "comment.create": "assigned",
     "profile.updateOwn": "own",
   },
 
@@ -117,6 +121,11 @@ export const SYSTEM_ROLE_GRANTS: Record<SystemRoleKey, Partial<Record<Permission
     // `own` di sini hanya sebagai sinyal izin & konsistensi dengan surveyor
     // yang memakai `all` (lihat komentar di sana).
     "search.use": "own",
+    // Pesan proyek (F-2025-07-005): klien membaca & menulis di proyeknya
+    // sendiri. Ini SATU-SATUNYA aksi tulis yang dimiliki klien — portal
+    // tidak lagi strictly read-only.
+    "comment.read": "own",
+    "comment.create": "own",
     "profile.updateOwn": "own",
   },
 };
