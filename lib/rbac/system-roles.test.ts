@@ -37,6 +37,11 @@ const EXPECTED_CLIENT: Record<string, Scope> = {
   "map.read": "own",
   "document.read": "own",
   "payment.read": "own",
+  // ⌘K portal (F-2025-07-009): klien memakai palette yang SAMA dengan staf;
+  // scoping per-kind (`rbacFilter` di `globalSearchForUser`) sudah menyempit
+  // ke `own`, jadi di sini `own` hanya untuk konsistensi dengan surveyor
+  // (`all`).
+  "search.use": "own",
   "profile.updateOwn": "own",
 };
 

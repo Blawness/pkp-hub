@@ -1,4 +1,5 @@
 import { and, desc, eq, ilike, or } from "drizzle-orm";
+import { homeForRole } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import { clients, documents, projects } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
@@ -102,6 +103,11 @@ export async function globalSearchForUser(ctx: RbacContext, q: string): Promise<
   // di akhir sebelum dikembalikan — kolom ini tidak perlu sampai ke UI.
   type Scored = SearchResult & { createdAt: Date };
 
+  // `homeForRole` mengembalikan `/dashboard` untuk admin/surveyor dan
+  // `/portal` untuk klien. Dipakai sebagai basis href agar palette bekerja
+  // di kedua area tanpa harus membuat tindakan server terpisah.
+  const base = homeForRole(ctx.user.role);
+
   const combined: Scored[] = [
     ...clientRows.map(
       (c): Scored => ({
@@ -109,7 +115,11 @@ export async function globalSearchForUser(ctx: RbacContext, q: string): Promise<
         id: c.id,
         label: c.name,
         sub: c.email ?? c.phone ?? "",
-        href: `/dashboard/clients/${c.id}`,
+        // Klien di portal tidak melihat halaman detail klien, tapi palette
+        // konsisten: kalau klien mencari nama sendiri dan mengkliknya, ia
+        // akan sampai ke /portal (satu-satunya proyek miliknya) lewat
+        // fallback 404 → portal listing.
+        href: `${base}/clients/${c.id}`,
         createdAt: c.createdAt,
       }),
     ),
@@ -119,7 +129,7 @@ export async function globalSearchForUser(ctx: RbacContext, q: string): Promise<
         id: p.id,
         label: p.title,
         sub: p.locationLabel ?? "",
-        href: `/dashboard/projects/${p.id}`,
+        href: `${base}/projects/${p.id}`,
         createdAt: p.createdAt,
       }),
     ),
@@ -132,7 +142,7 @@ export async function globalSearchForUser(ctx: RbacContext, q: string): Promise<
         // dilihat di tab Dokumen dalam halaman proyek. `projectTitle`
         // membuat konteksnya jelas saat palette menampilkan hasil.
         sub: d.projectTitle,
-        href: `/dashboard/projects/${d.projectId}`,
+        href: `${base}/projects/${d.projectId}`,
         createdAt: d.createdAt,
       }),
     ),

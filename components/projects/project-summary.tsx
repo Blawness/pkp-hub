@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { z } from "zod";
 import { DuplicateProjectButton } from "@/components/projects/duplicate-project-button";
 import { ProjectFormDialog } from "@/components/projects/project-form-dialog";
+import { ProjectProgress } from "@/components/projects/project-progress";
 import type { StatusLogRow } from "@/components/projects/status-history";
 import { StatusPipeline } from "@/components/projects/status-pipeline";
 import { SurveyorAssignDialog } from "@/components/projects/surveyor-assign-dialog";
@@ -131,14 +132,9 @@ export function ProjectSummary({
               <p className="text-sm text-muted-foreground">Belum ada fase.</p>
             ) : (
               <>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
+                <ProjectProgress progress={progressPercent} />
                 <p className="text-xs text-muted-foreground">
-                  {progressPercent}% · {phasesDone} dari {phasesTotal} fase selesai
+                  {phasesDone} dari {phasesTotal} fase selesai
                 </p>
               </>
             )}

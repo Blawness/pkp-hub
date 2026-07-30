@@ -1,6 +1,7 @@
-import { and, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { clients, equipment, payments, projects, users } from "@/lib/db/schema";
+import { clients, equipment, payments, projectPhases, projects, users } from "@/lib/db/schema";
+import { todayString } from "@/lib/phases/derive";
 import { can, scopeOf } from "@/lib/rbac/can";
 import { rbacFilter } from "@/lib/rbac/filter";
 import type { RbacContext } from "@/lib/rbac/types";
@@ -227,4 +228,146 @@ export async function getSurveyorDashboardData(ctx: RbacContext): Promise<Survey
     projects: projectRows,
     needsActionCount: projectRows.filter((p) => p.needsAction).length,
   };
+}
+
+// -------------------------------------------------------------------------
+// "Perangkat jatuh tempo" — agregat fase lewat tempo (spec 2026-07-30, F-2025-07-002).
+// -------------------------------------------------------------------------
+
+/** Fase yang masuk "due soon" (≤ 7 hari) masuk daftar ini. */
+const DUE_SOON_WINDOW_DAYS = 7;
+
+const ACTIVE_PHASE_STATUSES = ["belum", "berjalan"] as const;
+
+export type OverduePhaseRow = {
+  phaseId: string;
+  phaseName: string;
+  phaseStatus: "belum" | "berjalan";
+  weight: number;
+  targetDate: string;
+  /** Negatif = telat N hari. Positif = masih N hari lagi. */
+  daysUntilTarget: number;
+  projectId: string;
+  projectTitle: string;
+  clientName: string | null;
+  surveyorName: string | null;
+};
+
+export type OverduePhasesData = {
+  /** Telat — `targetDate < today`. Diurutkan paling telat dulu. */
+  overdue: OverduePhaseRow[];
+  /** `today <= targetDate <= today + DUE_SOON_WINDOW_DAYS`. Urut paling dekat dulu. */
+  dueSoon: OverduePhaseRow[];
+  overdueCount: number;
+  dueSoonCount: number;
+};
+
+/**
+ * Daftar fase yang sudah / akan jatuh tempo, dipisah jadi dua keranjang.
+ *
+ * - `overdue` dan `dueSoon` dipotong 10 baris masing-masing supaya kartu
+ *   dashboard tidak melar; hitungan total (`overdueCount` / `dueSoonCount`)
+ *   tetap lengkap untuk badge.
+ * - Baris sumber di-SELECT lewat `rbacFilter(ctx, "phase.read")` — surveyor
+ *   hanya melihat fase dari proyek yang ditugaskan padanya (atau ditugaskan
+ *   langsung ke salah satu fasenya). Klien tidak punya `phase.read` sama
+ *   sekali dan menerima `null`; admin melihat semuanya.
+ * - `null` (bukan `[]`) ketika caller tak punya izin — pemanggil menyembunyikan
+ *   kartunya, sama dengan `getTotalEquipmentValue`.
+ */
+export async function getOverduePhasesForUser(
+  ctx: RbacContext,
+  options: { limit?: number } = {},
+): Promise<OverduePhasesData | null> {
+  if (!can(ctx, "phase.read")) return null;
+
+  const limit = options.limit ?? 10;
+  const today = todayString(new Date());
+  // `targetDate` disimpan `YYYY-MM-DD` (`mode: "string"`), jadi perbandingan
+  // string leksikografis aman — tidak perlu parsing Date.
+  const horizon = addDaysIso(today, DUE_SOON_WINDOW_DAYS);
+
+  const rows = await db
+    .select({
+      phaseId: projectPhases.id,
+      phaseName: projectPhases.name,
+      phaseStatus: projectPhases.status,
+      weight: projectPhases.weight,
+      targetDate: projectPhases.targetDate,
+      projectId: projects.id,
+      projectTitle: projects.title,
+      clientName: clients.name,
+      surveyorName: users.name,
+    })
+    .from(projectPhases)
+    .innerJoin(projects, eq(projects.id, projectPhases.projectId))
+    .leftJoin(clients, eq(clients.id, projects.clientId))
+    .leftJoin(users, eq(users.id, projectPhases.assignedSurveyorId))
+    .where(
+      and(
+        inArray(projectPhases.status, [...ACTIVE_PHASE_STATUSES]),
+        lte(projectPhases.targetDate, horizon),
+        rbacFilter(ctx, "phase.read"),
+      ),
+    )
+    // ASC: yang paling dekat jatuh tempo (atau paling telat) muncul lebih dulu
+    // — kartu overdue tinggal membalik untuk `overdue` (paling telat di atas).
+    .orderBy(asc(projectPhases.targetDate));
+
+  const todayMs = isoToLocalDayMs(today);
+
+  const overdue: OverduePhaseRow[] = [];
+  const dueSoon: OverduePhaseRow[] = [];
+  for (const row of rows) {
+    if (!row.targetDate) continue; // defensive: `lte` with NULL is unknown, tapi filter query kadang lolos
+    const days = Math.round((isoToLocalDayMs(row.targetDate) - todayMs) / 86_400_000);
+    const enriched: OverduePhaseRow = {
+      phaseId: row.phaseId,
+      phaseName: row.phaseName,
+      phaseStatus: row.phaseStatus as "belum" | "berjalan",
+      weight: row.weight,
+      targetDate: row.targetDate,
+      daysUntilTarget: days,
+      projectId: row.projectId,
+      projectTitle: row.projectTitle,
+      clientName: row.clientName,
+      surveyorName: row.surveyorName,
+    };
+    if (days < 0) overdue.push(enriched);
+    else dueSoon.push(enriched);
+  }
+
+  // Overdue: paling telat lebih dulu (days paling negatif). Due soon: paling
+  // dekat lebih dulu (days terkecil positif). `rows` sudah ASC, jadi overdue
+  // kebetulan urut benar; dueSoon juga. Kita tidak sort ulang, tapi potong
+  // setelah difilter.
+  return {
+    overdue: overdue.slice(0, limit),
+    dueSoon: dueSoon.slice(0, limit),
+    overdueCount: overdue.length,
+    dueSoonCount: dueSoon.length,
+  };
+}
+
+/** ISO `YYYY-MM-DD` + N hari, zona Waktu Indonesia Barat. */
+function addDaysIso(yyyymmdd: string, days: number): string {
+  const ms = isoToLocalDayMs(yyyymmdd) + days * 86_400_000;
+  // `en-CA` formatter (sama dengan `todayString`) — menjaga konsistensi zona
+  // dan format string. Lewat Date UTC, formatter `en-CA` di tz Asia/Jakarta
+  // memberikan YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}
+
+/** String `YYYY-MM-DD` → epoch ms di awal hari Asia/Jakarta. */
+function isoToLocalDayMs(yyyymmdd: string): number {
+  const [y, m, d] = yyyymmdd.split("-").map(Number);
+  // Buat Date di UTC midnight, lalu geser ke Asia/Jakarta (UTC+7). Cukup
+  // akurat untuk "berapa hari" yang integer; sub-second tidak relevan.
+  const utc = Date.UTC(y, m - 1, d, 0, 0, 0, 0);
+  return utc - 7 * 3_600_000;
 }

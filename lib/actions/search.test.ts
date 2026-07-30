@@ -224,9 +224,14 @@ describe("globalSearchForUser: surveyor yang hanya ditugaskan ke P2", () => {
   });
 });
 
-describe("globalSearchForUser: role klien tidak punya search.use", () => {
-  it("melempar saat dipanggil dengan konteks klien", async () => {
-    await expect(globalSearchForUser(clientCtx, "anything")).rejects.toThrow();
+describe("globalSearchForUser: klien dengan search.use:own (F-2025-07-009)", () => {
+  it("tidak melempar dan mengembalikan [] (clientId null → scope own = himpunan kosong)", async () => {
+    // Setelah F-2025-07-009 (portal ⌘K), role klien memegang `search.use:own`.
+    // `assertCan` lolos; yang menyempitkan hasil adalah `rbacFilter` per kind —
+    // `client.read`/`project.read`/`document.read` untuk klien memakai scope
+    // `own`, yang untuk `ctx.clientId = null` jatuh ke `sql\`false\``.
+    const results = await globalSearchForUser(clientCtx, "anything");
+    expect(results).toEqual([]);
   });
 });
 

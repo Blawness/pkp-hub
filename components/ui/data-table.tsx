@@ -11,6 +11,7 @@ import {
   type RowSelectionState,
   type SortingState,
   useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import { SearchIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -43,6 +44,8 @@ export function DataTable<TData extends { id: string }, TValue>({
   selectable = false,
   selectedIds = [],
   onSelectionChange,
+  columnVisibility,
+  onColumnVisibilityChange,
 }: {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
@@ -54,6 +57,14 @@ export function DataTable<TData extends { id: string }, TValue>({
   selectable?: boolean;
   selectedIds?: string[];
   onSelectionChange?: (ids: string[]) => void;
+  /**
+   * Visibilitas kolom (controlled). Dipasangkan dengan
+   * `<TableColumnToggle>` — parent yang memegang state dan
+   * localStorage; di sini cukup diteruskan ke `useReactTable`.
+   * Biarkan `undefined` kalau tabel tidak butuh toggle kolom.
+   */
+  columnVisibility?: VisibilityState;
+  onColumnVisibilityChange?: (next: VisibilityState) => void;
 }) {
   const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
@@ -142,7 +153,21 @@ export function DataTable<TData extends { id: string }, TValue>({
     onSortingChange: setSorting,
     onGlobalFilterChange: setGlobalFilter,
     onRowSelectionChange: selectable ? setRowSelection : undefined,
-    state: { sorting, globalFilter, rowSelection: selectable ? rowSelection : undefined },
+    onColumnVisibilityChange: onColumnVisibilityChange
+      ? (updater) => {
+          // @tanstack/react-table dapat mengirim fungsi updater ATAU nilai
+          // baru. Kita normalkan ke nilai sebelum di-forward, supaya parent
+          // selalu menerima objek (lebih mudah di-derive di `TableColumnToggle`).
+          const next = typeof updater === "function" ? updater(columnVisibility ?? {}) : updater;
+          onColumnVisibilityChange(next);
+        }
+      : undefined,
+    state: {
+      sorting,
+      globalFilter,
+      rowSelection: selectable ? rowSelection : undefined,
+      ...(columnVisibility !== undefined ? { columnVisibility } : {}),
+    },
     initialState: { pagination: { pageSize: PAGE_SIZE } },
   });
 

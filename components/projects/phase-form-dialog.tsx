@@ -14,8 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { FormFieldWithTooltip } from "@/components/ui/field-tooltip";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createPhase, updatePhase } from "@/lib/actions/phases";
@@ -118,34 +118,50 @@ export function PhaseFormDialog({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="phase-name">Nama fase</Label>
+          <FormFieldWithTooltip
+            label="Nama fase"
+            htmlFor="phase-name"
+            required
+            tooltip="Nama fase pekerjaan, mis. 'Pengukuran Lapangan' atau 'Pengolahan Data'."
+          >
             <Input id="phase-name" {...register("name")} />
-          </div>
+          </FormFieldWithTooltip>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="phase-description">Catatan internal (opsional)</Label>
+          <FormFieldWithTooltip
+            label="Catatan internal (opsional)"
+            htmlFor="phase-description"
+            tooltip="Catatan hanya untuk tim internal. Tidak pernah dikirim ke klien lewat portal atau email."
+          >
             <Textarea
               id="phase-description"
               rows={2}
               placeholder="Tidak terlihat oleh klien."
               {...register("description")}
             />
-          </div>
+          </FormFieldWithTooltip>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="phase-weight">Bobot</Label>
+            <FormFieldWithTooltip
+              label="Bobot"
+              htmlFor="phase-weight"
+              tooltip="Kontribusi fase terhadap progres total. Default 1. Persen dihitung dari perbandingan antar-fase, jadi total tidak harus 100."
+            >
               <Input id="phase-weight" type="number" min={1} step={1} {...register("weight")} />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="phase-target">Target (opsional)</Label>
+            </FormFieldWithTooltip>
+            <FormFieldWithTooltip
+              label="Target (opsional)"
+              htmlFor="phase-target"
+              tooltip="Tanggal kalender target selesai fase (YYYY-MM-DD). Lewat tanggal ini dengan status belum/berjalan ditandai 'Telat' di timeline."
+            >
               <Input id="phase-target" type="date" {...register("targetDate")} />
-            </div>
+            </FormFieldWithTooltip>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="phase-surveyor">Penanggung jawab (opsional)</Label>
+          <FormFieldWithTooltip
+            label="Penanggung jawab (opsional)"
+            htmlFor="phase-surveyor"
+            tooltip="Surveyor yang bertanggung jawab atas fase ini. Menugaskan seseorang ke satu fase memberi mereka akses ke proyek yang sama (aturan 'assigned' di RBAC)."
+          >
             <Controller
               control={control}
               name="assignedSurveyorId"
@@ -163,7 +179,7 @@ export function PhaseFormDialog({
                 />
               )}
             />
-          </div>
+          </FormFieldWithTooltip>
 
           {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 

@@ -1,5 +1,6 @@
 import { ClipboardCheckIcon, CoinsIcon, FolderKanbanIcon, WalletIcon } from "lucide-react";
 import Link from "next/link";
+import { OverduePhasesCard } from "@/components/dashboard/overdue-phases-card";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ProjectRow } from "@/components/dashboard/project-row";
 import { StatCard } from "@/components/dashboard/stat-card";
@@ -7,8 +8,10 @@ import { StatusPipeline } from "@/components/dashboard/status-pipeline";
 import { Reveal, Stagger } from "@/components/motion/reveal";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { StatusLegend } from "@/components/ui/status-legend";
 import {
   getAdminDashboardData,
+  getOverduePhasesForUser,
   getSurveyorDashboardData,
   getTotalEquipmentValue,
 } from "@/lib/actions/dashboard-logic";
@@ -40,9 +43,15 @@ export default async function DashboardPage() {
     // Query terpisah, gerbang terpisah (`equipment.readCost`) — lihat komentar
     // `getTotalEquipmentValue`. `null` berarti tidak berizin, kartunya
     // disembunyikan; berbeda dari `0` (berizin, belum ada alat).
-    const [data, totalAssetValue] = await Promise.all([
+    //
+    // `getOverduePhasesForUser` mengikuti pola yang SAMA: `null` = tanpa izin
+    // (saat ini hanya klien, yang tidak melihat dashboard ini); admin
+    // selalu non-null. `Promise.all` ketiganya karena tidak bergantung satu
+    // sama lain.
+    const [data, totalAssetValue, overduePhases] = await Promise.all([
       getAdminDashboardData(ctx),
       getTotalEquipmentValue(ctx),
+      getOverduePhasesForUser(ctx),
     ]);
     const activeCount = data.latestProjects.length;
 
@@ -91,6 +100,16 @@ export default async function DashboardPage() {
             </Card>
           </Reveal>
 
+          {/* Kartu "Perangkat jatuh tempo" — fase aktif yang lewat atau akan
+              jatuh tempo dalam 7 hari ke depan. Disembunyikan kalau caller tak
+              punya `phase.read` (saat ini hanya klien, yang tidak melihat
+              dashboard ini). Lihat komentar di `getOverduePhasesForUser`. */}
+          {overduePhases ? (
+            <Reveal>
+              <OverduePhasesCard data={overduePhases} />
+            </Reveal>
+          ) : null}
+
           <Reveal>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between gap-4">
@@ -127,6 +146,14 @@ export default async function DashboardPage() {
                 )}
               </CardContent>
             </Card>
+          </Reveal>
+
+          {/* Legenda status — referensi visual untuk admin/surveyor yang
+              baru pertama melihat pipeline. `StatusPipeline` di atas sudah
+              menunjukkan hitungan per status; ini melengkapi dengan
+              penjelasan tiap nilai (ikon + label). */}
+          <Reveal>
+            <StatusLegend />
           </Reveal>
         </Stagger>
       </main>

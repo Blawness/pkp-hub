@@ -1,7 +1,11 @@
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { getAdminDashboardData, getSurveyorDashboardData } from "@/lib/actions/dashboard-logic";
+import {
+  getAdminDashboardData,
+  getOverduePhasesForUser,
+  getSurveyorDashboardData,
+} from "@/lib/actions/dashboard-logic";
 import type { SessionUser } from "@/lib/auth-guards";
 import { db } from "@/lib/db";
 import {
@@ -9,12 +13,14 @@ import {
   documents,
   mapLayers,
   payments,
+  projectPhases,
   projectStatusLogs,
   projects,
   users,
 } from "@/lib/db/schema";
+import { todayString } from "@/lib/phases/derive";
 import { backfillUserRoles, seedSystemRoles } from "@/lib/rbac/system-roles";
-import { makeTestContextForUser } from "@/lib/rbac/test-fixtures";
+import { fakeContext, makeTestContextForUser } from "@/lib/rbac/test-fixtures";
 import type { RbacContext } from "@/lib/rbac/types";
 
 /**
@@ -329,3 +335,182 @@ describe("getSurveyorDashboardData", () => {
     expect(data.projects[0]?.title).toContain("selesai, sebagian");
   });
 });
+
+describe("getOverduePhasesForUser (F-2025-07-002)", () => {
+  // Fixture khusus: proyek dengan fase yang lewat tempo DAN yang akan jatuh
+  // tempo. Kita isolasi dari fixture global di atas dengan menghapus
+  // `projectPhases` di awal test ini — fase mereka sudah ada, tapi status
+  // semua `selesai`, jadi tidak akan masuk "active" filter.
+  beforeAll(async () => {
+    await db.delete(projectPhases);
+  });
+
+  it("mengembalikan null untuk konteks tanpa phase.read (defensive: role kustom di masa depan)", async () => {
+    // Semua role sistem saat ini MEMANG punya `phase.read` (admin:all,
+    // surveyor:assigned, client:own). null adalah defensive branch untuk role
+    // kustom yang sengaja melepas grant itu — pakai `fakeContext` dengan
+    // grants kosong, BUKAN `clientCtx` (yang justru punya phase.read:own).
+    const emptyCtx = fakeContext({});
+    const data = await getOverduePhasesForUser(emptyCtx);
+    expect(data).toBeNull();
+  });
+
+  it("klien dengan clientId null menerima data kosong (own scope = himpunan kosong)", async () => {
+    // Setelah F-2025-07-009, klien memegang `search.use:own` dan `phase.read:own`.
+    // Konteks klien pada test ini `clientId = null` (tidak ditautkan ke baris
+    // `clients` mana pun), jadi `rbacFilter(..., 'phase.read')` dengan scope
+    // `own` jatuh ke `sql\`false\`` dan query mengembalikan nol baris.
+    const data = await getOverduePhasesForUser(clientCtx);
+    expect(data).not.toBeNull();
+    expect(data).toEqual({
+      overdue: [],
+      dueSoon: [],
+      overdueCount: 0,
+      dueSoonCount: 0,
+    });
+  });
+
+  it("admin melihat overdue + dueSoon, dipisah dengan benar, dengan daysUntilTarget yang akurat", async () => {
+    const today = todayString(new Date());
+    const yesterday = addDays(today, -1);
+    const tomorrow = addDays(today, 1);
+    const sixDays = addDays(today, 6);
+    const tenDays = addDays(today, 10); // di luar horizon 7 hari — TIDAK masuk
+
+    // Proyek test khusus, assigned ke `surveyor` supaya beberapa cek scoping
+    // di bawah bisa valid.
+    const [proj] = await db
+      .insert(projects)
+      .values({
+        title: "Overdue Fixture Project",
+        clientId: fixtureClientId,
+        surveyType: "topografi",
+        assignedSurveyorId: surveyor.id,
+        status: "diproses",
+      })
+      .returning();
+
+    // 4 fase: lewat tempo (kemarin), besok (due soon), 6 hari lagi (due soon),
+    // 10 hari lagi (di luar horizon).
+    await db.insert(projectPhases).values([
+      {
+        projectId: proj.id,
+        name: "Telat Sehari",
+        sortOrder: 0,
+        status: "berjalan",
+        weight: 1,
+        assignedSurveyorId: surveyor.id,
+        targetDate: yesterday,
+      },
+      {
+        projectId: proj.id,
+        name: "Besok",
+        sortOrder: 1,
+        status: "belum",
+        weight: 1,
+        assignedSurveyorId: surveyor.id,
+        targetDate: tomorrow,
+      },
+      {
+        projectId: proj.id,
+        name: "Enam Hari Lagi",
+        sortOrder: 2,
+        status: "belum",
+        weight: 1,
+        assignedSurveyorId: surveyor.id,
+        targetDate: sixDays,
+      },
+      {
+        projectId: proj.id,
+        name: "Sepuluh Hari Lagi",
+        sortOrder: 3,
+        status: "belum",
+        weight: 1,
+        assignedSurveyorId: surveyor.id,
+        targetDate: tenDays,
+      },
+      // Selesai dengan target kemarin — HARUS dikecualikan, bukan overdue.
+      {
+        projectId: proj.id,
+        name: "Selesai Meskipun Telat",
+        sortOrder: 4,
+        status: "selesai",
+        weight: 1,
+        assignedSurveyorId: surveyor.id,
+        targetDate: yesterday,
+        completedAt: new Date(),
+      },
+    ]);
+
+    const data = await getOverduePhasesForUser(adminCtx);
+    expect(data).not.toBeNull();
+    if (!data) return;
+
+    // Overdue: 1 (Telat Sehari)
+    expect(data.overdueCount).toBe(1);
+    expect(data.overdue.map((p) => p.phaseName)).toEqual(["Telat Sehari"]);
+    expect(data.overdue[0]?.daysUntilTarget).toBeLessThanOrEqual(-1);
+    expect(data.overdue[0]?.projectTitle).toBe("Overdue Fixture Project");
+    expect(data.overdue[0]?.surveyorName).toBe(surveyor.name);
+
+    // Due soon: 2 (Besok, Enam Hari Lagi)
+    expect(data.dueSoonCount).toBe(2);
+    const dueSoonNames = data.dueSoon.map((p) => p.phaseName);
+    expect(dueSoonNames).toContain("Besok");
+    expect(dueSoonNames).toContain("Enam Hari Lagi");
+    expect(dueSoonNames).not.toContain("Sepuluh Hari Lagi");
+    expect(dueSoonNames).not.toContain("Selesai Meskipun Telat");
+
+    // Due soon diurutkan paling dekat lebih dulu
+    for (let i = 1; i < data.dueSoon.length; i++) {
+      const prev = data.dueSoon[i - 1];
+      const curr = data.dueSoon[i];
+      if (prev && curr) {
+        expect(prev.daysUntilTarget).toBeLessThanOrEqual(curr.daysUntilTarget);
+      }
+    }
+  });
+
+  it("surveyor hanya melihat fase dari proyek yang ditugaskan padanya", async () => {
+    // Buat proyek untuk `otherSurveyor` dengan fase overdue.
+    const tomorrow = addDays(todayString(new Date()), 1);
+    const [otherProj] = await db
+      .insert(projects)
+      .values({
+        title: "Other Surveyor Project",
+        clientId: fixtureClientId,
+        surveyType: "kavling",
+        assignedSurveyorId: otherSurveyor.id,
+        status: "baru",
+      })
+      .returning();
+    await db.insert(projectPhases).values({
+      projectId: otherProj.id,
+      name: "Other Surveyor Phase",
+      sortOrder: 0,
+      status: "berjalan",
+      weight: 1,
+      assignedSurveyorId: otherSurveyor.id,
+      targetDate: tomorrow,
+    });
+
+    const data = await getOverduePhasesForUser(surveyorCtx);
+    expect(data).not.toBeNull();
+    if (!data) return;
+    // Tidak boleh melihat fase dari proyek otherSurveyor.
+    const allNames = [...data.overdue, ...data.dueSoon].map((p) => p.phaseName);
+    expect(allNames).not.toContain("Other Surveyor Phase");
+  });
+});
+
+/** `YYYY-MM-DD` ± N hari, zona Asia/Jakarta. */
+function addDays(yyyymmdd: string, days: number): string {
+  const [y, m, d] = yyyymmdd.split("-").map(Number);
+  const ms = Date.UTC(y, m - 1, d, 0, 0, 0, 0) + days * 86_400_000 - 7 * 3_600_000;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(ms));
+}

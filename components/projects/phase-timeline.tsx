@@ -1,5 +1,6 @@
 import { ListChecksIcon } from "lucide-react";
 import { PhaseCard, type PhaseCardPhase } from "@/components/projects/phase-card";
+import { PhaseDisplayCard } from "@/components/projects/phase-display-card";
 import { PhaseFormDialog } from "@/components/projects/phase-form-dialog";
 import { PhaseReorderButtons } from "@/components/projects/phase-reorder-buttons";
 import { Button } from "@/components/ui/button";
@@ -90,31 +91,60 @@ export function PhaseTimeline({
       </div>
 
       <div className="flex flex-col gap-3">
-        {sorted.map((phase, index) => (
-          <PhaseCard
-            key={phase.id}
-            phase={phase}
-            late={isPhaseLate(phase, today)}
-            canEditPlan={canEditPlan}
-            canReportWork={canReportWork}
-            projectId={projectId}
-            surveyorName={
-              phase.assignedSurveyorId
-                ? (surveyorNameById.get(phase.assignedSurveyorId) ?? "—")
-                : null
-            }
-            surveyors={surveyors}
-            reorder={
-              canEditPlan ? (
-                <PhaseReorderButtons
-                  projectId={projectId}
-                  orderedPhaseIds={orderedIds}
-                  index={index}
-                />
-              ) : undefined
-            }
-          />
-        ))}
+        {sorted.map((phase, index) => {
+          // Read-only viewer (portal, atau staf tanpa izin): kartu presentasi
+          // murni, tanpa tombol apa pun — sama ketatnya dengan `PhaseCard` saat
+          // kedua flag `false`, tapi presentasinya lebih kaya (ikon status,
+          // indikator overdue, surveyor, bobot) sesuai spec 2026-07-14.
+          const readOnly = !canEditPlan && !canReportWork;
+          if (readOnly) {
+            const totalWeight = sorted.reduce((sum, p) => sum + (p.weight ?? 1), 0);
+            return (
+              <PhaseDisplayCard
+                key={phase.id}
+                id={phase.id}
+                name={phase.name}
+                status={phase.status}
+                weight={phase.weight ?? 1}
+                totalWeight={totalWeight}
+                targetDate={phase.targetDate}
+                description={phase.description ?? null}
+                assignedSurveyor={
+                  phase.assignedSurveyorId
+                    ? {
+                        name: surveyorNameById.get(phase.assignedSurveyorId) ?? "—",
+                      }
+                    : null
+                }
+              />
+            );
+          }
+          return (
+            <PhaseCard
+              key={phase.id}
+              phase={phase}
+              late={isPhaseLate(phase, today)}
+              canEditPlan={canEditPlan}
+              canReportWork={canReportWork}
+              projectId={projectId}
+              surveyorName={
+                phase.assignedSurveyorId
+                  ? (surveyorNameById.get(phase.assignedSurveyorId) ?? "—")
+                  : null
+              }
+              surveyors={surveyors}
+              reorder={
+                canEditPlan ? (
+                  <PhaseReorderButtons
+                    projectId={projectId}
+                    orderedPhaseIds={orderedIds}
+                    index={index}
+                  />
+                ) : undefined
+              }
+            />
+          );
+        })}
       </div>
     </div>
   );

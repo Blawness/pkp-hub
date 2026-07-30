@@ -5,8 +5,8 @@ import { useAction } from "next-safe-action/hooks";
 import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
+import { FormFieldWithTooltip } from "@/components/ui/field-tooltip";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { optionsFromLabels, SelectField } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createEquipment, updateEquipment } from "@/lib/actions/equipment";
@@ -110,18 +110,28 @@ export function EquipmentForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-lg flex-col gap-4" noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="code">Kode unit</Label>
+      <FormFieldWithTooltip
+        label="Kode unit"
+        htmlFor="code"
+        required
+        tooltip="Kode inventaris internal studio — unik, dipakai untuk saling merujuk di lapangan dan di laporan. Boleh beda dari nomor seri pabrik."
+      >
         <Input id="code" {...register("code")} />
-      </div>
+      </FormFieldWithTooltip>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="serialNumber">Nomor seri (opsional)</Label>
+      <FormFieldWithTooltip
+        label="Nomor seri (opsional)"
+        htmlFor="serialNumber"
+        tooltip="Nomor seri dari pabrikan. Boleh dikosongkan kalau tidak ada di nameplate, atau kalau alat adalah rakitan internal."
+      >
         <Input id="serialNumber" {...register("serialNumber")} />
-      </div>
+      </FormFieldWithTooltip>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="condition">Kondisi</Label>
+      <FormFieldWithTooltip
+        label="Kondisi"
+        htmlFor="condition"
+        tooltip="Kondisi fisik alat. 'Perawatan' atau 'Rusak' menandai alat TIDAK bisa dipinjam, dan 'Pensiun' menyembunyikannya dari katalog aktif."
+      >
         <Controller
           control={control}
           name="condition"
@@ -136,23 +146,32 @@ export function EquipmentForm({
             />
           )}
         />
-      </div>
+      </FormFieldWithTooltip>
 
       <div className="grid grid-cols-2 gap-4">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="purchaseDate">Tanggal beli (opsional)</Label>
+        <FormFieldWithTooltip
+          label="Tanggal beli (opsional)"
+          htmlFor="purchaseDate"
+          tooltip="Tanggal pembelian dalam YYYY-MM-DD. Dipakai untuk laporan aset dan garansi."
+        >
           <Input id="purchaseDate" type="date" {...register("purchaseDate")} />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="purchasePrice">Harga beli, IDR (opsional)</Label>
+        </FormFieldWithTooltip>
+        <FormFieldWithTooltip
+          label="Harga beli, IDR (opsional)"
+          htmlFor="purchasePrice"
+          tooltip="Harga beli dalam rupiah, bilangan bulat. Hanya terlihat oleh admin — surveyor tidak melihat kolom ini di spreadsheet."
+        >
           <Input id="purchasePrice" type="number" min={0} step={1} {...register("purchasePrice")} />
-        </div>
+        </FormFieldWithTooltip>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="notes">Catatan (opsional)</Label>
+      <FormFieldWithTooltip
+        label="Catatan (opsional)"
+        htmlFor="notes"
+        tooltip="Catatan bebas: riwayat kalibrasi, lokasi penyimpanan, atau pengingat perawatan. Ditampilkan di detail unit."
+      >
         <Textarea id="notes" rows={3} {...register("notes")} />
-      </div>
+      </FormFieldWithTooltip>
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 

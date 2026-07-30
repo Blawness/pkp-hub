@@ -1,6 +1,5 @@
 "use client";
 
-import { Loader2Icon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAction } from "next-safe-action/hooks";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
@@ -14,6 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { LoadingContainer } from "@/components/ui/loading-container";
 import { globalSearch } from "@/lib/actions/search";
 import type { SearchResult } from "@/lib/actions/search-logic";
 
@@ -160,6 +160,9 @@ function GlobalSearchPalette() {
   const trimmed = query.trim();
   const showInitialHint = trimmed.length === 0;
   const showTooShortHint = trimmed.length > 0 && trimmed.length < MIN_CHARS;
+  // Loading = fetch in-flight DAN belum ada hasil basi untuk ditampilkan
+  // (hasil sebelumnya tetap ditampilkan saat kueri berikut berjalan, jadi
+  // palette tidak berkedip tiap ketukan baru).
   const showLoading = isExecuting && results.length === 0 && trimmed.length >= MIN_CHARS;
   const showEmpty =
     !isExecuting && results.length === 0 && trimmed.length >= MIN_CHARS && !fetchError;
@@ -190,14 +193,6 @@ function GlobalSearchPalette() {
             <p className="px-3 py-6 text-center text-sm text-muted-foreground">
               Ketik minimal {MIN_CHARS} karakter untuk mulai mencari.
             </p>
-          ) : showLoading ? (
-            <div
-              role="status"
-              className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-muted-foreground"
-            >
-              <Loader2Icon aria-hidden className="size-4 animate-spin" />
-              Mencari…
-            </div>
           ) : fetchError ? (
             <p className="px-3 py-6 text-center text-sm text-destructive">
               Pencarian gagal: {fetchError}
@@ -205,32 +200,34 @@ function GlobalSearchPalette() {
           ) : showEmpty ? (
             <CommandEmpty>Tidak ada hasil untuk &quot;{trimmed}&quot;.</CommandEmpty>
           ) : (
-            KIND_ORDER.map((kind) => {
-              const items = grouped[kind];
-              if (items.length === 0) return null;
-              return (
-                <CommandGroup key={kind} heading={HEADINGS[kind]}>
-                  {items.map((r) => (
-                    <CommandItem
-                      key={`${kind}-${r.id}`}
-                      // `value` dipakai cmdk untuk identitas item saat
-                      // di-navigate keyboard; filter tidak dipakai karena
-                      // `shouldFilter={false}`, tapi assistive tech tetap
-                      // mengumumkan `value` jika tidak ada teks dalam item.
-                      value={`${r.label} ${r.sub}`.trim()}
-                      onSelect={() => handleSelect(r.href)}
-                    >
-                      <div className="flex min-w-0 flex-col">
-                        <span className="truncate">{r.label}</span>
-                        {r.sub ? (
-                          <span className="truncate text-xs text-muted-foreground">{r.sub}</span>
-                        ) : null}
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              );
-            })
+            <LoadingContainer isLoading={showLoading} type="list" rows={3} className="px-3 py-2">
+              {KIND_ORDER.map((kind) => {
+                const items = grouped[kind];
+                if (items.length === 0) return null;
+                return (
+                  <CommandGroup key={kind} heading={HEADINGS[kind]}>
+                    {items.map((r) => (
+                      <CommandItem
+                        key={`${kind}-${r.id}`}
+                        // `value` dipakai cmdk untuk identitas item saat
+                        // di-navigate keyboard; filter tidak dipakai karena
+                        // `shouldFilter={false}`, tapi assistive tech tetap
+                        // mengumumkan `value` jika tidak ada teks dalam item.
+                        value={`${r.label} ${r.sub}`.trim()}
+                        onSelect={() => handleSelect(r.href)}
+                      >
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate">{r.label}</span>
+                          {r.sub ? (
+                            <span className="truncate text-xs text-muted-foreground">{r.sub}</span>
+                          ) : null}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                );
+              })}
+            </LoadingContainer>
           )}
         </CommandList>
       </Command>

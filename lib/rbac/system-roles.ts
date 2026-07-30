@@ -112,6 +112,11 @@ export const SYSTEM_ROLE_GRANTS: Record<SystemRoleKey, Partial<Record<Permission
     "map.read": "own",
     "document.read": "own",
     "payment.read": "own",
+    // Cmd-K di portal klien — baris tetap di-scope per `rbacFilter` di
+    // `globalSearchForUser` (client hanya melihat miliknya sendiri), jadi
+    // `own` di sini hanya sebagai sinyal izin & konsistensi dengan surveyor
+    // yang memakai `all` (lihat komentar di sana).
+    "search.use": "own",
     "profile.updateOwn": "own",
   },
 };

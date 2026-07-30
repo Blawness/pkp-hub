@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { SessionHeartbeat } from "@/components/auth/session-heartbeat";
 import { UserMenu } from "@/components/dashboard/user-menu";
+import { PortalSearchButton } from "@/components/portal/portal-search-button";
 import { PermissionsProvider } from "@/components/rbac/permissions-provider";
+import { GlobalSearchProvider } from "@/components/search/global-search-palette";
 import { homeForRole, requireUser } from "@/lib/auth-guards";
 import { getRbacContext } from "@/lib/rbac/context";
 import type { Permission } from "@/lib/rbac/resources";
@@ -22,6 +24,13 @@ export const metadata: Metadata = {
  * punya tombol keluar MAUPUN pemilih tema di mana pun. Keduanya sudah ada dan
  * berfungsi untuk staf lewat sidebar /dashboard — klien hanya tidak pernah
  * diberi jalan ke sana.
+ *
+ * ⌘K (F-2025-07-009): klien sekarang bisa memakai palette yang sama dengan
+ * staf. `GlobalSearchProvider` di sini memasang listener ⌘K global dan
+ * dialog palette; `PortalSearchButton` merender tombol pemicu di topbar —
+ * KEDUA dikontrol izin `search.use` (saat ini ditambahkan ke matrix peran
+ * klien dengan scope `own`; `rbacFilter` per-kind di `globalSearchForUser`
+ * tetap menyempitkan hasil ke miliknya sendiri).
  */
 export default async function PortalLayout({ children }: { children: ReactNode }) {
   // Gerbang AREA: staf dipantulkan ke /dashboard. Izin datanya milik ctx.
@@ -31,18 +40,23 @@ export default async function PortalLayout({ children }: { children: ReactNode }
   return (
     // Cast aman: `loadEffectivePermissions` menyaring grant lewat `isPermission`.
     <PermissionsProvider permissions={[...ctx.permissions.keys()] as Permission[]}>
-      <div className="flex min-h-svh flex-col">
-        <SessionHeartbeat />
-        <nav className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 text-sm sm:px-8">
-          <Link href="/portal" className="font-medium">
-            PKP Hub
-          </Link>
-          <div className="w-56 shrink-0">
-            <UserMenu user={user} side="bottom" />
-          </div>
-        </nav>
-        {children}
-      </div>
+      <GlobalSearchProvider>
+        <div className="flex min-h-svh flex-col">
+          <SessionHeartbeat />
+          <nav className="flex items-center justify-between gap-4 border-b border-border px-4 py-3 text-sm sm:px-8">
+            <Link href="/portal" className="font-medium">
+              PKP Hub
+            </Link>
+            <div className="flex items-center gap-2">
+              <PortalSearchButton />
+              <div className="w-56 shrink-0">
+                <UserMenu user={user} side="bottom" />
+              </div>
+            </div>
+          </nav>
+          {children}
+        </div>
+      </GlobalSearchProvider>
     </PermissionsProvider>
   );
 }

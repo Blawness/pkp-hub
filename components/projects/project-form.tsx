@@ -7,8 +7,8 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import type { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { FormFieldWithTooltip } from "@/components/ui/field-tooltip";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { optionsFromLabels, SelectField, type SelectOption } from "@/components/ui/select-field";
 import { Textarea } from "@/components/ui/textarea";
 import { createProject, updateProject } from "@/lib/actions/projects";
@@ -97,11 +97,15 @@ export function ProjectForm({
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex max-w-lg flex-col gap-4" noValidate>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="title">Judul</Label>
+      <FormFieldWithTooltip
+        label="Judul"
+        htmlFor="title"
+        required
+        tooltip="Nama proyek yang mudah dikenali di daftar dan laporan, mis. 'Topografi Kavling 12 — Cimahi'."
+      >
         <Input id="title" aria-invalid={!!errors.title} {...register("title")} />
-        {errors.title ? <p className="text-xs text-destructive">{errors.title.message}</p> : null}
-      </div>
+      </FormFieldWithTooltip>
+      {errors.title ? <p className="text-xs text-destructive">{errors.title.message}</p> : null}
 
       {/*
         `register()` hanya bisa dipakai pada elemen form native — ia menempelkan
@@ -109,8 +113,12 @@ export function ProjectForm({
         di form ini melewati <Controller>, yang menghubungkan state react-hook-form
         ke pasangan value/onValueChange milik komponennya.
       */}
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="clientId">Klien</Label>
+      <FormFieldWithTooltip
+        label="Klien"
+        htmlFor="clientId"
+        required
+        tooltip="Pemilik proyek. Wajib ada sebelum proyek bisa disimpan — kalau belum ada, gunakan tombol 'Buat klien' di header dialog."
+      >
         <Controller
           control={control}
           name="clientId"
@@ -126,13 +134,16 @@ export function ProjectForm({
             />
           )}
         />
-        {errors.clientId ? (
-          <p className="text-xs text-destructive">{errors.clientId.message}</p>
-        ) : null}
-      </div>
+      </FormFieldWithTooltip>
+      {errors.clientId ? (
+        <p className="text-xs text-destructive">{errors.clientId.message}</p>
+      ) : null}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="surveyType">Jenis survey</Label>
+      <FormFieldWithTooltip
+        label="Jenis survey"
+        htmlFor="surveyType"
+        tooltip="Kategori pekerjaan (topografi, kavling, batas tanah, luas bangunan, lainnya). Memengaruhi label default di laporan dan portal klien."
+      >
         <Controller
           control={control}
           name="surveyType"
@@ -147,16 +158,22 @@ export function ProjectForm({
             />
           )}
         />
-      </div>
+      </FormFieldWithTooltip>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="locationLabel">Alamat / lokasi lahan</Label>
+      <FormFieldWithTooltip
+        label="Alamat / lokasi lahan"
+        htmlFor="locationLabel"
+        tooltip="Penanda lokasi umum — alamat, nama dusun, atau ringkasan singkat. Peta detail (GeoJSON) disimpan terpisah di tab Peta."
+      >
         <Input id="locationLabel" {...register("locationLabel")} />
-      </div>
+      </FormFieldWithTooltip>
 
       {!isEditing ? (
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="assignedSurveyorId">Surveyor</Label>
+        <FormFieldWithTooltip
+          label="Surveyor"
+          htmlFor="assignedSurveyorId"
+          tooltip="Surveyor utama yang bertanggung jawab atas proyek. Setelah dibuat, surveyor diubah lewat halaman detail (tombol ganti di pojok kanan atas)."
+        >
           <Controller
             control={control}
             name="assignedSurveyorId"
@@ -171,22 +188,29 @@ export function ProjectForm({
               />
             )}
           />
-        </div>
+        </FormFieldWithTooltip>
       ) : (
         <p className="text-xs text-muted-foreground">
           Surveyor yang ditugaskan diubah lewat halaman detail proyek, bukan di sini.
         </p>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="orderDate">Tanggal order</Label>
+      <FormFieldWithTooltip
+        label="Tanggal order"
+        htmlFor="orderDate"
+        required
+        tooltip="Tanggal proyek diterima dari klien. Default: hari ini. Bisa diubah di sini sebelum proyek disimpan; setelah itu lewat halaman detail."
+      >
         <Input id="orderDate" type="date" {...register("orderDate")} />
-      </div>
+      </FormFieldWithTooltip>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="description">Deskripsi</Label>
+      <FormFieldWithTooltip
+        label="Deskripsi"
+        htmlFor="description"
+        tooltip="Catatan tambahan tentang proyek, mis. ruang lingkup atau instruksi khusus. Tidak terlihat oleh klien."
+      >
         <Textarea id="description" rows={3} {...register("description")} />
-      </div>
+      </FormFieldWithTooltip>
 
       {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
 
