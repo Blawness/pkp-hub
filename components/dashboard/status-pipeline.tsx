@@ -2,6 +2,15 @@ import Link from "next/link";
 import { projectStatusOrder, statusLabel } from "@/lib/labels";
 import { toneFor } from "@/lib/status-color";
 import { cn } from "@/lib/utils";
+import { StatusDot } from "@/components/projects/status-badge";
+import {
+  ClipboardListIcon,
+  CalendarIcon,
+  BarChart3Icon,
+  Settings2Icon,
+  CheckCircleIcon,
+  XCircleIcon,
+} from "lucide-react";
 
 /**
  * Sebaran proyek per status, sebagai SATU kartu.
@@ -43,20 +52,32 @@ export function StatusPipeline({ counts }: { counts: Record<string, number> }) {
       </div>
 
       <ul className="grid gap-x-4 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
-        {segments.map(({ status, count }) => (
-          <li key={status}>
-            <Link
-              href={`/dashboard/projects?status=${status}`}
-              className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <span aria-hidden className={cn("size-2 rounded-full", toneFor(status).fill)} />
-              <span className="truncate text-muted-foreground group-hover:text-foreground">
-                {statusLabel[status] ?? status}
-              </span>
-              <span className="ml-auto font-medium tabular-nums">{count}</span>
-            </Link>
-          </li>
-        ))}
+        {segments.map(({ status, count }) => {
+          const statusIconMap: Record<string, React.ReactNode> = {
+            baru: <ClipboardListIcon className="size-4" aria-hidden />,
+            dijadwalkan: <CalendarIcon className="size-4" aria-hidden />,
+            data_diambil: <BarChart3Icon className="size-4" aria-hidden />,
+            diproses: <Settings2Icon className="size-4" aria-hidden />,
+            selesai: <CheckCircleIcon className="size-4" aria-hidden />,
+            dibatalkan: <XCircleIcon className="size-4" aria-hidden />,
+          };
+          return (
+            <li key={status}>
+              <Link
+                href={`/dashboard/projects?status=${status}`}
+                className="group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span aria-hidden className="text-muted-foreground group-hover:text-foreground">
+                  {statusIconMap[status]}
+                </span>
+                <span className="truncate text-muted-foreground group-hover:text-foreground">
+                  {statusLabel[status] ?? status}
+                </span>
+                <span className="ml-auto font-medium tabular-nums">{count}</span>
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

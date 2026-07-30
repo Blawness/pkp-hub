@@ -407,15 +407,20 @@ export async function archiveUser(ctx: RbacContext, userId: string): Promise<voi
     }
   }
 
-  await db
-    .update(users)
-    .set({ archivedAt: new Date(), updatedAt: new Date() })
-    .where(eq(users.id, userId));
+  // Arsip dan putus sesi dalam SATU transaksi untuk meniadakan jendela balap
+  // (BUGS-001): tanpa ini, ada celah antara update dan delete sesi tempat
+  // request yang sudah lewat proxy bisa tetap menggunakan sesi yang sah.
+  await db.transaction(async (tx) => {
+    await tx
+      .update(users)
+      .set({ archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, userId));
 
-  // Putuskan sesi yang sedang berjalan. `getSession` juga menolak user terarsip,
-  // jadi ini lapis kedua — tapi lapis pertama yang membuat pencabutan terasa
-  // seketika, bukan menunggu cookie sesi kedaluwarsa.
-  await db.delete(sessions).where(eq(sessions.userId, userId));
+    // Putuskan sesi yang sedang berjalan. `getSession` juga menolak user terarsip,
+    // jadi ini lapis kedua — tapi lapis pertama yang membuat pencabutan terasa
+    // seketika, bukan menunggu cookie sesi kedaluwarsa.
+    await tx.delete(sessions).where(eq(sessions.userId, userId));
+  });
 
   await recordAudit({
     actorId: ctx.user.id,
