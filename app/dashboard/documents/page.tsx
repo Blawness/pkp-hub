@@ -65,7 +65,12 @@ export default async function DocumentsSearchPage({
     : [];
   const uploaderNameById = new Map(uploaderUsers.map((u) => [u.id, u.name]));
 
-  const clientRows = await listClients();
+  // Client directory is admin-only (`client.read`). Surveyors must not receive
+  // it (SAST-001): the filter dropdown gets an empty list, and even for admins
+  // we project to {id, name} so full PII never reaches the RSC payload.
+  const canViewClients = can(ctx, "client.read");
+  const clientRows = canViewClients ? await listClients() : [];
+  const clientFilterRows = clientRows.map((c) => ({ id: c.id, name: c.name }));
 
   // `searchDocumentsForUser` sudah menyaring baris sesuai peran; penandatanganan
   // di sini hanya mengubah baris yang BOLEH dilihat menjadi tautan yang bisa
@@ -116,7 +121,7 @@ export default async function DocumentsSearchPage({
         </TabsList>
 
         <TabsContent value="dokumen" className="flex flex-col gap-4 pt-4">
-          <DocumentsFilters clients={clientRows} />
+          <DocumentsFilters clients={clientFilterRows} />
 
           <DocumentsTable
             rows={rows}

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { FolderKanbanIcon } from "lucide-react";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ActiveFilters } from "@/components/projects/active-filters";
@@ -54,11 +54,31 @@ export default async function ProjectsPage({
     return true;
   });
 
-  const [clientRows, surveyorRows, activeClientRows] = await Promise.all([
-    db.select({ id: clients.id, name: clients.name }).from(clients),
-    db.select({ id: users.id, name: users.name }).from(users).where(eq(users.role, "surveyor")),
-    listClients(),
-  ]);
+  // Client directory is admin-only (`client.read`). Surveyors must never
+  // receive the full client list (SAST-001): they only get the clients behind
+  // projects they can already see, so the filter dropdown and row names leak
+  // nothing new. `listClients()` (full records) only runs for users who can
+  // create projects (admins — they necessarily hold `client.read`).
+  const canViewClients = can(ctx, "client.read");
+  const canCreateProject = can(ctx, "project.create");
+  const scopedClientIds = [
+    ...new Set(scopedProjects.map((p) => p.clientId).filter((id): id is string => Boolean(id))),
+  ];
+
+  let clientRows: { id: string; name: string }[] = [];
+  if (canViewClients) {
+    clientRows = await db.select({ id: clients.id, name: clients.name }).from(clients);
+  } else if (scopedClientIds.length > 0) {
+    clientRows = await db
+      .select({ id: clients.id, name: clients.name })
+      .from(clients)
+      .where(inArray(clients.id, scopedClientIds));
+  }
+  const surveyorRows = await db
+    .select({ id: users.id, name: users.name })
+    .from(users)
+    .where(eq(users.role, "surveyor"));
+  const activeClientRows = canCreateProject ? await listClients() : [];
   const activeClients = activeClientRows.map((c) => ({ id: c.id, name: c.name }));
   const clientMap = new Map(clientRows.map((c) => [c.id, c.name]));
   const surveyorMap = new Map(surveyorRows.map((s) => [s.id, s.name]));

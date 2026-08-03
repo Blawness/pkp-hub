@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { FileIcon } from "lucide-react";
 import type { z } from "zod";
+import { EntityTimeline } from "@/components/audit/entity-timeline";
 import { DocumentUpload } from "@/components/documents/document-upload";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import {
@@ -13,11 +14,10 @@ import { PaymentForm } from "@/components/projects/payment-form";
 import { PhaseTimeline } from "@/components/projects/phase-timeline";
 import { ProjectMessages } from "@/components/projects/project-messages";
 import { ProjectSummary } from "@/components/projects/project-summary";
-import { EntityTimeline } from "@/components/audit/entity-timeline";
-import { listAuditForEntity } from "@/lib/actions/audit-logic";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { listAuditForEntity } from "@/lib/actions/audit-logic";
 import { getClientById } from "@/lib/actions/clients-logic";
 import { listCommentsForProject } from "@/lib/actions/comments-logic";
 import { listDocumentsForProject } from "@/lib/actions/documents-logic";
@@ -128,10 +128,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
   // klien proyek ini sendiri kalau kebetulan terarsip — meniru guard di
   // halaman `/[id]/edit` yang dihapus, supaya klien saat ini tidak hilang
   // diam-diam dari opsi dropdown.
-  const clientRows = await db
-    .select({ id: clients.id, name: clients.name })
-    .from(clients)
-    .where(or(isNull(clients.archivedAt), eq(clients.id, project.clientId)));
+  // Client directory is admin-only (`client.read`). The edit dialog is
+  // rendered only for `isAdmin`, so the full list is only fetched — and only
+  // passed into the RSC payload — for admins (SAST-001).
+  const clientRows = isAdmin
+    ? await db
+        .select({ id: clients.id, name: clients.name })
+        .from(clients)
+        .where(or(isNull(clients.archivedAt), eq(clients.id, project.clientId)))
+    : [];
 
   const phases = await listPhasesForProject(ctx, project.id);
   const progress = await getProjectProgress(ctx, project.id);
