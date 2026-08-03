@@ -1,3 +1,4 @@
+import { inArray } from "drizzle-orm";
 import { FileIcon } from "lucide-react";
 import { DocumentsTable } from "@/components/documents/documents-table";
 import { PetaView } from "@/components/map/peta-view";
@@ -14,7 +15,8 @@ import { listMapLayersForProject } from "@/lib/actions/maps-logic";
 import { getPaymentSummary, listPaymentsForProject } from "@/lib/actions/payments-logic";
 import { getPortalProgress, listPortalPhases } from "@/lib/actions/portal-logic";
 import { getStatusLogsForProject } from "@/lib/actions/projects-logic";
-import type { projects } from "@/lib/db/schema";
+import { db } from "@/lib/db";
+import { type projects, users } from "@/lib/db/schema";
 import { formatArea } from "@/lib/geo/area";
 import { surveyTypeLabel } from "@/lib/labels";
 import { todayString } from "@/lib/phases/derive";
@@ -53,6 +55,16 @@ export default async function PortalProjectDetailPage({
   // proyek klien lain berujung `notFound()` asli, bukan 500 terjemahan.
   const project = (await requireScopedRow(ctx, "project.read", id)) as typeof projects.$inferSelect;
   const statusLogs = await getStatusLogsForProject(project.id);
+  // BUG-005: riwayat status portal memakai nama aktor ASLI (sama seperti
+  // halaman staf), bukan string keras "PKP Hub".
+  const changedByIds = [...new Set(statusLogs.map((l) => l.changedById))];
+  const changedByUsers = changedByIds.length
+    ? await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(inArray(users.id, changedByIds))
+    : [];
+  const statusActorNameById = new Map(changedByUsers.map((u) => [u.id, u.name]));
   const phases = await listPortalPhases(ctx, project.id);
   const phaseProgress = await getPortalProgress(ctx, project.id);
   const mapLayerRows = await listMapLayersForProject(ctx, project.id);
@@ -112,7 +124,7 @@ export default async function PortalProjectDetailPage({
               id: log.id,
               fromStatus: log.fromStatus,
               toStatus: log.toStatus,
-              changedByName: "PKP Hub",
+              changedByName: statusActorNameById.get(log.changedById) ?? "PKP Hub",
               createdAt: log.createdAt,
             }))}
           />
