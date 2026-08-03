@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { AuditLogTable } from "@/components/audit/audit-log-table";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { ENTITY_TYPES, listAuditLogs } from "@/lib/actions/audit-logic";
+import { can } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Log Audit" };
@@ -11,6 +13,9 @@ type SearchParams = Promise<{ page?: string; entityType?: string }>;
 export default async function AuditLogPage(props: { searchParams: SearchParams }) {
   const searchParams = await props.searchParams;
   const ctx = await getRbacContext();
+  // `audit.read` superuser-only: admin yang mengetik URL ini harus
+  // dipantulkan dengan halus, bukan disuguhi 500 dari assertCan (BUG-003).
+  if (!can(ctx, "audit.read")) redirect("/dashboard/settings/users");
   const page = Math.max(1, parseInt(searchParams.page ?? "1", 10) || 1);
   const entityType = searchParams.entityType ?? undefined;
 

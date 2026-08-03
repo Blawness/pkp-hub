@@ -1,6 +1,8 @@
+import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/dashboard/page-header";
 import { SessionTable } from "@/components/sessions/session-table";
 import { listActiveSessions } from "@/lib/actions/session-logic";
+import { can } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 
 export const metadata = { title: "Sesi Aktif" };
@@ -12,6 +14,9 @@ export const dynamic = "force-dynamic";
  */
 export default async function SessionsPage() {
   const ctx = await getRbacContext();
+  // `session.read` superuser-only: admin yang mengetik URL ini harus
+  // dipantulkan dengan halus, bukan disuguhi 500 dari assertCan (BUG-003).
+  if (!can(ctx, "session.read")) redirect("/dashboard/settings/users");
   const rows = await listActiveSessions(ctx);
 
   return (
