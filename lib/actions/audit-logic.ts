@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { auditLog, users } from "@/lib/db/schema";
 import { assertCan } from "@/lib/rbac/can";
+import { requireScopedRow } from "@/lib/rbac/scoped-row";
 import type { RbacContext } from "@/lib/rbac/types";
 
 export type AuditLogRow = {
@@ -94,8 +95,19 @@ export async function listAuditForEntity(
   params: { entityType: string; entityId: string; limit?: number },
 ): Promise<AuditLogRow[]> {
   // Gate sesuai entitas — superuser dipersempit tidak perlu di sini.
-  if (params.entityType === "project") assertCan(ctx, "project.read");
-  else if (params.entityType === "client") assertCan(ctx, "client.read");
+  if (params.entityType === "project") {
+    assertCan(ctx, "project.read");
+    // Row-level scoping (SAST-002): `assertCan` is role-level only — a
+    // surveyor (scope `assigned`) must not read another project's timeline
+    // by passing an arbitrary entityId. `requireScopedRow` uses the SAME
+    // rbacFilter as the list path; out-of-scope ids yield an empty timeline
+    // instead of leaking rows.
+    try {
+      await requireScopedRow(ctx, "project.read", params.entityId);
+    } catch {
+      return [];
+    }
+  } else if (params.entityType === "client") assertCan(ctx, "client.read");
   else assertCan(ctx, "audit.read");
 
   const rows = await db
