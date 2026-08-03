@@ -531,6 +531,13 @@ export async function correctUsageForUser(
     .where(eq(equipmentUsage.id, input.usageId));
   if (!session) throw new Error("Sesi pakai tidak ditemukan.");
 
+  // BUG-002: membuka kembali sesi yang sudah ditutup (endedAt null) bisa
+  // menghasilkan DUA baris aktif untuk alat yang sama — unique index parsial
+  // `equipment_active_usage_uniq` hanya melindungi INSERT, bukan UPDATE ini.
+  if (session.endedAt && input.endedAt === null) {
+    throw new Error("Sesi yang sudah ditutup tidak bisa dibuka kembali.");
+  }
+
   const windowError = validateUsageWindow(input.startedAt, input.endedAt, new Date());
   if (windowError) throw new Error(windowError);
 
