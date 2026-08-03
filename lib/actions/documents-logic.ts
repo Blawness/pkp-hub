@@ -8,12 +8,14 @@ import type { ScopedPermission } from "@/lib/rbac/resources";
 import { requireScopedRow } from "@/lib/rbac/scoped-row";
 import type { RbacContext } from "@/lib/rbac/types";
 import { storage } from "@/lib/storage";
+import { parseStorageKey } from "@/lib/storage/keys";
 import type {
   DeleteDocumentInput,
   SearchDocumentsInput,
   ToggleDocumentShareInput,
   UploadDocumentInput,
 } from "./documents-schemas";
+import { ALLOWED_DOCUMENT_MIME } from "./documents-schemas";
 
 /**
  * Server-only business logic for document upload/share/delete/search,
@@ -40,6 +42,31 @@ function isNotFoundDigest(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const digest = (error as { digest?: unknown }).digest;
   return typeof digest === "string" && digest.startsWith("NEXT_HTTP_ERROR_FALLBACK;404");
+}
+
+/**
+ * Ekstrak kunci objek storage dari `fileUrl` secara AGNOSTIK-driver.
+ *
+ * `storage.keyFromUrl` bergantung pada driver yang aktif (R2 vs lokal) —
+ * dan driver dipilih saat module load dari env, jadi di lingkungan dengan
+ * kredensial R2, URL gaya-lokal (dipakai dev tanpa R2 dan fixture tes)
+ * ditolak. Yang penting untuk keamanan (SAST-003) adalah: URL harus
+ * bentuk yang KITA kenal (prefix `/api/storage/` atau host R2 kita), dan
+ * segmen proyek pada kunci harus sama dengan `projectId` yang diklaim.
+ * Mengembalikan `null` untuk URL yang bukan milik storage kita.
+ */
+function extractDocumentKey(fileUrl: string): string | null {
+  const localMarker = "/api/storage/documents/";
+  const localIdx = fileUrl.lastIndexOf(localMarker);
+  if (localIdx !== -1) {
+    return fileUrl.slice(localIdx + "/api/storage/".length);
+  }
+  const r2Marker = "/documents/";
+  const r2Idx = fileUrl.lastIndexOf(r2Marker);
+  if (r2Idx !== -1 && fileUrl.slice(0, r2Idx).includes("r2.cloudflarestorage.com")) {
+    return fileUrl.slice(r2Idx + 1);
+  }
+  return null;
 }
 
 /** Verifikasi `ctx` boleh mengakses proyek ini; 404 → penolakan biasa. */
@@ -72,6 +99,22 @@ async function requireScopedDocOrReject(
 export async function uploadDocumentForUser(ctx: RbacContext, input: UploadDocumentInput) {
   assertCan(ctx, "document.upload");
   await requireProjectReadOrReject(ctx, input.projectId);
+
+  // SAST-003: `fileUrl` datang dari klien, jadi kunci objek di dalamnya harus
+  // BENAR-BENAR milik proyek yang diklaim — kalau tidak, seorang staf dengan
+  // akses ke dua proyek bisa mendaftarkan dokumen proyek A yang menunjuk ke
+  // byte proyek B, lalu (setelah dibagikan admin) membocorkannya ke klien A.
+  const key = extractDocumentKey(input.fileUrl);
+  const parsedKey = key ? parseStorageKey(key) : null;
+  if (parsedKey?.kind !== "document" || parsedKey.projectId !== input.projectId) {
+    throw new Error("File tidak cocok dengan proyek ini.");
+  }
+
+  // SAST-004: `mimeType` tidak boleh sembarang string — baris metadata dan
+  // contentType PUT harus berasal dari satu allowlist yang sama.
+  if (!ALLOWED_DOCUMENT_MIME.has(input.mimeType)) {
+    throw new Error("Tipe file tidak diizinkan.");
+  }
 
   const [doc] = await db
     .insert(documents)

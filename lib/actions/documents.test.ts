@@ -128,7 +128,7 @@ describe("uploadDocumentForUser", () => {
         projectId: projectOther,
         name: "foto.jpg",
         category: "foto_lapangan",
-        fileUrl: "/api/storage/documents/x/foto.jpg",
+        fileUrl: `/api/storage/documents/${projectOther}/foto.jpg`,
         fileSize: 1024,
         mimeType: "image/jpeg",
       }),
@@ -143,12 +143,38 @@ describe("uploadDocumentForUser", () => {
       projectId: projectAssigned,
       name: "laporan.pdf",
       category: "laporan",
-      fileUrl: "/api/storage/documents/y/laporan.pdf",
+      fileUrl: `/api/storage/documents/${projectAssigned}/laporan.pdf`,
       fileSize: 2048,
       mimeType: "application/pdf",
     });
     expect(doc.projectId).toBe(projectAssigned);
     expect(doc.uploadedById).toBe(surveyorAssigned.id);
+  });
+
+  it("rejects a fileUrl whose storage key belongs to a different project (SAST-003)", async () => {
+    await expect(
+      uploadDocumentForUser(surveyorAssignedCtx, {
+        projectId: projectAssigned,
+        name: "cross-project.pdf",
+        category: "laporan",
+        fileUrl: `/api/storage/documents/${projectOther}/cross-project.pdf`,
+        fileSize: 1024,
+        mimeType: "application/pdf",
+      }),
+    ).rejects.toThrow("File tidak cocok dengan proyek ini.");
+  });
+
+  it("rejects a non-allowlisted mimeType (SAST-004)", async () => {
+    await expect(
+      uploadDocumentForUser(surveyorAssignedCtx, {
+        projectId: projectAssigned,
+        name: "evil.svg",
+        category: "lainnya",
+        fileUrl: `/api/storage/documents/${projectAssigned}/evil.svg`,
+        fileSize: 1024,
+        mimeType: "image/svg+xml",
+      }),
+    ).rejects.toThrow("Tipe file tidak diizinkan.");
   });
 });
 
@@ -158,7 +184,7 @@ describe("toggleDocumentShareForUser", () => {
       projectId: projectAssigned,
       name: "sertifikat.pdf",
       category: "sertifikat",
-      fileUrl: "/api/storage/documents/z/sertifikat.pdf",
+      fileUrl: `/api/storage/documents/${projectAssigned}/sertifikat.pdf`,
       fileSize: 512,
       mimeType: "application/pdf",
     });
@@ -176,7 +202,7 @@ describe("toggleDocumentShareForUser", () => {
       projectId: projectAssigned,
       name: "data.csv",
       category: "data_mentah",
-      fileUrl: "/api/storage/documents/w/data.csv",
+      fileUrl: `/api/storage/documents/${projectAssigned}/data.csv`,
       fileSize: 256,
       mimeType: "text/csv",
     });
@@ -197,7 +223,7 @@ describe("searchDocumentsForUser: cross-project scoping", () => {
       projectId: projectOther,
       name: "other-project-doc.pdf",
       category: "laporan",
-      fileUrl: "/api/storage/documents/v/other-project-doc.pdf",
+      fileUrl: `/api/storage/documents/${projectOther}/other-project-doc.pdf`,
       fileSize: 128,
       mimeType: "application/pdf",
     });

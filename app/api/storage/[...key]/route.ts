@@ -34,7 +34,9 @@ const MIME_BY_EXT: Record<string, string> = {
   jpeg: "image/jpeg",
   gif: "image/gif",
   webp: "image/webp",
-  svg: "image/svg+xml",
+  // `svg` sengaja TIDAK ada (SAST-004): SVG bisa membawa script dan akan
+  // dieksekusi kalau dibuka langsung di origin aplikasi. Ekstensi yang tidak
+  // dikenal jatuh ke octet-stream (diunduh, bukan dirender).
   csv: "text/csv",
   txt: "text/plain",
   doc: "application/msword",

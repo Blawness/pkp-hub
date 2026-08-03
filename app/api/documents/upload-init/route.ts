@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
-import { uploadInitInputSchema } from "@/lib/actions/documents-schemas";
+import { ALLOWED_DOCUMENT_MIME, uploadInitInputSchema } from "@/lib/actions/documents-schemas";
 import { can } from "@/lib/rbac/can";
 import { getRbacContext } from "@/lib/rbac/context";
 import { requireScopedRow } from "@/lib/rbac/scoped-row";
@@ -50,22 +50,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ukuran file maksimum 100MB." }, { status: 400 });
   }
 
-  const ALLOWED_MIME = new Set([
-    "application/pdf",
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/tiff",
-    "text/csv",
-    "application/vnd.ms-excel",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    "application/vnd.ms-word",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "application/zip",
-    "application/x-zip-compressed",
-    "application/octet-stream",
-  ]);
-  if (!ALLOWED_MIME.has(contentType)) {
+  if (!ALLOWED_DOCUMENT_MIME.has(contentType)) {
     return NextResponse.json({ error: "Tipe file tidak diizinkan." }, { status: 400 });
   }
 

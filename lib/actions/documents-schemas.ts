@@ -16,6 +16,28 @@ export const documentCategorySchema = z.enum([
 ]);
 export type DocumentCategory = z.infer<typeof documentCategorySchema>;
 
+/**
+ * Tipe file yang boleh diunggah sebagai dokumen. Satu-satunya sumber
+ * kebenaran — dipakai BAIK oleh `/api/documents/upload-init` (untuk
+ * `contentType` PUT) MAUPUN oleh `uploadDocumentForUser` (untuk `mimeType`
+ * baris metadata), supaya keduanya tidak bisa melenceng (SAST-004).
+ */
+export const ALLOWED_DOCUMENT_MIME = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/tiff",
+  "text/csv",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-word",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/zip",
+  "application/x-zip-compressed",
+  "application/octet-stream",
+]);
+
 /** Metadata persisted AFTER the bytes have already landed in storage. */
 export const uploadDocumentInputSchema = z.object({
   projectId: z.uuid(),

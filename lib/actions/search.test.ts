@@ -152,7 +152,7 @@ beforeAll(async () => {
     projectId: projectP1Id,
     name: "doc-p1.pdf",
     category: "laporan",
-    fileUrl: "/api/storage/documents/p1/doc-p1.pdf",
+    fileUrl: `/api/storage/documents/${projectP1Id}/doc-p1.pdf`,
     fileSize: 1024,
     mimeType: "application/pdf",
   });
@@ -160,7 +160,7 @@ beforeAll(async () => {
     projectId: projectP2Id,
     name: "doc-p2.pdf",
     category: "laporan",
-    fileUrl: "/api/storage/documents/p2/doc-p2.pdf",
+    fileUrl: `/api/storage/documents/${projectP2Id}/doc-p2.pdf`,
     fileSize: 2048,
     mimeType: "application/pdf",
   });
