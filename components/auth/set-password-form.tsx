@@ -12,7 +12,10 @@ import { authClient } from "@/lib/auth-client";
 
 const setPasswordSchema = z
   .object({
-    password: z.string().min(8, "Password must be at least 8 characters."),
+    // Server policy is minPasswordLength: 10 (lib/auth.ts). The client must
+    // mirror it, otherwise an 8–9 char password passes the form and fails
+    // with a raw Better Auth error (BUG-001).
+    password: z.string().min(10, "Password must be at least 10 characters."),
     confirmPassword: z.string().min(1, "Confirm your password."),
   })
   .refine((values) => values.password === values.confirmPassword, {
