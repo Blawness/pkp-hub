@@ -297,6 +297,14 @@ export async function recordPaymentForUser(
     throw new Error("Isi nilai proyek dulu sebelum mencatat pembayaran.");
   }
 
+  // BUG-006: tahun nomor kwitansi diambil dari string `paidAt` (lihat
+  // buildReceiptNumber) — jadi tanggal di masa depan akan menghasilkan nomor
+  // kwitansi tahun depan. Kemunduran waktu (pencatatan tertunda) tetap sah.
+  const paidAtYear = Number(input.paidAt.slice(0, 4));
+  if (paidAtYear > new Date().getFullYear()) {
+    throw new Error("Tanggal pembayaran tidak boleh di masa depan.");
+  }
+
   const payment = await db.transaction(async (tx) => {
     const seq = await nextReceiptSeq(tx);
     const [row] = await tx
