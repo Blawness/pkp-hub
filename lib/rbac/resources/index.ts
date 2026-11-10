@@ -17,6 +17,7 @@ import { roleResource } from "./role";
 import { searchResource } from "./search";
 import { sessionResource } from "./session";
 import { settingsResource } from "./settings";
+import { socialResource } from "./social";
 import { storageResource } from "./storage";
 import { userResource } from "./user";
 
@@ -44,6 +45,7 @@ export const RESOURCES = {
   search: searchResource,
   session: sessionResource,
   settings: settingsResource,
+  social: socialResource,
   storage: storageResource,
   user: userResource,
 } as const;

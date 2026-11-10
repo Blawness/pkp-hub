@@ -3,6 +3,7 @@ import {
   FileTextIcon,
   FolderKanbanIcon,
   LayoutDashboardIcon,
+  MegaphoneIcon,
   SettingsIcon,
   UsersIcon,
   WrenchIcon,
@@ -78,6 +79,13 @@ export function buildLinks(can: CanFn): NavLink[] {
       label: "Klien",
       icon: UsersIcon,
       permission: "client.read",
+    },
+    {
+      segment: "sosmed",
+      href: "/dashboard/sosmed",
+      label: "Sosmed",
+      icon: MegaphoneIcon,
+      permission: "social.read",
     },
     {
       segment: "settings",

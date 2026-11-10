@@ -52,6 +52,7 @@ optional for Preview — see §4).
 | `R2_SECRET_ACCESS_KEY` | required for prod | Shown once when you create the R2 API token above — copy it immediately. |
 | `R2_BUCKET` | required for prod | The bucket name you create in R2 → Create bucket for PKP Hub documents. |
 | `RESEND_API_KEY` | required only if client-portal invite emails are used | Resend dashboard → API Keys → create a key. Needs a verified sending domain in Resend for real delivery. |
+| `SOSMED_SYNC_TOKEN` | required only for tracking sosmed | Generate locally: `openssl rand -base64 32`. Dipakai pipeline lokal sebagai `Authorization: Bearer <token>` ke `POST /api/sosmed/sync`. Kosong = route menolak semua panggilan (503). |
 
 Notes:
 - `env.ts` (via `@t3-oss/env-nextjs`) validates all of these at build time.

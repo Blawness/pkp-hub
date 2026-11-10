@@ -16,6 +16,11 @@ export const env = createEnv({
     R2_SECRET_ACCESS_KEY: z.string().min(1).optional(),
     R2_BUCKET: z.string().min(1).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
+    /**
+     * Token mesin untuk `POST /api/sosmed/sync` (pipeline lokal → Hub).
+     * Opsional: tanpa token, route menolak semua panggilan (fail-closed).
+     */
+    SOSMED_SYNC_TOKEN: z.string().min(32).optional(),
   },
   client: {
     NEXT_PUBLIC_APP_URL: z.url(),
@@ -29,6 +34,7 @@ export const env = createEnv({
     R2_SECRET_ACCESS_KEY: process.env.R2_SECRET_ACCESS_KEY,
     R2_BUCKET: process.env.R2_BUCKET,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    SOSMED_SYNC_TOKEN: process.env.SOSMED_SYNC_TOKEN,
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
   },
   emptyStringAsUndefined: true,

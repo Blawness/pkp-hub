@@ -659,3 +659,146 @@ export const commentsRelations = relations(comments, ({ one }) => ({
   project: one(projects, { fields: [comments.projectId], references: [projects.id] }),
   author: one(users, { fields: [comments.authorId], references: [users.id] }),
 }));
+
+/* -------------------------------------------------------------------------- */
+/* Tracking pipeline sosmed — postingan & komentar reachout                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Data ini DI-PUSH oleh pipeline lokal (`_shared/sosmed-pipeline/komentar`)
+ * lewat `POST /api/sosmed/sync`, bukan diketik di Hub. Karena itu setiap baris
+ * membawa `externalId` — kunci stabil dari sumbernya (slug folder post di
+ * `posts/`, atau id item `k-YYMMDD-xxxx` di `queue.json`) — dan unique index
+ * `(brand, externalId)` membuat sync berulang idempoten: kirim ulang batch yang
+ * sama tidak pernah menggandakan baris.
+ */
+export const socialBrand = pgEnum("social_brand", ["pkp", "trihuni"]);
+
+/** Sama dengan enum `status` di `Sosmed Agent/schema/draft.schema.json`. */
+export const socialPostStatus = pgEnum("social_post_status", [
+  "idea",
+  "drafted",
+  "in_review",
+  "revision",
+  "approved",
+  "scheduled",
+  "published",
+  "rejected",
+  "skipped",
+]);
+
+export const socialCommentMode = pgEnum("social_comment_mode", ["balas", "sapa"]);
+export const socialCommentClass = pgEnum("social_comment_class", [
+  "pertanyaan",
+  "lead",
+  "pujian",
+  "kritik",
+  "spam",
+  "internal",
+  "lain",
+]);
+/** Sama dengan status antrean engine komentar (`MODES`/`STATUSES` di `store.mjs`). */
+export const socialCommentStatus = pgEnum("social_comment_status", [
+  "drafted",
+  "approved",
+  "posted",
+  "skipped",
+  "failed",
+]);
+
+export const socialSyncStatus = pgEnum("social_sync_status", ["ok", "partial", "failed"]);
+
+/**
+ * Satu baris = satu post IG di pipeline konten. `status` mengikuti draft.json;
+ * `postedAt` + `permalink` diisi saat post benar-benar tayang. `caption` disimpan
+ * sebagai teks (bukan link storage) supaya halaman Hub bisa menampilkan isi yang
+ * tayang tanpa mengakses folder lokal.
+ */
+export const socialPosts = pgTable(
+  "social_post",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brand: socialBrand("brand").notNull(),
+    externalId: text("external_id").notNull(),
+    title: text("title").notNull(),
+    pillar: text("pillar"),
+    status: socialPostStatus("status").notNull().default("drafted"),
+    version: integer("version").notNull().default(1),
+    scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    permalink: text("permalink"),
+    caption: text("caption"),
+    slideCount: integer("slide_count"),
+    /** Kapan terakhir baris ini ditimpa sync. Bukan tanggal post. */
+    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("social_post_brand_external_id_key").on(t.brand, t.externalId),
+    index("social_post_status_idx").on(t.status),
+    index("social_post_posted_at_idx").on(t.postedAt),
+  ],
+);
+
+/**
+ * Satu baris = satu komentar reachout dari engine komentar, baik balasan ke
+ * komentar orang (`mode: balas`) maupun komentar keluar ke akun lain
+ * (`mode: sapa`). `reason` menyimpan alasan skip/failed apa adanya dari log.
+ */
+export const socialComments = pgTable(
+  "social_comment",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brand: socialBrand("brand").notNull(),
+    externalId: text("external_id").notNull(),
+    mode: socialCommentMode("mode").notNull(),
+    class: socialCommentClass("class").notNull(),
+    status: socialCommentStatus("status").notNull(),
+    /** Handle akun yang dikomentari (mode sapa) atau pemilik post (mode balas). */
+    targetOwner: text("target_owner"),
+    postId: text("post_id"),
+    permalink: text("permalink"),
+    sourceAuthor: text("source_author"),
+    sourceText: text("source_text"),
+    draft: text("draft").notNull(),
+    reason: text("reason"),
+    /** Waktu komentar sumber dibuat di IG, bukan waktu ingest. */
+    commentCreatedAt: timestamp("comment_created_at", { withTimezone: true }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("social_comment_brand_external_id_key").on(t.brand, t.externalId),
+    index("social_comment_status_idx").on(t.status),
+    index("social_comment_posted_at_idx").on(t.postedAt),
+    index("social_comment_target_owner_idx").on(t.targetOwner),
+  ],
+);
+
+/**
+ * Jejak setiap panggilan sync: berapa baris yang masuk, kapan, dan pesan error
+ * kalau gagal. Berguna saat pipeline lokal dan Hub tidak sinkron — tanpa tabel
+ * ini, "data belum masuk" tidak bisa dibedakan dari "push-nya tidak pernah
+ * terjadi".
+ */
+export const socialSyncRuns = pgTable(
+  "social_sync_run",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    brand: socialBrand("brand").notNull(),
+    /** Handle akun yang dilaporkan pipeline pada sync ini, mis. `@presisikonsulindoprima`. */
+    handle: text("handle").notNull(),
+    source: text("source"),
+    status: socialSyncStatus("status").notNull().default("ok"),
+    postsUpserted: integer("posts_upserted").notNull().default(0),
+    commentsUpserted: integer("comments_upserted").notNull().default(0),
+    note: text("note"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+  },
+  (t) => [index("social_sync_run_brand_started_at_idx").on(t.brand, t.startedAt)],
+);

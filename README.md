@@ -3,11 +3,14 @@
 Internal management dashboard for a land/building survey studio: manage
 clients, survey projects, measurement maps, a document archive, light
 finances, plus a read-only portal for clients to check their own project
-status and shared documents.
+status and shared documents. Also tracks the social-media pipeline (Instagram
+posts and comment outreach) pushed in from the local `_shared/sosmed-pipeline`
+engine.
 
 See `PRD.md` for the full product spec (features, data model, server
 actions, environment variables) and `tasks.md` for the phase-by-phase build
-log.
+log. Tracking sosmed punya spec sendiri:
+`docs/superpowers/specs/2026-11-10-tracking-sosmed-design.md`.
 
 ## Stack
 
@@ -41,6 +44,8 @@ cp .env.example .env.local
 #   R2_* / RESEND_API_KEY  — optional in dev; omit and the app falls back to
 #                            a local-disk storage driver and logs invite
 #                            links to the console instead of emailing them
+#   SOSMED_SYNC_TOKEN      — optional; token mesin untuk POST /api/sosmed/sync
+#                            (pipeline lokal → Hub). Kosong = route mati.
 
 pnpm db:migrate     # apply migrations to DATABASE_URL
 pnpm db:seed        # seed demo data — NON-destructive: skips if already seeded
